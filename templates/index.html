@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Minecraft Bedrock Server Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+<div class="container">
+    <header>
+        <h1>Bedrock Server Dashboard</h1>
+        <p>Headless Server Controller Interface</p>
+    </header>
+
+    <div class="tab-bar">
+        <button class="tab-btn active" id="tabHomeBtn" onclick="showTab('home')">Home</button>
+        <button class="tab-btn" id="tabWorldsBtn" onclick="showTab('worlds')">Worlds</button>
+        <button class="tab-btn" id="tabPlayersBtn" onclick="showTab('players')">Players</button>
+        <button class="tab-btn" id="tabAddonsBtn" onclick="showTab('addons')">Addons</button>
+        <button class="tab-btn" id="tabPropertiesBtn" onclick="showTab('properties')">Properties</button>
+        <button class="tab-btn" id="tabConsoleBtn" onclick="showTab('console')">Console Logs</button>
+        <button class="tab-btn" id="tabUpdateBtn" onclick="showTab('update')">Update</button>
+        <button class="tab-btn" id="tabSettingsBtn" onclick="showTab('settings')">Settings</button>
+    </div>
+
+    <!-- Home Tab -->
+    <div id="tabHome" class="tab-content">
+        <div class="status-card">
+            <div class="status-info">
+                <h3>Server Status</h3>
+                <h2 id="statusActiveWorld">Active World: Loading...</h2>
+            </div>
+            <div class="status-badge" id="statusBadge">
+                <span class="status-dot"></span>
+                <span id="statusText">Checking...</span>
+            </div>
+        </div>
+
+        <div class="btn-grid">
+            <button class="action-btn start" onclick="serverAction('start')">Start Server</button>
+            <button class="action-btn stop" onclick="serverAction('stop')">Stop Server</button>
+            <button class="action-btn restart" onclick="serverAction('restart')">Restart Server</button>
+        </div>
+
+        <div class="card">
+            <h3>Quick Console Command</h3>
+            <div class="cmd-box">
+                <input type="text" id="homeCmdInput" placeholder="Enter server command...">
+                <button onclick="sendConsoleCommand('homeCmdInput')">Send</button>
+            </div>
+            <div id="homeCmdMsg" class="msg-alert"></div>
+        </div>
+    </div>
+
+    <!-- Worlds Tab -->
+    <div id="tabWorlds" class="tab-content" style="display:none">
+        <div class="card">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                <h3>Worlds List</h3>
+                <button class="action-btn start" style="padding:6px 16px; font-size:0.85em;" onclick="openModal('createWorldModal')">+ Create World</button>
+            </div>
+            <div id="worldsList">Loading...</div>
+        </div>
+
+        <div class="card">
+            <h3>Import World (.zip or .mcworld)</h3>
+            <div class="upload-zone" id="worldUploadZone" onclick="document.getElementById('worldFile').click()">
+                <p>Drag & drop your world archive here, or click to browse</p>
+                <input type="file" id="worldFile" style="display:none;" onchange="uploadWorldFile(this.files[0])">
+            </div>
+            <div id="worldUploadMsg" class="msg-alert"></div>
+        </div>
+
+        <div class="card" id="worldBackupsCard" style="display:none;">
+            <h3>World Backups</h3>
+            <div id="backupsList">Loading...</div>
+        </div>
+    </div>
+
+    <!-- Players Tab -->
+    <div id="tabPlayers" class="tab-content" style="display:none">
+        <!-- Cheat Commands Card -->
+        <div class="card" id="cheatCommandsCard">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+                <div>
+                    <h3 style="margin:0;">Cheat Commands</h3>
+                    <span id="cheatsStatusBadge" style="font-size:0.8em;"></span>
+                </div>
+                <div id="cheatsWorldLabel" style="font-size:0.85em; color:var(--text-muted);"></div>
+            </div>
+
+            <div id="cheatCommandsPanel">
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom:12px;">
+                    <!-- Give Item -->
+                    <div style="background:rgba(0,0,0,0.15); border:1px solid var(--border-color); border-radius:10px; padding:14px;">
+                        <div style="font-weight:600; font-size:0.9em; margin-bottom:10px;">🎁 Give Item</div>
+                        <input class="cheat-input" id="give_player" placeholder="Player name" style="margin-bottom:6px;">
+                        <input class="cheat-input" id="give_item" placeholder="Item (e.g. minecraft:diamond)">
+                        <div style="display:flex; gap:6px; margin-top:8px; align-items:center;">
+                            <input class="cheat-input" id="give_amount" type="number" value="1" min="1" style="width:70px;">
+                            <button class="action-btn start cheat-btn" onclick="sendCheatCmd('give')">Give</button>
+                        </div>
+                    </div>
+                    <!-- Teleport -->
+                    <div style="background:rgba(0,0,0,0.15); border:1px solid var(--border-color); border-radius:10px; padding:14px;">
+                        <div style="font-weight:600; font-size:0.9em; margin-bottom:10px;">📍 Teleport</div>
+                        <input class="cheat-input" id="tp_player" placeholder="Player to teleport" style="margin-bottom:6px;">
+                        <div style="display:flex; gap:4px;">
+                            <input class="cheat-input" id="tp_x" placeholder="X" style="width:50px;">
+                            <input class="cheat-input" id="tp_y" placeholder="Y" style="width:50px;">
+                            <input class="cheat-input" id="tp_z" placeholder="Z" style="width:50px;">
+                        </div>
+                        <button class="action-btn start cheat-btn" style="margin-top:8px;" onclick="sendCheatCmd('tp')">Teleport</button>
+                    </div>
+                    <!-- Kill Entity -->
+                    <div style="background:rgba(0,0,0,0.15); border:1px solid var(--border-color); border-radius:10px; padding:14px;">
+                        <div style="font-weight:600; font-size:0.9em; margin-bottom:10px;">💀 Kill Player</div>
+                        <input class="cheat-input" id="kill_player" placeholder="Player name (or @a)">
+                        <button class="action-btn" style="background:var(--danger); margin-top:8px; width:100%;" onclick="sendCheatCmd('kill')">Kill</button>
+                    </div>
+                    <!-- Effect -->
+                    <div style="background:rgba(0,0,0,0.15); border:1px solid var(--border-color); border-radius:10px; padding:14px;">
+                        <div style="font-weight:600; font-size:0.9em; margin-bottom:10px;">✨ Apply Effect</div>
+                        <input class="cheat-input" id="effect_player" placeholder="Player name" style="margin-bottom:6px;">
+                        <input class="cheat-input" id="effect_name" placeholder="Effect (e.g. speed)" style="margin-bottom:6px;">
+                        <div style="display:flex; gap:4px;">
+                            <input class="cheat-input" id="effect_duration" placeholder="Dur (s)" type="number" value="30">
+                            <input class="cheat-input" id="effect_level" placeholder="Lvl" type="number" value="1">
+                        </div>
+                        <button class="action-btn start cheat-btn" style="margin-top:8px;" onclick="sendCheatCmd('effect')">Apply</button>
+                    </div>
+                    <!-- Time -->
+                    <div style="background:rgba(0,0,0,0.15); border:1px solid var(--border-color); border-radius:10px; padding:14px;">
+                        <div style="font-weight:600; font-size:0.9em; margin-bottom:10px;">🌙 Set Time</div>
+                        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                            <button class="action-btn start cheat-btn" onclick="sendRawCmd('time set day')">Day</button>
+                            <button class="action-btn start cheat-btn" onclick="sendRawCmd('time set night')">Night</button>
+                            <button class="action-btn start cheat-btn" onclick="sendRawCmd('time set noon')">Noon</button>
+                            <button class="action-btn start cheat-btn" onclick="sendRawCmd('time set midnight')">Midnight</button>
+                        </div>
+                    </div>
+                    <!-- Weather -->
+                    <div style="background:rgba(0,0,0,0.15); border:1px solid var(--border-color); border-radius:10px; padding:14px;">
+                        <div style="font-weight:600; font-size:0.9em; margin-bottom:10px;">🌦 Set Weather</div>
+                        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                            <button class="action-btn start cheat-btn" onclick="sendRawCmd('weather clear')">Clear</button>
+                            <button class="action-btn start cheat-btn" onclick="sendRawCmd('weather rain')">Rain</button>
+                            <button class="action-btn start cheat-btn" onclick="sendRawCmd('weather thunder')">Thunder</button>
+                        </div>
+                    </div>
+                </div>
+                <div id="cheatCmdMsg" class="msg-alert" style="margin-top:0;"></div>
+            </div>
+        </div>
+
+        <!-- Players List Card -->
+        <div class="card">
+            <h3>Online &amp; Historical Players</h3>
+            <div id="playersList">Loading...</div>
+        </div>
+
+        <!-- Allowlist Card -->
+        <div class="card">
+            <h3>Allowlist</h3>
+            <p style="font-size:0.85em; color:var(--text-muted); margin-bottom:12px;">Players in this list are allowed to connect when the server has <strong>allow-list=true</strong>. Banning a player removes them from here.</p>
+            <div id="allowlistContainer">Loading...</div>
+        </div>
+    </div>
+
+    <!-- Addons Tab -->
+    <div id="tabAddons" class="tab-content" style="display:none">
+        <div class="card">
+            <h3>Install Resource/Behavior Packs (.zip or .mcpack)</h3>
+            <div class="upload-zone" id="uploadZone" onclick="document.getElementById('addonFile').click()">
+                <p>Drag & drop your addon file here, or click to browse</p>
+                <input type="file" id="addonFile" style="display:none;" onchange="uploadAddonFile(this.files[0])">
+            </div>
+            <div id="uploadMsg" class="msg-alert"></div>
+        </div>
+
+        <div class="card">
+            <h3>Pack Management</h3>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px;">
+                <div>
+                    <h4>Behavior Packs</h4>
+                    <div id="behaviorPacksList" style="margin-top:10px;"></div>
+                </div>
+                <div>
+                    <h4>Resource Packs</h4>
+                    <div id="resourcePacksList" style="margin-top:10px;"></div>
+                </div>
+            </div>
+            <button class="action-btn start" style="margin-top:20px; width:100%;" onclick="applyAddonsToWorld()">Apply Selected Packs to Active World</button>
+            <div id="addonApplyMsg" class="msg-alert"></div>
+        </div>
+    </div>
+
+    <!-- Properties Tab -->
+    <div id="tabProperties" class="tab-content" style="display:none">
+        <div class="card">
+            <h3>Server properties</h3>
+            <form id="propertiesForm" style="display:grid; grid-template-columns: 1fr 1fr; gap:16px;"></form>
+            <button class="action-btn start" style="margin-top:20px; width:100%;" onclick="saveProperties()">Save Server Properties</button>
+            <div id="propertiesMsg" class="msg-alert"></div>
+        </div>
+    </div>
+
+    <!-- Console Logs Tab -->
+    <div id="tabConsole" class="tab-content" style="display:none">
+        <div class="card">
+            <h3>Server Terminal Logs</h3>
+            <pre class="log-output" id="terminalLogs">Loading output logs...</pre>
+            <div class="cmd-box">
+                <input type="text" id="consoleCmdInput" placeholder="Enter server command...">
+                <button onclick="sendConsoleCommand('consoleCmdInput')">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Update Tab -->
+    <div id="tabUpdate" class="tab-content" style="display:none">
+        <div class="card">
+            <h3>BDS Version Update Installer</h3>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px; margin-bottom: 20px;">
+                <div class="form-group">
+                    <label>Current running Bedrock Server version:</label>
+                    <h3 id="currentServerVersion" style="color:var(--primary); font-size:1.4em;">Loading...</h3>
+                </div>
+                <div class="form-group">
+                    <label>Latest available version on Minecraft.net:</label>
+                    <h3 id="latestServerVersion" style="color:var(--success); font-size:1.4em;">Loading...</h3>
+                </div>
+            </div>
+            
+            <button class="action-btn start" id="btnTriggerUpdate" style="width:100%; display:none;" onclick="triggerServerUpdate()">Upgrade Server to Latest Version</button>
+            
+            <!-- Stepper Container -->
+            <div class="stepper" id="updateStepper" style="display:none;">
+                <!-- Step 1: Download -->
+                <div class="step-item pending" id="stepItem_download">
+                    <div class="step-icon" id="stepIcon_download">
+                        <!-- Pending state icon (default empty circle) -->
+                    </div>
+                    <div class="step-content">
+                        <div class="step-title">Download Update Package</div>
+                        <div class="step-desc" id="stepDesc_download">Waiting to download...</div>
+                        <div class="step-console" id="stepConsole_download" style="display:none;"></div>
+                    </div>
+                </div>
+
+                <!-- Step 2: Stop Server -->
+                <div class="step-item pending" id="stepItem_stopping">
+                    <div class="step-icon" id="stepIcon_stopping"></div>
+                    <div class="step-content">
+                        <div class="step-title">Shutdown Dedicated Server</div>
+                        <div class="step-desc" id="stepDesc_stopping">Waiting to stop server...</div>
+                        <div class="step-console" id="stepConsole_stopping" style="display:none;"></div>
+                    </div>
+                </div>
+
+                <!-- Step 3: Extract -->
+                <div class="step-item pending" id="stepItem_extracting">
+                    <div class="step-icon" id="stepIcon_extracting"></div>
+                    <div class="step-content">
+                        <div class="step-title">Extract & Overwrite Binaries</div>
+                        <div class="step-desc" id="stepDesc_extracting">Waiting to extract files...</div>
+                        <div class="step-console" id="stepConsole_extracting" style="display:none;"></div>
+                    </div>
+                </div>
+
+                <!-- Step 4: Finalize & Launch -->
+                <div class="step-item pending" id="stepItem_restarting">
+                    <div class="step-icon" id="stepIcon_restarting"></div>
+                    <div class="step-content">
+                        <div class="step-title">Finalize & Launch Server</div>
+                        <div class="step-desc" id="stepDesc_restarting">Waiting to start updated server...</div>
+                        <div class="step-console" id="stepConsole_restarting" style="display:none;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Success Checkmark Draw Panel -->
+            <div class="success-checkmark-card" id="updateSuccessCard" style="display:none;">
+                <svg class="large-checkmark-svg" viewBox="0 0 52 52">
+                    <circle class="large-checkmark-circle" cx="26" cy="26" r="25"/>
+                    <path class="large-checkmark-check" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
+                </svg>
+                <h3 style="color:var(--success); border:none; padding:0; margin-bottom:10px;">Server Updated Successfully!</h3>
+                <p style="color:var(--text-muted); font-size:0.95em; margin-bottom:20px;">All Bedrock Dedicated Server files have been upgraded to the latest version.</p>
+                <button class="action-btn start" style="margin:0 auto; padding:10px 24px;" onclick="checkVersion()">Back to Update Dashboard</button>
+            </div>
+            
+            <div id="updateMsg" class="msg-alert" style="margin-top:16px;"></div>
+        </div>
+    </div>
+
+    <!-- Settings Tab -->
+    <div id="tabSettings" class="tab-content" style="display:none">
+        <div class="card">
+            <h3>Headless Manager Settings</h3>
+            <form id="settingsForm">
+                <div class="form-group">
+                    <label>Auto-start Bedrock Server on manager startup:</label>
+                    <select id="settingAutoStart">
+                        <option value="true">Enabled</option>
+                        <option value="false">Disabled</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Backup Frequency:</label>
+                    <input type="text" id="settingBackupFreq" placeholder="e.g. 1 hour, 12 hours">
+                </div>
+                <div class="form-group">
+                    <label>Max backups to keep (0 = unlimited):</label>
+                    <input type="number" id="settingMaxBackups">
+                </div>
+                <button class="action-btn start" style="width:100%;" type="button" onclick="saveSettings()">Save Settings</button>
+            </form>
+            <div id="settingsMsg" class="msg-alert"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Create World -->
+<div class="modal" id="createWorldModal">
+    <div class="modal-content">
+        <h3>Create New World</h3>
+        <div class="form-group" style="margin-top:16px;">
+            <label>World Name:</label>
+            <input type="text" id="newWorldName" placeholder="e.g. Survival World">
+        </div>
+        <div class="form-group">
+            <label>World Seed (optional):</label>
+            <input type="text" id="newWorldSeed" placeholder="Leave blank for random seed">
+        </div>
+        <div class="modal-buttons">
+            <button class="btn-secondary" onclick="closeModal('createWorldModal')">Cancel</button>
+            <button class="btn-primary" onclick="createWorld()">Create</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Player History -->
+<div class="modal" id="playerHistoryModal">
+    <div class="modal-content" style="max-width: 600px;">
+        <h3 id="historyModalTitle">Player Session History</h3>
+        <div style="max-height: 300px; overflow-y: auto; margin-top: 16px;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 0.9em; text-align: left;">
+                <thead>
+                    <tr style="border-bottom: 2px solid var(--border-color); color: var(--text-muted); font-size:0.85em;">
+                        <th style="padding: 8px;">Session Start</th>
+                        <th style="padding: 8px;">Session End</th>
+                        <th style="padding: 8px;">Duration</th>
+                        <th style="padding: 8px;">World</th>
+                    </tr>
+                </thead>
+                <tbody id="historyTableBody">
+                    <!-- History rows will go here -->
+                </tbody>
+            </table>
+        </div>
+        <div class="modal-buttons">
+            <button class="btn-primary" onclick="closeModal('playerHistoryModal')">Close</button>
+        </div>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

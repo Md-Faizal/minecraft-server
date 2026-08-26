@@ -1,0 +1,5 @@
+{
+  "auto_start": false,
+  "backup_frequency": "1 hour",
+  "max_backups": 10
+}
