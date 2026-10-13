@@ -1,799 +1,990 @@
-let playersInterval = null;
-    let playersSecTimer = null;
+/**
+ * Minecraft Bedrock Server Management Dashboard
+ * Zentra Design System & Buffed Remote Terminal Controller
+ */
 
-    // Tab controller
-    function showTab(tabId) {
-        document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
-        document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
-        
-        document.getElementById('tab' + tabId.charAt(0).toUpperCase() + tabId.slice(1)).style.display = 'block';
-        document.getElementById('tab' + tabId.charAt(0).toUpperCase() + tabId.slice(1) + 'Btn').classList.add('active');
+// Global State
+let currentTab = 'home';
+let autoScroll = true;
+let consoleFilter = 'all';
+let searchQuery = '';
+let commandHistory = JSON.parse(localStorage.getItem('bds_cmd_history') || '[]');
+let historyIndex = -1;
+let rawLogsCache = [];
+let pollInterval = 2000;
+let pollTimer = null;
 
-        // Stop polling by default when leaving tabs
-        if (tabId !== 'console') stopConsolePolling();
-        if (tabId !== 'players') stopPlayersPolling();
+// Minecraft Bedrock Common Commands for Autocomplete
+const BDS_COMMANDS = [
+    { cmd: "list", desc: "List all connected players" },
+    { cmd: "save-all", desc: "Save server state to disk" },
+    { cmd: "whitelist on", desc: "Enable allowlist mode" },
+    { cmd: "whitelist off", desc: "Disable allowlist mode" },
+    { cmd: "whitelist reload", desc: "Reload allowlist.json from disk" },
+    { cmd: "time set day", desc: "Set world time to 1000 (day)" },
+    { cmd: "time set night", desc: "Set world time to 13000 (night)" },
+    { cmd: "weather clear", desc: "Clear rain and thunderstorms" },
+    { cmd: "weather rain", desc: "Start rain downfall" },
+    { cmd: "gamerule showcoordinates true", desc: "Enable coordinate display" },
+    { cmd: "gamerule keepinventory true", desc: "Prevent losing items on death" },
+    { cmd: "gamerule mobgriefing false", desc: "Prevent creepers breaking blocks" },
+    { cmd: "gamemode survival", desc: "Set default gamemode to survival" },
+    { cmd: "gamemode creative", desc: "Set default gamemode to creative" },
+    { cmd: "kick", desc: "Kick player from server" },
+    { cmd: "tp", desc: "Teleport player" },
+    { cmd: "say", desc: "Broadcast public message" },
+    { cmd: "stop", desc: "Gracefully shutdown BDS daemon" }
+];
 
-        // Populate tabs
-        if (tabId === 'home') refreshStatus();
-        if (tabId === 'worlds') loadWorlds();
-        if (tabId === 'players') startPlayersPolling();
-        if (tabId === 'addons') loadAddons();
-        if (tabId === 'properties') loadProperties();
-        if (tabId === 'console') startConsolePolling();
-        if (tabId === 'update') checkVersion();
-        if (tabId === 'settings') loadSettings();
+/* =========================================================================
+   1. ORGANIC DYNAMIC HALFTONE BACKGROUND ENGINE (Zentra Physics)
+   ========================================================================= */
+function initZentraHalftoneBackground() {
+    const canvas = document.getElementById('zentraCanvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d', { alpha: true });
+    if (!ctx) return;
+
+    let width = 0;
+    let height = 0;
+    let animationFrameId;
+
+    const mouse = {
+        x: -2000,
+        y: -2000,
+        targetX: -2000,
+        targetY: -2000,
+        active: false,
+        intensity: 0
+    };
+
+    function resize() {
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        width = window.innerWidth;
+        height = window.innerHeight;
+        canvas.width = Math.floor(width * dpr);
+        canvas.height = Math.floor(height * dpr);
+        canvas.style.width = `${width}px`;
+        canvas.style.height = `${height}px`;
+        ctx.scale(dpr, dpr);
     }
 
-    // Modal helpers
-    function openModal(id) { document.getElementById(id).style.display = 'flex'; }
-    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+    window.addEventListener('resize', resize);
+    window.addEventListener('mousemove', (e) => {
+        mouse.targetX = e.clientX;
+        mouse.targetY = e.clientY;
+        mouse.active = true;
+    }, { passive: true });
 
-    // Home status
-    function refreshStatus() {
-        fetch('/api/status').then(r => r.json()).then(data => {
-            document.getElementById('statusActiveWorld').textContent = "Active World: " + (data.active_world || 'None');
-            let badge = document.getElementById('statusBadge');
-            let text = document.getElementById('statusText');
-            if (data.server_running) {
-                badge.className = 'status-badge online';
-                text.textContent = 'ONLINE';
-            } else {
-                badge.className = 'status-badge offline';
-                text.textContent = 'OFFLINE';
-            }
-        });
-    }
-
-    function serverAction(action) {
-        fetch('/api/' + action, {method: 'POST'}).then(r => r.json()).then(res => {
-            setTimeout(refreshStatus, 1500);
-        });
-    }
-
-    // Console Logs
-    let consoleInterval = null;
-    function startConsolePolling() {
-        updateConsole();
-        consoleInterval = setInterval(updateConsole, 2000);
-    }
-    function stopConsolePolling() {
-        if (consoleInterval) clearInterval(consoleInterval);
-    }
-    function updateConsole() {
-        fetch('/api/server_output').then(r => r.text()).then(logs => {
-            let el = document.getElementById('terminalLogs');
-            el.textContent = logs || 'Terminal is active. No logs generated yet.';
-            el.scrollTop = el.scrollHeight;
-        });
-    }
-
-    function sendConsoleCommand(inputId) {
-        let input = document.getElementById(inputId);
-        let cmd = input.value.trim();
-        if (!cmd) return;
-        fetch('/api/command', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({command: cmd})
-        }).then(r => r.json()).then(res => {
-            input.value = '';
-            if (inputId === 'homeCmdInput') {
-                let msg = document.getElementById('homeCmdMsg');
-                msg.textContent = 'Command sent: ' + cmd;
-                msg.className = 'msg-alert success';
-                msg.style.display = 'block';
-                setTimeout(() => msg.style.display = 'none', 3000);
-            } else {
-                updateConsole();
-            }
-        });
-    }
-
-    // Worlds Tab
-    function loadWorlds() {
-        fetch('/api/worlds').then(r => r.json()).then(data => {
-            let html = '';
-            if (data.worlds && data.worlds.length) {
-                html = '<ul class="item-list">';
-                data.worlds.forEach(w => {
-                    let isActive = w === data.active_world;
-                    html += `<li>
-                        <div>
-                            <strong style="font-size:1.05em;">${w}</strong>
-                            ${isActive ? '<span style="color:var(--success); margin-left:8px; font-size:0.8em; font-weight:600;">ACTIVE</span>' : ''}
-                        </div>
-                        <div style="display:flex; gap:8px;">
-                            ${!isActive ? `<button style="background:var(--success); padding:6px 12px; font-size:0.85em; width:auto; margin:0;" onclick="setActiveWorld('${w}')">Activate</button>` : ''}
-                            <button style="background:var(--primary); padding:6px 12px; font-size:0.85em; width:auto; margin:0;" onclick="loadBackups('${w}')">Backups</button>
-                            <button style="background:var(--danger); padding:6px 12px; font-size:0.85em; width:auto; margin:0;" onclick="deleteWorld('${w}')">Delete</button>
-                        </div>
-                    </li>`;
-                });
-                html += '</ul>';
-            } else {
-                html = '<p style="color:var(--text-muted);">No worlds found on the server.</p>';
-            }
-            document.getElementById('worldsList').innerHTML = html;
-        });
-    }
-
-    function setActiveWorld(name) {
-        fetch('/api/set_active_world', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({world: name})
-        }).then(r => r.json()).then(res => {
-            loadWorlds();
-        });
-    }
-
-    function createWorld() {
-        let name = document.getElementById('newWorldName').value.trim();
-        let seed = document.getElementById('newWorldSeed').value.trim();
-        if (!name) return;
-        fetch('/api/worlds/create', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({name: name, seed: seed})
-        }).then(r => r.json()).then(res => {
-            closeModal('createWorldModal');
-            loadWorlds();
-        });
-    }
-
-    function deleteWorld(name) {
-        if (!confirm(`Are you absolutely sure you want to permanently delete world '${name}'? This cannot be undone.`)) return;
-        fetch('/api/worlds/delete', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({world: name})
-        }).then(r => r.json()).then(res => {
-            loadWorlds();
-        });
-    }
-
-    function loadBackups(worldName) {
-        document.getElementById('worldBackupsCard').style.display = 'block';
-        fetch('/api/list_backups?world=' + encodeURIComponent(worldName)).then(r => r.json()).then(data => {
-            let html = `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-                <h4 style="color:var(--text-muted);">World: ${worldName}</h4>
-                <button class="action-btn start" style="padding:6px 12px; font-size:0.8em; width:auto; margin:0;" onclick="createBackup('${worldName}')">Create Backup Now</button>
-            </div>`;
-            if (data.backups && data.backups.length) {
-                html += '<ul class="item-list">';
-                data.backups.forEach(b => {
-                    html += `<li>
-                        <div>
-                            <strong>${b.filename}</strong>
-                            <div style="font-size:0.8em; color:var(--text-muted); margin-top:2px;">Size: ${b.size} | Date: ${b.date}</div>
-                        </div>
-                    </li>`;
-                });
-                html += '</ul>';
-            } else {
-                html += '<p style="color:var(--text-muted);">No backups exist for this world.</p>';
-            }
-            document.getElementById('backupsList').innerHTML = html;
-        });
-    }
-
-    function createBackup(worldName) {
-        fetch('/api/backup_world', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({world: worldName})
-        }).then(r => r.json()).then(res => {
-            loadBackups(worldName);
-        });
-    }
-
-    // Players Tab
-    function startPlayersPolling() {
-        loadPlayers();
-        loadCheatsStatus();
-        loadAllowlist();
-        if (playersInterval) clearInterval(playersInterval);
-        playersInterval = setInterval(loadPlayers, 3000);
-
-        if (playersSecTimer) clearInterval(playersSecTimer);
-        playersSecTimer = setInterval(tickPlayersTimers, 1000);
-    }
-
-    function stopPlayersPolling() {
-        if (playersInterval) clearInterval(playersInterval);
-        if (playersSecTimer) clearInterval(playersSecTimer);
-    }
-
-    function tickPlayersTimers() {
-        document.querySelectorAll('.ticking-duration').forEach(el => {
-            let status = el.getAttribute('data-status');
-            let timeStr = el.getAttribute('data-time');
-            if (!timeStr || timeStr === '-') return;
-
-            // Parse timestamp as local time (no timezone conversion)
-            let targetDt = new Date(timeStr.replace(' ', 'T'));
-            if (isNaN(targetDt.getTime())) return;
-
-            let diffSec = Math.floor(Math.abs(new Date() - targetDt) / 1000);
-            
-            if (status === 'online') {
-                el.textContent = `Online for: ${formatDuration(diffSec)}`;
-            } else {
-                el.textContent = `Offline for: ${formatDuration(diffSec)}`;
-            }
-        });
-    }
-
-    function formatDuration(sec) {
-        if (sec < 60) return sec + "s";
-        let min = Math.floor(sec / 60);
-        let s = sec % 60;
-        if (min < 60) return `${min}m ${s}s`;
-        let hr = Math.floor(min / 60);
-        let m = min % 60;
-        if (hr < 24) return `${hr}h ${m}m`;
-        let d = Math.floor(hr / 24);
-        let h = hr % 24;
-        return `${d}d ${h}h`;
-    }
-
-    function loadPlayers() {
-        fetch('/api/players').then(r => r.json()).then(data => {
-            let html = '';
-            if (data.players && data.players.length) {
-                html = `<div style="margin-bottom:12px; font-size:0.85em; color:var(--text-muted); display:grid; grid-template-columns: 1.2fr 1.5fr 1fr auto; padding:0 16px;">
-                    <div>Gamertag</div>
-                    <div>Status</div>
-                    <div>Permissions</div>
-                    <div>Actions</div>
-                </div>`;
-                data.players.forEach(p => {
-                    let isOnline = p.status === 'Online';
-                    let timeAttribute = isOnline ? p.session_start : p.last_seen;
-                    let isBanned = p.allowlist_enabled && !p.in_allowlist;
-                    
-                    html += `<div class="player-row" style="grid-template-columns: 1.2fr 1.5fr 1fr auto;">
-                        <div>
-                            <strong>${p.name}</strong>
-                            ${isBanned ? '<span style="margin-left:6px; font-size:0.72em; background:rgba(231,76,60,0.15); color:var(--danger); border:1px solid rgba(231,76,60,0.3); padding:1px 6px; border-radius:10px; vertical-align:middle;">BANNED</span>' : ''}
-                            <div style="font-size:0.75em; color:var(--text-muted); margin-top:2px;">XUID: ${p.xuid || 'None'}</div>
-                        </div>
-                        <div>
-                            <span style="color: ${isOnline ? 'var(--success)' : 'var(--danger)'}; font-weight:600; font-size:0.9em;">${p.status}</span>
-                            <div class="ticking-duration" data-status="${isOnline ? 'online' : 'offline'}" data-time="${timeAttribute}" style="font-size:0.75em; color:var(--text-muted); margin-top:2px;">
-                                Calculating...
-                            </div>
-                        </div>
-                        <div style="text-transform: capitalize; font-size:0.9em;">${p.level}</div>
-                        <div style="display:flex; gap:6px; flex-wrap:wrap;">
-                            <button style="background:var(--primary); padding:6px 10px; font-size:0.8em; width:auto; margin:0;" onclick="playerAction('${p.name}', 'promote')">Promote</button>
-                            <button style="background:var(--warning); color:#000; padding:6px 10px; font-size:0.8em; width:auto; margin:0;" onclick="playerAction('${p.name}', 'demote')">Demote</button>
-                            ${isBanned
-                                ? `<button style="background:var(--success); padding:6px 10px; font-size:0.8em; width:auto; margin:0;" onclick="playerAction('${p.name}', 'unban')">Unban</button>`
-                                : `<button style="background:var(--danger); padding:6px 10px; font-size:0.8em; width:auto; margin:0;" onclick="confirmBan('${p.name}')">Ban</button>`
-                            }
-                            <button style="background:rgba(255,255,255,0.08); padding:6px 10px; font-size:0.8em; width:auto; margin:0; border:1px solid var(--border-color);" onclick="viewPlayerHistory('${p.name}')">History</button>
-                        </div>
-                    </div>`;
-                });
-            } else {
-                html = '<p style="color:var(--text-muted);">No player records found.</p>';
-            }
-            document.getElementById('playersList').innerHTML = html;
-            tickPlayersTimers();
-        });
-    }
-
-    function confirmBan(name) {
-        if (!confirm(`Are you sure you want to ban "${name}"? They will be kicked and removed from the allowlist.`)) return;
-        playerAction(name, 'ban');
-    }
-
-    function viewPlayerHistory(name) {
-        document.getElementById('historyModalTitle').textContent = `${name}'s Session History`;
-        let tbody = document.getElementById('historyTableBody');
-        tbody.innerHTML = '<tr><td colspan="4" style="padding: 10px; text-align: center; color: var(--text-muted);">Loading...</td></tr>';
-        openModal('playerHistoryModal');
-
-        fetch(`/api/player_sessions?player=${encodeURIComponent(name)}`).then(r => r.json()).then(data => {
-            let html = '';
-            if (data.sessions && data.sessions.length) {
-                let reversed = [...data.sessions].reverse();
-                reversed.forEach(s => {
-                    let start = s.start || '-';
-                    let end = s.end || 'Active';
-                    let world = s.world || '-';
-                    let durStr = '-';
-                    if (s.start && s.end) {
-                        let diffSec = Math.floor(Math.abs(new Date(s.end.replace(" ", "T")) - new Date(s.start.replace(" ", "T"))) / 1000);
-                        durStr = formatDuration(diffSec);
-                    }
-                    html += `<tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
-                        <td style="padding: 8px;">${start}</td>
-                        <td style="padding: 8px;">${end}</td>
-                        <td style="padding: 8px;">${durStr}</td>
-                        <td style="padding: 8px; color:var(--primary);">${world}</td>
-                    </tr>`;
-                });
-            } else {
-                html = '<tr><td colspan="4" style="padding: 10px; text-align: center; color: var(--text-muted);">No session records found.</td></tr>';
-            }
-            tbody.innerHTML = html;
-        }).catch(err => {
-            tbody.innerHTML = '<tr><td colspan="4" style="padding: 10px; text-align: center; color: var(--danger);">Failed to load history.</td></tr>';
-        });
-    }
-
-    function playerAction(name, action) {
-        fetch('/api/player_action', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({player: name, action: action})
-        }).then(r => r.json()).then(res => {
-            loadPlayers();
-            loadAllowlist();
-        });
-    }
-
-    // Cheat commands
-    function loadCheatsStatus() {
-        fetch('/api/cheats_status').then(r => r.json()).then(data => {
-            let panel = document.getElementById('cheatCommandsPanel');
-            let badge = document.getElementById('cheatsStatusBadge');
-            let worldLabel = document.getElementById('cheatsWorldLabel');
-            
-            worldLabel.textContent = `World: ${data.active_world || 'None'}`;
-            
-            if (data.cheats_enabled) {
-                badge.innerHTML = ' <span style="color:var(--success); background:rgba(46,204,113,0.1); border:1px solid rgba(46,204,113,0.25); padding:2px 8px; border-radius:10px;">Cheats ON</span>';
-                panel.classList.remove('cheats-disabled-overlay');
-                panel.querySelectorAll('.cheat-btn, button').forEach(b => b.disabled = false);
-            } else {
-                badge.innerHTML = ' <span style="color:var(--danger); background:rgba(231,76,60,0.1); border:1px solid rgba(231,76,60,0.25); padding:2px 8px; border-radius:10px;">Cheats OFF</span>';
-                panel.classList.add('cheats-disabled-overlay');
-                panel.querySelectorAll('.cheat-btn, button').forEach(b => b.disabled = true);
-            }
-        });
-    }
-
-    function sendCheatCmd(type) {
-        let cmd = '';
-        if (type === 'give') {
-            let p = document.getElementById('give_player').value.trim();
-            let item = document.getElementById('give_item').value.trim();
-            let amt = document.getElementById('give_amount').value || 1;
-            if (!p || !item) return showCheatMsg('Fill in player name and item.', 'error');
-            cmd = `give ${p} ${item} ${amt}`;
-        } else if (type === 'tp') {
-            let p = document.getElementById('tp_player').value.trim();
-            let x = document.getElementById('tp_x').value.trim();
-            let y = document.getElementById('tp_y').value.trim();
-            let z = document.getElementById('tp_z').value.trim();
-            if (!p || !x || !y || !z) return showCheatMsg('Fill in player name and coordinates.', 'error');
-            cmd = `tp ${p} ${x} ${y} ${z}`;
-        } else if (type === 'kill') {
-            let p = document.getElementById('kill_player').value.trim();
-            if (!p) return showCheatMsg('Fill in player name or @a.', 'error');
-            cmd = `kill ${p}`;
-        } else if (type === 'effect') {
-            let p = document.getElementById('effect_player').value.trim();
-            let eff = document.getElementById('effect_name').value.trim();
-            let dur = document.getElementById('effect_duration').value || 30;
-            let lvl = document.getElementById('effect_level').value || 1;
-            if (!p || !eff) return showCheatMsg('Fill in player name and effect.', 'error');
-            cmd = `effect ${p} ${eff} ${dur} ${lvl}`;
-        }
-        sendRawCmd(cmd);
-    }
-
-    function sendRawCmd(cmd) {
-        fetch('/api/player_command', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({command: cmd})
-        }).then(r => r.json()).then(res => {
-            showCheatMsg(res.result, res.result.includes('failed') || res.result.includes('not') ? 'error' : 'success');
-        }).catch(err => showCheatMsg('Failed to send command.', 'error'));
-    }
-
-    function showCheatMsg(text, type) {
-        let msg = document.getElementById('cheatCmdMsg');
-        msg.textContent = text;
-        msg.className = `msg-alert ${type}`;
-        msg.style.display = 'block';
-        setTimeout(() => msg.style.display = 'none', 4000);
-    }
-
-    // Allowlist
-    function loadAllowlist() {
-        fetch('/api/allowlist').then(r => r.json()).then(data => {
-            let container = document.getElementById('allowlistContainer');
-            let list = data.allowlist || [];
-            if (!list.length) {
-                container.innerHTML = '<p style="color:var(--text-muted);">No entries in allowlist.json.</p>';
-                return;
-            }
-            let html = '<ul class="item-list">';
-            list.forEach(e => {
-                html += `<li>
-                    <div>
-                        <strong>${e.name || 'Unknown'}</strong>
-                        <div style="font-size:0.75em; color:var(--text-muted); margin-top:2px;">XUID: ${e.xuid || 'N/A'}</div>
-                    </div>
-                    <div style="display:flex; gap:6px;">
-                        <button style="background:var(--danger); padding:5px 10px; font-size:0.8em; width:auto; margin:0;" onclick="playerAction('${e.name}', 'ban')">Remove</button>
-                    </div>
-                </li>`;
-            });
-            html += '</ul>';
-            container.innerHTML = html;
-        });
-    }
-
-    // Addons Tab
-    function loadAddons() {
-        fetch('/api/addons').then(r => r.json()).then(data => {
-            // Populate behavior packs
-            let bHtml = '';
-            if (data.behavior_packs && data.behavior_packs.length) {
-                data.behavior_packs.forEach(p => {
-                    let applied = data.applied_behavior.some(ab => ab.pack_id === p.uuid);
-                    bHtml += `<div style="margin-bottom:8px;"><label><input type="checkbox" name="behaviorPack" value="${p.folder}" ${applied?'checked':''}> ${p.name}</label></div>`;
-                });
-            } else {
-                bHtml = '<p style="color:var(--text-muted);">No behavior packs installed.</p>';
-            }
-            document.getElementById('behaviorPacksList').innerHTML = bHtml;
-
-            // Populate resource packs
-            let rHtml = '';
-            if (data.resource_packs && data.resource_packs.length) {
-                data.resource_packs.forEach(p => {
-                    let applied = data.applied_resource.some(ar => ar.pack_id === p.uuid);
-                    rHtml += `<div style="margin-bottom:8px;"><label><input type="checkbox" name="resourcePack" value="${p.folder}" ${applied?'checked':''}> ${p.name}</label></div>`;
-                });
-            } else {
-                rHtml = '<p style="color:var(--text-muted);">No resource packs installed.</p>';
-            }
-            document.getElementById('resourcePacksList').innerHTML = rHtml;
-        });
-    }
-
-    function uploadAddonFile(file) {
-        if (!file) return;
-        let formData = new FormData();
-        formData.append("file", file);
-        let msg = document.getElementById('uploadMsg');
-        msg.textContent = 'Uploading addon package...';
-        msg.className = 'msg-alert success';
-        msg.style.display = 'block';
-
-        fetch('/api/addons/upload', {
-            method: 'POST',
-            body: formData
-        }).then(r => r.json()).then(res => {
-            msg.textContent = res.result;
-            loadAddons();
-            setTimeout(() => msg.style.display = 'none', 5000);
-        }).catch(err => {
-            msg.textContent = 'Upload failed.';
-            msg.className = 'msg-alert error';
-        });
-    }
-
-    function applyAddonsToWorld() {
-        let bSelected = Array.from(document.querySelectorAll('input[name="behaviorPack"]:checked')).map(el => el.value);
-        let rSelected = Array.from(document.querySelectorAll('input[name="resourcePack"]:checked')).map(el => el.value);
-        
-        let msg = document.getElementById('addonApplyMsg');
-        fetch('/api/addons/apply', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({behavior_packs: bSelected, resource_packs: rSelected})
-        }).then(r => r.json()).then(res => {
-            msg.textContent = res.result;
-            msg.className = 'msg-alert success';
-            msg.style.display = 'block';
-            setTimeout(() => msg.style.display = 'none', 3000);
-        });
-    }
-
-    // Drag & Drop Setup (Addons)
-    let zone = document.getElementById('uploadZone');
-    zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
-    zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
-    zone.addEventListener('drop', e => {
-        e.preventDefault();
-        zone.classList.remove('dragover');
-        uploadAddonFile(e.dataTransfer.files[0]);
+    document.addEventListener('mouseleave', () => {
+        mouse.active = false;
     });
 
-    // Drag & Drop Setup (Worlds)
-    function uploadWorldFile(file) {
-        if (!file) return;
-        let formData = new FormData();
-        formData.append("file", file);
-        let msg = document.getElementById('worldUploadMsg');
-        msg.textContent = 'Importing world archive (this may take a few moments)...';
-        msg.className = 'msg-alert success';
-        msg.style.display = 'block';
+    resize();
 
-        fetch('/api/worlds/upload', {
-            method: 'POST',
-            body: formData
-        }).then(r => r.json()).then(res => {
-            msg.textContent = res.result;
-            loadWorlds();
-            setTimeout(() => msg.style.display = 'none', 5000);
-        }).catch(err => {
-            msg.textContent = 'Import failed.';
-            msg.className = 'msg-alert error';
-        });
-    }
+    const SPACING = 38;
+    const startTime = performance.now();
+    const NODE_RADIUS = 280;
+    const MOUSE_RADIUS = 260;
 
-    let worldZone = document.getElementById('worldUploadZone');
-    worldZone.addEventListener('dragover', e => { e.preventDefault(); worldZone.classList.add('dragover'); });
-    worldZone.addEventListener('dragleave', () => worldZone.classList.remove('dragover'));
-    worldZone.addEventListener('drop', e => {
-        e.preventDefault();
-        worldZone.classList.remove('dragover');
-        uploadWorldFile(e.dataTransfer.files[0]);
-    });
-
-    // Properties Tab
-    function loadProperties() {
-        fetch('/api/properties').then(r => r.json()).then(data => {
-            let html = '';
-            if (data.properties) {
-                data.properties.forEach(p => {
-                    html += `<div class="form-group">
-                        <label>${p.label || p.key}</label>`;
-                    if (p.type === 'choice') {
-                        html += `<select name="${p.key}">`;
-                        p.choices.forEach(opt => {
-                            html += `<option value="${opt}" ${opt == p.value ? 'selected' : ''}>${opt}</option>`;
-                        });
-                        html += `</select>`;
-                    } else if (p.type === 'bool') {
-                        html += `<select name="${p.key}">
-                            <option value="true" ${p.value === 'true' || p.value === true ? 'selected' : ''}>true</option>
-                            <option value="false" ${p.value === 'false' || p.value === false ? 'selected' : ''}>false</option>
-                        </select>`;
-                    } else {
-                        html += `<input type="${p.type === 'int' || p.type === 'float' ? 'number' : 'text'}" name="${p.key}" value="${p.value || ''}">`;
-                    }
-                    html += `</div>`;
-                });
-            }
-            document.getElementById('propertiesForm').innerHTML = html;
-        });
-    }
-
-    function saveProperties() {
-        let data = {};
-        let form = document.getElementById('propertiesForm');
-        let formData = new FormData(form);
-        formData.forEach((val, key) => data[key] = val);
-
-        // Include selects since FormData doesn't auto-read disabled or some custom tags, but standard form inputs are fine
-        let msg = document.getElementById('propertiesMsg');
-        fetch('/api/properties', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(data)
-        }).then(r => r.json()).then(res => {
-            msg.textContent = res.result + " Restart the server to apply changes.";
-            msg.className = 'msg-alert success';
-            msg.style.display = 'block';
-            setTimeout(() => msg.style.display = 'none', 5000);
-        });
-    }
-
-    // Version update tab
-    let progressInterval = null;
-
-    const SVG_SPINNER = `<svg class="spinner-svg" viewBox="0 0 50 50"><circle class="spinner-circle" cx="25" cy="25" r="20"></circle></svg>`;
-    const SVG_CHECK = `<svg class="checkmark-svg" viewBox="0 0 52 52"><circle class="checkmark-circle" cx="26" cy="26" r="25"/><path class="checkmark-check" d="M14.1 27.2l7.1 7.2 16.7-16.8"/></svg>`;
-    const SVG_PENDING = `<div style="width:10px; height:10px; border-radius:50%; background:rgba(255,255,255,0.15);"></div>`;
-
-    function checkVersion() {
-        fetch('/api/update_status').then(r => r.json()).then(state => {
-            if (state.status !== 'idle' && state.status !== 'success' && state.status !== 'failed') {
-                showProgressArea();
-                startProgressPolling();
-                return;
-            }
-
-            // Normal check
-            document.getElementById('updateStepper').style.display = 'none';
-            document.getElementById('updateSuccessCard').style.display = 'none';
-            document.getElementById('updateMsg').style.display = 'none';
-            document.getElementById('btnTriggerUpdate').style.display = 'none';
-
-            fetch('/api/status').then(r => r.json()).then(data => {
-                document.getElementById('currentServerVersion').textContent = data.version || 'Offline / Unknown';
-                
-                fetch('/api/latest_version_url').then(r => r.json()).then(latest => {
-                    if (latest.version) {
-                        document.getElementById('latestServerVersion').textContent = latest.version;
-                        
-                        let msg = document.getElementById('updateMsg');
-                        let btn = document.getElementById('btnTriggerUpdate');
-                        
-                        if (data.version && data.version !== 'Unknown' && data.version !== latest.version) {
-                            msg.innerHTML = `<strong>A new server version is available: ${latest.version}</strong> (Current version: ${data.version}).`;
-                            msg.className = 'msg-alert warning';
-                            msg.style.display = 'block';
-                            btn.textContent = `Upgrade Server to ${latest.version}`;
-                            btn.style.display = 'block';
-                        } else {
-                            msg.innerHTML = `Your server is fully up to date! Latest version: ${latest.version}.`;
-                            msg.className = 'msg-alert success';
-                            msg.style.display = 'block';
-                            btn.style.display = 'none';
-                        }
-                    }
-                }).catch(e => {
-                    console.log("Failed to fetch latest version info.", e);
-                    document.getElementById('latestServerVersion').textContent = 'Error';
-                });
-            });
-        });
-    }
-
-    function triggerServerUpdate() {
-        if (!confirm("Are you sure you want to upgrade the server? This will stop the server and install the latest Bedrock files.")) return;
-        
-        let btn = document.getElementById('btnTriggerUpdate');
-        btn.style.display = 'none';
-        
-        showProgressArea();
-        
-        fetch('/api/update_server', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({})
-        }).then(r => r.json()).then(res => {
-            startProgressPolling();
-        }).catch(err => {
-            showError("Failed to initiate update process.");
-        });
-    }
-
-    function showProgressArea() {
-        document.getElementById('updateStepper').style.display = 'flex';
-        document.getElementById('updateSuccessCard').style.display = 'none';
-        document.getElementById('updateMsg').style.display = 'none';
-        document.getElementById('btnTriggerUpdate').style.display = 'none';
-        
-        // Reset steps
-        ['download', 'stopping', 'extracting', 'restarting'].forEach(step => {
-            let el = document.getElementById(`stepItem_${step}`);
-            el.className = 'step-item pending';
-            document.getElementById(`stepIcon_${step}`).innerHTML = SVG_PENDING;
-            document.getElementById(`stepConsole_${step}`).style.display = 'none';
-        });
-    }
-
-    function startProgressPolling() {
-        if (progressInterval) clearInterval(progressInterval);
-        progressInterval = setInterval(checkUpdateProgress, 800);
-    }
-
-    function updateStepUI(stepId, state, message = '') {
-        let item = document.getElementById(`stepItem_${stepId}`);
-        let icon = document.getElementById(`stepIcon_${stepId}`);
-        let consoleDiv = document.getElementById(`stepConsole_${stepId}`);
-        let desc = document.getElementById(`stepDesc_${stepId}`);
-
-        if (state === 'completed') {
-            item.className = 'step-item completed';
-            icon.innerHTML = SVG_CHECK;
-            consoleDiv.style.display = 'none';
-            desc.textContent = 'Completed.';
-        } else if (state === 'active') {
-            item.className = 'step-item active';
-            icon.innerHTML = SVG_SPINNER;
-            desc.textContent = 'Processing...';
-            if (message) {
-                consoleDiv.style.display = 'block';
-                consoleDiv.textContent = message;
-            } else {
-                consoleDiv.style.display = 'none';
-            }
+    function render(currentTime) {
+        if (mouse.active) {
+            mouse.x += (mouse.targetX - mouse.x) * 0.08;
+            mouse.y += (mouse.targetY - mouse.y) * 0.08;
+            mouse.intensity += (1.0 - mouse.intensity) * 0.08;
         } else {
-            item.className = 'step-item pending';
-            icon.innerHTML = SVG_PENDING;
-            consoleDiv.style.display = 'none';
-            desc.textContent = 'Pending...';
+            mouse.x += (-2000 - mouse.x) * 0.04;
+            mouse.y += (-2000 - mouse.y) * 0.04;
+            mouse.intensity += (0 - mouse.intensity) * 0.06;
         }
-    }
 
-    function checkUpdateProgress() {
-        fetch('/api/update_status').then(r => r.json()).then(state => {
-            let status = state.status;
-            let msg = state.message;
-            
-            if (status === 'downloading') {
-                updateStepUI('download', 'active', msg);
-                updateStepUI('stopping', 'pending');
-                updateStepUI('extracting', 'pending');
-                updateStepUI('restarting', 'pending');
-            } else if (status === 'stopping') {
-                updateStepUI('download', 'completed');
-                updateStepUI('stopping', 'active', msg);
-                updateStepUI('extracting', 'pending');
-                updateStepUI('restarting', 'pending');
-            } else if (status === 'extracting') {
-                updateStepUI('download', 'completed');
-                updateStepUI('stopping', 'completed');
-                updateStepUI('extracting', 'active', msg);
-                updateStepUI('restarting', 'pending');
-            } else if (status === 'setting_permissions' || status === 'restarting') {
-                updateStepUI('download', 'completed');
-                updateStepUI('stopping', 'completed');
-                updateStepUI('extracting', 'completed');
-                updateStepUI('restarting', 'active', msg);
-            } else if (status === 'success') {
-                clearInterval(progressInterval);
-                updateStepUI('download', 'completed');
-                updateStepUI('stopping', 'completed');
-                updateStepUI('extracting', 'completed');
-                updateStepUI('restarting', 'completed');
-                
-                setTimeout(() => {
-                    document.getElementById('updateStepper').style.display = 'none';
-                    document.getElementById('updateSuccessCard').style.display = 'block';
-                }, 1000);
-            } else if (status === 'failed') {
-                clearInterval(progressInterval);
-                showError(`Update failed! Error: ${state.error}`);
+        ctx.clearRect(0, 0, width, height);
+        const elapsed = (currentTime - startTime) * 0.001;
+        const cols = Math.ceil(width / SPACING) + 2;
+        const rows = Math.ceil(height / SPACING) + 2;
+
+        const node1X = width * (0.5 + 0.38 * Math.sin(elapsed * 0.55) * Math.cos(elapsed * 0.28));
+        const node1Y = height * (0.5 + 0.36 * Math.cos(elapsed * 0.45) * Math.sin(elapsed * 0.33));
+        const node2X = width * (0.5 + 0.34 * Math.cos(elapsed * 0.65 + 1.8));
+        const node2Y = height * (0.5 + 0.36 * Math.sin(elapsed * 0.5 + 2.4));
+
+        for (let r = 0; r < rows; r++) {
+            const y = r * SPACING;
+            const yProgress = Math.max(0, Math.min(1, y / height));
+            const baseRadius = 1.4 + Math.pow(yProgress, 1.4) * 6.8;
+            const baseAlpha = 0.22 + yProgress * 0.38;
+
+            for (let c = 0; c < cols; c++) {
+                const x = c * SPACING;
+                const wave1 = Math.sin(x * 0.009 + elapsed * 1.3) * Math.cos(y * 0.009 - elapsed * 1.1);
+                const wave2 = Math.sin((x + y) * 0.007 - elapsed * 0.85) * Math.cos(x * 0.006 + elapsed * 0.7);
+                const wave3 = Math.sin(x * 0.015 - y * 0.012 + elapsed * 1.6) * 0.5;
+
+                const ambientDriftX = (wave1 * 0.65 + wave2 * 0.35 + wave3 * 0.2) * 6.0;
+                const ambientDriftY = (wave2 * 0.65 - wave1 * 0.35 + wave3 * 0.2) * 6.0;
+                const ambientScale = (wave1 + wave2) * 1.2;
+
+                let drawX = x + ambientDriftX;
+                let drawY = y + ambientDriftY;
+                let radius = baseRadius + ambientScale;
+                let alpha = baseAlpha;
+
+                // Node 1
+                const n1dx = drawX - node1X;
+                const n1dy = drawY - node1Y;
+                const n1distSq = n1dx * n1dx + n1dy * n1dy;
+                if (n1distSq < NODE_RADIUS * NODE_RADIUS) {
+                    const dist = Math.sqrt(n1distSq);
+                    const factor = Math.cos((dist / NODE_RADIUS) * (Math.PI / 2));
+                    radius += factor * 3.0;
+                    alpha += factor * 0.2;
+                }
+
+                // Node 2
+                const n2dx = drawX - node2X;
+                const n2dy = drawY - node2Y;
+                const n2distSq = n2dx * n2dx + n2dy * n2dy;
+                if (n2distSq < NODE_RADIUS * NODE_RADIUS) {
+                    const dist = Math.sqrt(n2distSq);
+                    const factor = Math.cos((dist / NODE_RADIUS) * (Math.PI / 2));
+                    radius += factor * 2.6;
+                    alpha += factor * 0.18;
+                }
+
+                // Mouse Reaction
+                const mdx = drawX - mouse.x;
+                const mdy = drawY - mouse.y;
+                const mDistSq = mdx * mdx + mdy * mdy;
+                if (mDistSq < MOUSE_RADIUS * MOUSE_RADIUS && mouse.intensity > 0.01) {
+                    const mDist = Math.sqrt(mDistSq);
+                    const mFactor = Math.cos((mDist / MOUSE_RADIUS) * (Math.PI / 2)) * mouse.intensity;
+                    radius += mFactor * 3.2;
+                    alpha += mFactor * 0.28;
+                    if (mDist > 0.5) {
+                        const push = mFactor * 9.0;
+                        drawX += (mdx / mDist) * push;
+                        drawY += (mdy / mDist) * push;
+                    }
+                }
+
+                if (radius <= 0.3) continue;
+
+                ctx.beginPath();
+                ctx.arc(drawX, drawY, Math.max(0.6, radius), 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(17, 17, 17, ${Math.min(0.85, Math.max(0.12, alpha))})`;
+                ctx.fill();
             }
-        }).catch(e => {
-            clearInterval(progressInterval);
-            showError("Connection lost during update monitoring.");
+        }
+
+        animationFrameId = requestAnimationFrame(render);
+    }
+
+    animationFrameId = requestAnimationFrame(render);
+}
+
+/* =========================================================================
+   2. SLIDING PILL TAB NAVIGATION
+   ========================================================================= */
+function updateTabSlider(activeBtn) {
+    const slider = document.getElementById('tabSliderPill');
+    if (!slider || !activeBtn) return;
+    const parent = activeBtn.parentElement;
+    const parentRect = parent.getBoundingClientRect();
+    const btnRect = activeBtn.getBoundingClientRect();
+
+    slider.style.left = `${btnRect.left - parentRect.left}px`;
+    slider.style.width = `${btnRect.width}px`;
+}
+
+function switchZentraTab(tabName) {
+    currentTab = tabName;
+    const allTabs = ['home', 'console', 'worlds', 'players', 'addons', 'properties', 'update', 'settings'];
+
+    allTabs.forEach(t => {
+        const cap = t.charAt(0).toUpperCase() + t.slice(1);
+        const view = document.getElementById(`view${cap}`);
+        const btn = document.querySelector(`.nav-tab-btn[data-tab="${t}"]`);
+        if (view) {
+            view.style.display = (t === tabName) ? 'block' : 'none';
+        }
+        if (btn) {
+            if (t === tabName) {
+                btn.classList.add('active');
+                updateTabSlider(btn);
+            } else {
+                btn.classList.remove('active');
+            }
+        }
+    });
+
+    if (tabName === 'worlds') loadWorlds();
+    if (tabName === 'players') loadPlayers();
+    if (tabName === 'addons') loadAddons();
+    if (tabName === 'properties') loadProperties();
+    if (tabName === 'update') checkBdsUpdates();
+    if (tabName === 'console') {
+        fetchLogs();
+        setTimeout(() => {
+            const screen = document.getElementById('terminalScreen');
+            if (screen && autoScroll) screen.scrollTop = screen.scrollHeight;
+        }, 50);
+    }
+}
+
+/* =========================================================================
+   3. TOAST NOTIFICATIONS
+   ========================================================================= */
+function showToast(message, type = 'info') {
+    const container = document.getElementById('toastContainer');
+    if (!container) return;
+
+    const toast = document.createElement('div');
+    toast.className = `zentra-toast ${type}`;
+    toast.innerHTML = `<span>${type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ'}</span> ${message}`;
+    container.appendChild(toast);
+
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(12px) scale(0.95)';
+        toast.style.transition = 'all 0.25s ease';
+        setTimeout(() => toast.remove(), 250);
+    }, 3200);
+}
+
+/* =========================================================================
+   4. BUFFED REMOTE TERMINAL CONSOLE ENGINE
+   ========================================================================= */
+function fetchLogs() {
+    fetch('/api/server_output')
+        .then(r => r.text())
+        .then(text => {
+            const lines = text.split('\n').filter(l => l.trim().length > 0);
+            rawLogsCache = lines;
+            renderTerminalLines(lines);
+            document.getElementById('termLineCount').textContent = `${lines.length} lines buffered`;
+        })
+        .catch(err => console.error("Error fetching logs:", err));
+}
+
+function renderTerminalLines(lines) {
+    const screen = document.getElementById('terminalScreen');
+    if (!screen) return;
+
+    const timeRegex = /\[(\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}:\d{3})\]/;
+    const levelRegex = /\[(INFO|WARN|ERROR|DEBUG)\]/i;
+
+    let filtered = lines;
+
+    // Apply Filter Chips
+    if (consoleFilter !== 'all') {
+        filtered = filtered.filter(line => {
+            if (consoleFilter === 'info') return line.includes('INFO');
+            if (consoleFilter === 'warn') return line.includes('WARN');
+            if (consoleFilter === 'error') return line.includes('ERROR');
+            if (consoleFilter === 'player') return line.includes('Player connected') || line.includes('Player disconnected');
+            return true;
         });
     }
 
-    function showError(errMsg) {
-        let msg = document.getElementById('updateMsg');
-        msg.textContent = errMsg;
-        msg.className = 'msg-alert error';
-        msg.style.display = 'block';
-        document.getElementById('updateStepper').style.display = 'none';
-        document.getElementById('btnTriggerUpdate').style.display = 'block';
+    // Apply Search Filter
+    if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        filtered = filtered.filter(line => line.toLowerCase().includes(q));
     }
 
-    // Settings tab
-    function loadSettings() {
-        fetch('/api/settings').then(r => r.json()).then(data => {
-            document.getElementById('settingAutoStart').value = (data.auto_start || false).toString();
-            document.getElementById('settingBackupFreq').value = data.backup_frequency || '1 hour';
-            document.getElementById('settingMaxBackups').value = data.max_backups || 10;
+    if (filtered.length === 0) {
+        screen.innerHTML = `<div style="color:#6e7681; font-style:italic; padding:12px;">No log entries match your filter.</div>`;
+        return;
+    }
+
+    let html = '';
+    for (const raw of filtered) {
+        let timestamp = '';
+        let level = 'INFO';
+        let content = raw;
+
+        const timeMatch = raw.match(timeRegex);
+        if (timeMatch) {
+            timestamp = timeMatch[1].split(' ')[1] || timeMatch[1];
+            content = content.replace(timeRegex, '');
+        }
+
+        const levelMatch = raw.match(levelRegex);
+        if (levelMatch) {
+            level = levelMatch[1].toUpperCase();
+            content = content.replace(levelRegex, '');
+        }
+
+        let isPlayerEvent = false;
+        if (content.includes('Player connected:') || content.includes('Player disconnected:')) {
+            level = 'PLAYER';
+            isPlayerEvent = true;
+        }
+
+        html += `
+            <div class="log-row">
+                <span class="log-timestamp">${timestamp || '--:--:--'}</span>
+                <span class="log-level ${level}">${level}</span>
+                <span class="log-msg ${isPlayerEvent ? 'highlight-player' : ''}">${escapeHtml(content.trim())}</span>
+            </div>
+        `;
+    }
+
+    screen.innerHTML = html;
+
+    if (autoScroll) {
+        screen.scrollTop = screen.scrollHeight;
+    }
+}
+
+function handleLogSearch(query) {
+    searchQuery = query;
+    renderTerminalLines(rawLogsCache);
+}
+
+function setConsoleFilter(filterType) {
+    consoleFilter = filterType;
+    document.querySelectorAll('.chip-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.filter === filterType);
+    });
+    renderTerminalLines(rawLogsCache);
+}
+
+function toggleScrollLock() {
+    autoScroll = !autoScroll;
+    const btn = document.getElementById('termScrollLockBtn');
+    if (btn) {
+        btn.classList.toggle('active', autoScroll);
+        btn.innerHTML = autoScroll ? '<span>⬇</span> Auto-scroll: ON' : '<span>⏸</span> Auto-scroll: PAUSED';
+    }
+    if (autoScroll) {
+        const screen = document.getElementById('terminalScreen');
+        if (screen) screen.scrollTop = screen.scrollHeight;
+    }
+}
+
+function clearTerminalView() {
+    const screen = document.getElementById('terminalScreen');
+    if (screen) {
+        screen.innerHTML = `<div style="color:#6e7681; font-style:italic; padding:12px;">Terminal view cleared. (Live stream still active)</div>`;
+    }
+}
+
+function downloadLogs() {
+    const text = rawLogsCache.join('\n');
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `bedrock-server-${new Date().toISOString().slice(0, 10)}.log`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast("Server log file downloaded", "success");
+}
+
+function toggleFullscreenTerminal() {
+    const win = document.getElementById('terminalWindow');
+    if (win) {
+        win.classList.toggle('fullscreen');
+    }
+}
+
+function quickSendCommand(cmd) {
+    document.getElementById('terminalCmdInput').value = cmd;
+    sendConsoleCommand('terminalCmdInput');
+}
+
+function sendConsoleCommand(inputId) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    const cmd = input.value.trim();
+    if (!cmd) return;
+
+    // Save to history
+    if (!commandHistory.includes(cmd)) {
+        commandHistory.push(cmd);
+        if (commandHistory.length > 50) commandHistory.shift();
+        localStorage.setItem('bds_cmd_history', JSON.stringify(commandHistory));
+    }
+    historyIndex = -1;
+
+    fetch('/api/command', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ command: cmd })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.result === 'sent') {
+            showToast(`Executed: ${cmd}`, 'success');
+            input.value = '';
+            setTimeout(fetchLogs, 400);
+        } else {
+            showToast(`Server response: ${data.result || 'Failed'}`, 'error');
+        }
+    })
+    .catch(err => {
+        showToast(`Failed to execute command: ${err}`, 'error');
+    });
+
+    hideAutocomplete();
+}
+
+// Arrow Up/Down Command History Navigation & Autocomplete
+function initTerminalKeyboard() {
+    const input = document.getElementById('terminalCmdInput');
+    const box = document.getElementById('autocompleteBox');
+    if (!input || !box) return;
+
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (commandHistory.length === 0) return;
+            if (historyIndex === -1) historyIndex = commandHistory.length - 1;
+            else if (historyIndex > 0) historyIndex--;
+            input.value = commandHistory[historyIndex] || '';
+        } else if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            if (historyIndex !== -1) {
+                if (historyIndex < commandHistory.length - 1) {
+                    historyIndex++;
+                    input.value = commandHistory[historyIndex];
+                } else {
+                    historyIndex = -1;
+                    input.value = '';
+                }
+            }
+        } else if (e.key === 'Enter') {
+            sendConsoleCommand('terminalCmdInput');
+        } else if (e.key === 'Escape') {
+            hideAutocomplete();
+        }
+    });
+
+    input.addEventListener('input', () => {
+        const val = input.value.trim().toLowerCase();
+        if (!val) {
+            hideAutocomplete();
+            return;
+        }
+
+        const matches = BDS_COMMANDS.filter(c => c.cmd.toLowerCase().startsWith(val) || c.cmd.toLowerCase().includes(val));
+        if (matches.length > 0) {
+            box.innerHTML = matches.map(m => `
+                <div class="autocomplete-item" onclick="selectAutocomplete('${m.cmd}')">
+                    <span>${m.cmd}</span>
+                    <span style="font-size:10px; color:#8b949e;">${m.desc}</span>
+                </div>
+            `).join('');
+            box.style.display = 'block';
+        } else {
+            hideAutocomplete();
+        }
+    });
+}
+
+function selectAutocomplete(cmd) {
+    const input = document.getElementById('terminalCmdInput');
+    if (input) {
+        input.value = cmd;
+        input.focus();
+    }
+    hideAutocomplete();
+}
+
+function hideAutocomplete() {
+    const box = document.getElementById('autocompleteBox');
+    if (box) box.style.display = 'none';
+}
+
+/* =========================================================================
+   5. SERVER PROCESS OPERATIONS & LIVE STATUS
+   ========================================================================= */
+function loadStatus() {
+    fetch('/api/status')
+        .then(r => r.json())
+        .then(data => {
+            const badge = document.getElementById('navStatusBadge');
+            const statusText = document.getElementById('navStatusText');
+            const statePill = document.getElementById('homeStatePill');
+            const homeActiveWorld = document.getElementById('homeActiveWorld');
+            const homeOnlineCount = document.getElementById('homeOnlineCount');
+            const homeVersion = document.getElementById('homeVersion');
+
+            const isRunning = data.server_running;
+            const activeWorld = data.active_world || 'None';
+            const onlineCount = (data.online_players || []).length;
+            const ver = data.version || 'Bedrock 1.26+';
+
+            if (homeActiveWorld) homeActiveWorld.textContent = activeWorld;
+            if (homeOnlineCount) homeOnlineCount.textContent = `${onlineCount} player${onlineCount === 1 ? '' : 's'}`;
+            if (homeVersion) homeVersion.textContent = ver;
+
+            if (isRunning) {
+                badge.className = 'status-pill-badge';
+                statusText.textContent = `Online (${activeWorld})`;
+                if (statePill) {
+                    statePill.className = 'metric-pill';
+                    statePill.textContent = '● Daemon Active';
+                }
+            } else {
+                badge.className = 'status-pill-badge stopped';
+                statusText.textContent = 'Server Stopped';
+                if (statePill) {
+                    statePill.className = 'metric-pill neutral';
+                    statePill.textContent = '○ Stopped';
+                }
+            }
+        })
+        .catch(err => console.error("Status fetch error:", err));
+}
+
+function serverAction(action) {
+    showToast(`Sending ${action} request to BDS daemon...`, 'info');
+    fetch(`/api/${action}`, { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+            showToast(`Server status: ${data.result || 'OK'}`, 'success');
+            setTimeout(loadStatus, 1500);
+            setTimeout(fetchLogs, 2000);
+        })
+        .catch(err => showToast(`Action failed: ${err}`, 'error'));
+}
+
+/* =========================================================================
+   6. WORLDS MANAGEMENT
+   ========================================================================= */
+function loadWorlds() {
+    fetch('/api/worlds')
+        .then(r => r.json())
+        .then(data => {
+            const tbody = document.getElementById('worldsTableBody');
+            if (!tbody) return;
+
+            const worlds = data.worlds || [];
+            const activeWorld = data.active_world;
+
+            if (worlds.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:var(--zentra-muted);">No worlds found on server.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = worlds.map(w => {
+                const isActive = (w === activeWorld);
+                return `
+                    <tr>
+                        <td style="font-weight:700;">${w}</td>
+                        <td>
+                            ${isActive ? '<span class="metric-pill">Active World</span>' : '<span class="metric-pill neutral">Inactive</span>'}
+                        </td>
+                        <td>
+                            <div style="display:flex; gap:8px;">
+                                ${!isActive ? `<button class="zentra-btn emerald" style="padding:4px 10px; font-size:12px;" onclick="setActiveWorld('${w}')">Activate</button>` : ''}
+                                <button class="zentra-btn secondary" style="padding:4px 10px; font-size:12px;" onclick="backupWorld('${w}')">Backup</button>
+                                <button class="zentra-btn secondary" style="padding:4px 10px; font-size:12px;" onclick="loadBackups('${w}')">Archives</button>
+                                ${!isActive ? `<button class="zentra-btn danger" style="padding:4px 10px; font-size:12px;" onclick="deleteWorld('${w}')">Delete</button>` : ''}
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
         });
-    }
+}
 
-    function saveSettings() {
-        let autoStart = document.getElementById('settingAutoStart').value === 'true';
-        let backupFreq = document.getElementById('settingBackupFreq').value;
-        let maxBackups = parseInt(document.getElementById('settingMaxBackups').value) || 0;
+function setActiveWorld(world) {
+    if (!confirm(`Switch active world to '${world}'? The server will restart automatically.`)) return;
+    showToast(`Activating world '${world}'...`, 'info');
+    fetch('/api/set_active_world', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ world: world })
+    })
+    .then(r => r.json())
+    .then(data => {
+        showToast(data.result || 'World activated', 'success');
+        setTimeout(() => { loadWorlds(); loadStatus(); }, 2000);
+    });
+}
 
-        let msg = document.getElementById('settingsMsg');
-        fetch('/api/settings', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                auto_start: autoStart,
-                backup_frequency: backupFreq,
-                max_backups: maxBackups
-            })
-        }).then(r => r.json()).then(res => {
-            msg.textContent = res.result;
-            msg.className = 'msg-alert success';
-            msg.style.display = 'block';
-            setTimeout(() => msg.style.display = 'none', 3000);
+function submitCreateWorld() {
+    const name = document.getElementById('newWorldName').value.trim();
+    const seed = document.getElementById('newWorldSeed').value.trim();
+    if (!name) return alert("Please specify a world name");
+
+    fetch('/api/worlds/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, seed })
+    })
+    .then(r => r.json())
+    .then(data => {
+        showToast(data.result || 'Created', 'success');
+        closeModal('createWorldModal');
+        loadWorlds();
+    });
+}
+
+function submitUploadWorld() {
+    const fileInput = document.getElementById('uploadWorldFileInput');
+    if (!fileInput.files || fileInput.files.length === 0) return alert("Please select a world file");
+
+    const formData = new FormData();
+    formData.append('file', fileInput.files[0]);
+
+    showToast("Uploading and importing world archive...", "info");
+    fetch('/api/worlds/upload', {
+        method: 'POST',
+        body: formData
+    })
+    .then(r => r.json())
+    .then(data => {
+        showToast(data.result || 'Imported successfully', 'success');
+        closeModal('uploadWorldModal');
+        loadWorlds();
+    })
+    .catch(err => showToast(`Upload failed: ${err}`, 'error'));
+}
+
+function backupWorld(world) {
+    showToast(`Creating snapshot archive for '${world}'...`, 'info');
+    fetch('/api/backup_world', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ world })
+    })
+    .then(r => r.json())
+    .then(data => {
+        showToast(data.result || 'Backup created', 'success');
+        loadBackups(world);
+    });
+}
+
+function loadBackups(world) {
+    fetch(`/api/list_backups?world=${encodeURIComponent(world)}`)
+        .then(r => r.json())
+        .then(data => {
+            const container = document.getElementById('backupsListContainer');
+            if (!container) return;
+            const backups = data.backups || [];
+            if (backups.length === 0) {
+                container.innerHTML = `<p style="color:var(--zentra-muted); font-size:13px;">No backups found for world '${world}'.</p>`;
+                return;
+            }
+            container.innerHTML = `
+                <h4 style="font-size:14px; font-weight:700; margin-bottom:10px;">Backups for world: ${world}</h4>
+                <div class="zentra-table-wrap">
+                    <table class="zentra-table">
+                        <thead>
+                            <tr><th>Filename</th><th>Size</th><th>Created Date</th></tr>
+                        </thead>
+                        <tbody>
+                            ${backups.map(b => `<tr><td style="font-family:var(--font-mono); font-size:12px;">${b.filename}</td><td>${b.size}</td><td>${b.date}</td></tr>`).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
         });
-    }
+}
 
-    // Initial status check
-    refreshStatus();
+function deleteWorld(world) {
+    if (!confirm(`Are you sure you want to permanently delete world '${world}'?`)) return;
+    fetch('/api/worlds/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ world })
+    })
+    .then(r => r.json())
+    .then(data => {
+        showToast(data.result || 'Deleted', 'info');
+        loadWorlds();
+    });
+}
+
+/* =========================================================================
+   7. PLAYERS MANAGEMENT
+   ========================================================================= */
+function loadPlayers() {
+    fetch('/api/players')
+        .then(r => r.json())
+        .then(data => {
+            const tbody = document.getElementById('playersTableBody');
+            if (!tbody) return;
+            const players = data.players || [];
+            if (players.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--zentra-muted);">No player records found.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = players.map(p => {
+                const isOnline = p.status === 'Online';
+                return `
+                    <tr>
+                        <td style="font-weight:700;">${p.name}</td>
+                        <td style="font-family:var(--font-mono); font-size:11px; color:var(--zentra-muted);">${p.xuid || '--'}</td>
+                        <td>${isOnline ? '<span class="metric-pill">Online</span>' : '<span class="metric-pill neutral">Offline</span>'}</td>
+                        <td><span style="font-weight:600; text-transform:capitalize;">${p.level}</span></td>
+                        <td>${p.session_time || '--'}</td>
+                        <td>${p.in_allowlist ? '<span style="color:#059669; font-weight:600;">Allowed</span>' : '<span style="color:#dc2626; font-weight:600;">Banned</span>'}</td>
+                        <td>
+                            <div style="display:flex; gap:6px;">
+                                ${p.in_allowlist 
+                                    ? `<button class="zentra-btn danger" style="padding:4px 8px; font-size:11px;" onclick="playerAction('${p.name}', 'ban')">Ban</button>`
+                                    : `<button class="zentra-btn emerald" style="padding:4px 8px; font-size:11px;" onclick="playerAction('${p.name}', 'unban')">Unban</button>`
+                                }
+                                <button class="zentra-btn secondary" style="padding:4px 8px; font-size:11px;" onclick="playerAction('${p.name}', 'promote')">Promote</button>
+                                <button class="zentra-btn secondary" style="padding:4px 8px; font-size:11px;" onclick="playerAction('${p.name}', 'demote')">Demote</button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        });
+}
+
+function playerAction(player, action) {
+    fetch('/api/player_action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ player, action })
+    })
+    .then(r => r.json())
+    .then(data => {
+        showToast(data.result || 'Updated', 'success');
+        loadPlayers();
+    });
+}
+
+/* =========================================================================
+   8. ADDONS MANAGEMENT
+   ========================================================================= */
+function loadAddons() {
+    fetch('/api/addons')
+        .then(r => r.json())
+        .then(data => {
+            const bCont = document.getElementById('behaviorPacksContainer');
+            const rCont = document.getElementById('resourcePacksContainer');
+            if (!bCont || !rCont) return;
+
+            const bPacks = data.behavior_packs || [];
+            const rPacks = data.resource_packs || [];
+            const appliedB = (data.applied_behavior || []).map(p => p.pack_id);
+            const appliedR = (data.applied_resource || []).map(p => p.pack_id);
+
+            bCont.innerHTML = bPacks.map(p => `
+                <label class="stat-box" style="display:flex; align-items:center; gap:10px; cursor:pointer;">
+                    <input type="checkbox" name="b_pack" value="${p.folder}" ${appliedB.includes(p.uuid) ? 'checked' : ''}>
+                    <div>
+                        <div style="font-weight:700; font-size:13px;">${p.name}</div>
+                        <div style="font-size:11px; color:var(--zentra-muted);">${p.folder}</div>
+                    </div>
+                </label>
+            `).join('') || '<p style="color:var(--zentra-muted); font-size:12px;">No behavior packs installed</p>';
+
+            rCont.innerHTML = rPacks.map(p => `
+                <label class="stat-box" style="display:flex; align-items:center; gap:10px; cursor:pointer;">
+                    <input type="checkbox" name="r_pack" value="${p.folder}" ${appliedR.includes(p.uuid) ? 'checked' : ''}>
+                    <div>
+                        <div style="font-weight:700; font-size:13px;">${p.name}</div>
+                        <div style="font-size:11px; color:var(--zentra-muted);">${p.folder}</div>
+                    </div>
+                </label>
+            `).join('') || '<p style="color:var(--zentra-muted); font-size:12px;">No resource packs installed</p>';
+        });
+}
+
+function applyAddonsToActiveWorld() {
+    const bCheckboxes = document.querySelectorAll('input[name="b_pack"]:checked');
+    const rCheckboxes = document.querySelectorAll('input[name="r_pack"]:checked');
+
+    const bFolders = Array.from(bCheckboxes).map(c => c.value);
+    const rFolders = Array.from(rCheckboxes).map(c => c.value);
+
+    fetch('/api/addons/apply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ behavior_packs: bFolders, resource_packs: rFolders })
+    })
+    .then(r => r.json())
+    .then(data => {
+        showToast(data.result || 'Addons applied', 'success');
+    });
+}
+
+function submitUploadAddon() {
+    const input = document.getElementById('uploadAddonFileInput');
+    if (!input.files || input.files.length === 0) return alert("Select an addon pack");
+
+    const formData = new FormData();
+    formData.append('file', input.files[0]);
+
+    showToast("Extracting and installing addon...", "info");
+    fetch('/api/addons/upload', {
+        method: 'POST',
+        body: formData
+    })
+    .then(r => r.json())
+    .then(data => {
+        showToast(data.result || 'Addon installed', 'success');
+        closeModal('uploadAddonModal');
+        loadAddons();
+    });
+}
+
+/* =========================================================================
+   9. SERVER PROPERTIES EDITOR
+   ========================================================================= */
+function loadProperties() {
+    fetch('/api/properties')
+        .then(r => r.json())
+        .then(data => {
+            const form = document.getElementById('propertiesForm');
+            if (!form) return;
+            const props = data.properties || [];
+
+            form.innerHTML = props.map(p => {
+                let inputHtml = '';
+                if (p.type === 'choice' && p.choices) {
+                    inputHtml = `
+                        <select name="${p.key}" class="zentra-input">
+                            ${p.choices.map(c => `<option value="${c}" ${c === String(p.value) ? 'selected' : ''}>${c}</option>`).join('')}
+                        </select>
+                    `;
+                } else if (p.type === 'bool') {
+                    inputHtml = `
+                        <select name="${p.key}" class="zentra-input">
+                            <option value="true" ${String(p.value).toLowerCase() === 'true' ? 'selected' : ''}>true</option>
+                            <option value="false" ${String(p.value).toLowerCase() === 'false' ? 'selected' : ''}>false</option>
+                        </select>
+                    `;
+                } else {
+                    inputHtml = `<input type="text" name="${p.key}" value="${escapeHtml(String(p.value ?? p.default))}" class="zentra-input">`;
+                }
+
+                return `
+                    <div class="zentra-input-group">
+                        <label>${p.label} <span style="font-family:var(--font-mono); font-size:10px; color:var(--zentra-muted);">(${p.key})</span></label>
+                        ${inputHtml}
+                    </div>
+                `;
+            }).join('');
+        });
+}
+
+function saveProperties() {
+    const form = document.getElementById('propertiesForm');
+    if (!form) return;
+    const formData = new FormData(form);
+    const obj = {};
+    formData.forEach((val, key) => { obj[key] = val; });
+
+    fetch('/api/properties', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(obj)
+    })
+    .then(r => r.json())
+    .then(data => {
+        showToast(data.result || 'Properties saved successfully', 'success');
+    });
+}
+
+/* =========================================================================
+   10. BDS VERSION UPDATER
+   ========================================================================= */
+function checkBdsUpdates() {
+    fetch('/api/status')
+        .then(r => r.json())
+        .then(data => {
+            document.getElementById('updateCurrentVer').textContent = data.version || 'Unknown';
+        });
+
+    fetch('/api/latest_version_url')
+        .then(r => r.json())
+        .then(data => {
+            document.getElementById('updateLatestVer').textContent = data.version || 'Latest';
+        })
+        .catch(() => {
+            document.getElementById('updateLatestVer').textContent = 'Unable to fetch';
+        });
+}
+
+function triggerServerUpdate() {
+    if (!confirm("This will download and update the Bedrock Dedicated Server binary. Your worlds and properties will be preserved. Proceed?")) return;
+
+    fetch('/api/update_server', { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+            showToast(data.result || 'Update started', 'info');
+            document.getElementById('updateProgressCard').style.display = 'block';
+            pollUpdateStatus();
+        });
+}
+
+function pollUpdateStatus() {
+    const timer = setInterval(() => {
+        fetch('/api/update_status')
+            .then(r => r.json())
+            .then(state => {
+                document.getElementById('updateStatusMsg').textContent = state.message || state.status;
+                document.getElementById('updatePercent').textContent = `${state.progress}%`;
+                document.getElementById('updateProgressBar').style.width = `${state.progress}%`;
+
+                if (state.status === 'success' || state.status === 'failed') {
+                    clearInterval(timer);
+                    showToast(state.message || state.status, state.status === 'success' ? 'success' : 'error');
+                }
+            });
+    }, 1000);
+}
+
+/* =========================================================================
+   11. SETTINGS & MODALS HELPERS
+   ========================================================================= */
+function saveSettings() {
+    const interval = parseInt(document.getElementById('settingPollInterval').value, 10);
+    const scroll = document.getElementById('settingAutoScroll').value === 'true';
+    pollInterval = interval;
+    autoScroll = scroll;
+    showToast("Settings saved locally", "success");
+}
+
+function openModal(id) {
+    const el = document.getElementById(id);
+    if (el) el.classList.add('open');
+}
+
+function closeModal(id) {
+    const el = document.getElementById(id);
+    if (el) el.classList.remove('open');
+}
+
+function escapeHtml(str) {
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+/* =========================================================================
+   12. INITIALIZATION
+   ========================================================================= */
+document.addEventListener('DOMContentLoaded', () => {
+    initZentraHalftoneBackground();
+    initTerminalKeyboard();
+
+    // Set initial tab slider position
+    const activeBtn = document.querySelector('.nav-tab-btn.active');
+    if (activeBtn) updateTabSlider(activeBtn);
+
+    loadStatus();
+    fetchLogs();
+
+    // Polling loop for status & logs
+    setInterval(() => {
+        loadStatus();
+        if (currentTab === 'console') {
+            fetchLogs();
+        }
+    }, pollInterval);
+});
