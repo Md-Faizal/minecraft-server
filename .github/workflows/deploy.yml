@@ -35,15 +35,34 @@ jobs:
           SSH_USER: ${{ secrets.SSH_USER || 'ubuntu' }}
           SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
         run: |
+          if [ -z "$SSH_KEY" ]; then
+            echo "::error::SSH_KEY secret is missing! Please add SSH_KEY in GitHub Repository Settings -> Secrets and variables -> Actions."
+            exit 1
+          fi
+          if [ -z "$SSH_HOST" ]; then
+            echo "::error::SSH_HOST secret is missing! Please add SSH_HOST in GitHub Repository Settings -> Secrets and variables -> Actions."
+            exit 1
+          fi
+
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
+          
+          # Handle raw PEM key or base64 encoded
           if echo "$SSH_KEY" | grep -q "^LS0t"; then
             echo "$SSH_KEY" | base64 -d > ~/.ssh/id_rsa
           else
-            echo "$SSH_KEY" | tr -d '\r' > ~/.ssh/id_rsa
+            printf "%s\n" "$SSH_KEY" | tr -d '\r' > ~/.ssh/id_rsa
           fi
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -p "$SSH_PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+          # Configure SSH client for non-interactive CI
+          cat << 'EOF' > ~/.ssh/config
+          Host *
+            StrictHostKeyChecking no
+            UserKnownHostsFile=/dev/null
+            LogLevel ERROR
+          EOF
+          chmod 600 ~/.ssh/config
 
       - name: Deploy Binary and Static Assets
         env:
@@ -54,13 +73,13 @@ jobs:
           TARGET_DIR="/home/ubuntu/stack/games/minecraft"
 
           echo "📦 Copying compiled binary to VM..."
-          scp -P "$SSH_PORT" -i ~/.ssh/id_rsa target/release/minecraft-server-manager "$SSH_USER@$SSH_HOST:$TARGET_DIR/minecraft-server-manager.new"
+          scp -P "$SSH_PORT" -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no target/release/minecraft-server-manager "$SSH_USER@$SSH_HOST:$TARGET_DIR/minecraft-server-manager.new"
 
           echo "📁 Syncing static assets and templates..."
-          scp -P "$SSH_PORT" -i ~/.ssh/id_rsa -r static templates "$SSH_USER@$SSH_HOST:$TARGET_DIR/"
+          scp -P "$SSH_PORT" -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -r static templates "$SSH_USER@$SSH_HOST:$TARGET_DIR/"
 
           echo "🚀 Activating new binary and restarting service..."
-          ssh -p "$SSH_PORT" -i ~/.ssh/id_rsa "$SSH_USER@$SSH_HOST" "bash -s" << 'EOF'
+          ssh -p "$SSH_PORT" -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no "$SSH_USER@$SSH_HOST" "bash -s" << 'EOF'
             set -e
             TARGET_DIR="/home/ubuntu/stack/games/minecraft"
             
