@@ -1,0 +1,90 @@
+name: Build & Deploy Minecraft Server Manager
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-minecraft-manager
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    name: Build Rust Binary & Deploy to VM
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build Release Binary
+        run: cargo build --release
+
+      - name: Setup SSH
+        env:
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER || 'ubuntu' }}
+          SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          if echo "$SSH_KEY" | grep -q "^LS0t"; then
+            echo "$SSH_KEY" | base64 -d > ~/.ssh/id_rsa
+          else
+            echo "$SSH_KEY" | tr -d '\r' > ~/.ssh/id_rsa
+          fi
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -p "$SSH_PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Deploy Binary and Static Assets
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER || 'ubuntu' }}
+          SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
+        run: |
+          TARGET_DIR="/home/ubuntu/stack/games/minecraft"
+
+          echo "📦 Copying compiled binary to VM..."
+          scp -P "$SSH_PORT" -i ~/.ssh/id_rsa target/release/minecraft-server-manager "$SSH_USER@$SSH_HOST:$TARGET_DIR/minecraft-server-manager.new"
+
+          echo "📁 Syncing static assets and templates..."
+          scp -P "$SSH_PORT" -i ~/.ssh/id_rsa -r static templates "$SSH_USER@$SSH_HOST:$TARGET_DIR/"
+
+          echo "🚀 Activating new binary and restarting service..."
+          ssh -p "$SSH_PORT" -i ~/.ssh/id_rsa "$SSH_USER@$SSH_HOST" "bash -s" << 'EOF'
+            set -e
+            TARGET_DIR="/home/ubuntu/stack/games/minecraft"
+            
+            # Make binary executable and atomic swap
+            chmod +x "$TARGET_DIR/minecraft-server-manager.new"
+            mv "$TARGET_DIR/minecraft-server-manager.new" "$TARGET_DIR/minecraft-server-manager"
+
+            # Check if systemd service needs update to point to Rust binary
+            SERVICE_FILE="/etc/systemd/system/mc-manager.service"
+            if grep -q "python3 src/app.py" "$SERVICE_FILE"; then
+              echo "Updating systemd service to run Rust binary..."
+              sudo sed -i 's|ExecStart=.*|ExecStart=/home/ubuntu/stack/games/minecraft/minecraft-server-manager|g' "$SERVICE_FILE"
+              sudo systemctl daemon-reload
+            fi
+
+            echo "Restarting mc-manager service..."
+            sudo systemctl restart mc-manager
+
+            echo "Verifying service health..."
+            sleep 2
+            curl -fsS http://127.0.0.1:5000/api/status || {
+              echo "Health check failed! Checking logs:"
+              journalctl -u mc-manager.service --no-pager -n 20
+              exit 1
+            }
+            echo "✅ Deployment successful and verified healthy!"
+          EOF

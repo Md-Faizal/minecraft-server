@@ -136,6 +136,7 @@ class HeadlessMinecraftServerManager:
             {"key": "max-players", "label": "Max Players", "type": "int", "default": 10},
             {"key": "server-port", "label": "Server Port", "type": "int", "default": 19132},
             {"key": "server-portv6", "label": "Server Port (v6)", "type": "int", "default": 19133},
+            {"key": "transport", "label": "Transport", "type": "choice", "choices": ["nethernet", "raknet"], "default": "nethernet"},
             {"key": "enable-lan-visibility", "label": "Enable LAN Visibility", "type": "bool", "default": True},
             {"key": "level-name", "label": "Level Name", "type": "str", "default": "Bedrock level"},
             {"key": "level-seed", "label": "Level Seed", "type": "str", "default": ""},
