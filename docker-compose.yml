@@ -17,5 +17,10 @@ services:
       - HOST=0.0.0.0
     deploy:
       resources:
+        limits:
+          # Prevents BDS from consuming all RAM during chunk gen (causes kernel page-swap = chunk stall)
+          # Adjust to ~75% of your total host RAM
+          memory: 2G
+          cpus: '2.0'
         reservations:
           memory: 350M

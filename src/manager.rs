@@ -85,18 +85,21 @@ impl ServerManager {
                         map.insert(k, v.trim().to_string());
                     }
                 }
+                // --- Chunk loading performance: applied once-for-all on every boot ---
                 map.insert("client-side-chunk-generation-enabled".to_string(), "false".to_string());
-                if let Some(vd) = map.get("view-distance") {
-                    if let Ok(v) = vd.parse::<i32>() {
-                        if v > 7 {
-                            map.insert("view-distance".to_string(), "7".to_string());
-                        }
-                    }
-                } else {
-                    map.insert("view-distance".to_string(), "7".to_string());
-                }
+                // Force exact view-distance — 6 is the BDS sweet spot for low-lag chunk delivery
+                map.insert("view-distance".to_string(), "6".to_string());
+                // tick-distance must be <= view-distance; 2 stops server from simulating far chunks
+                map.insert("tick-distance".to_string(), "2".to_string());
+                // max-threads=0 lets BDS use all available cores for chunk I/O
                 map.insert("max-threads".to_string(), "0".to_string());
+                // Async chunk writes — never block the main tick on disk flush
                 map.insert("sync-chunk-writes".to_string(), "false".to_string());
+                // snappy is far cheaper than zlib for chunk packet compression
+                map.insert("compression-algorithm".to_string(), "snappy".to_string());
+                map.insert("compression-threshold".to_string(), "512".to_string());
+                // Stop BDS from eagerly pre-generating chunks in all directions
+                map.insert("server-build-radius-ratio".to_string(), "Disabled".to_string());
                 if !map.contains_key("transport") {
                     map.insert("transport".to_string(), "nethernet".to_string());
                 }
@@ -739,19 +742,21 @@ impl ServerManager {
             map.insert("level-seed".to_string(), profile.seed.clone());
         }
 
-        // Apply performance optimizations to eliminate chunk loading stutter and lag:
+        // --- Chunk loading performance: permanent, applied on every world sync ---
         map.insert("client-side-chunk-generation-enabled".to_string(), "false".to_string());
-        if let Some(vd) = map.get("view-distance") {
-            if let Ok(v) = vd.parse::<i32>() {
-                if v > 7 {
-                    map.insert("view-distance".to_string(), "7".to_string());
-                }
-            }
-        } else {
-            map.insert("view-distance".to_string(), "7".to_string());
-        }
+        // Force exact view-distance — 6 is the BDS sweet spot for low-lag chunk delivery
+        map.insert("view-distance".to_string(), "6".to_string());
+        // tick-distance must be <= view-distance; 2 stops server from simulating far chunks
+        map.insert("tick-distance".to_string(), "2".to_string());
+        // max-threads=0 lets BDS use all available cores for chunk I/O
         map.insert("max-threads".to_string(), "0".to_string());
+        // Async chunk writes — never block the main tick on disk flush
         map.insert("sync-chunk-writes".to_string(), "false".to_string());
+        // snappy is far cheaper than zlib for chunk packet compression
+        map.insert("compression-algorithm".to_string(), "snappy".to_string());
+        map.insert("compression-threshold".to_string(), "512".to_string());
+        // Stop BDS from eagerly pre-generating chunks in all directions
+        map.insert("server-build-radius-ratio".to_string(), "Disabled".to_string());
         if !map.contains_key("transport") {
             map.insert("transport".to_string(), "nethernet".to_string());
         }

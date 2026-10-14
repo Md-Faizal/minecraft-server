@@ -20,9 +20,9 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 futures-util = "0.3"
 
 [profile.release]
-opt-level = 2
-codegen-units = 256
-lto = "off"
+opt-level = 3
+codegen-units = 1
+lto = "thin"
 panic = "abort"
 strip = true
 debug = false
