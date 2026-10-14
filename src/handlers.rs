@@ -135,17 +135,33 @@ pub async fn api_command(
 
 pub async fn api_worlds(State(mgr): State<Arc<ServerManager>>) -> Json<WorldsResponse> {
     let mut worlds = Vec::new();
+    let active_world = mgr.get_active_world_name();
+
     if let Ok(entries) = fs::read_dir(&mgr.worlds_dir) {
         for entry in entries.flatten() {
             if entry.path().is_dir() {
                 if let Ok(name) = entry.file_name().into_string() {
-                    worlds.push(name);
+                    let profile = mgr.get_world_profile(&name);
+                    let folder_size = mgr.calculate_folder_size(&entry.path());
+                    let size_formatted = ServerManager::format_bytes(folder_size);
+                    let is_active = Some(&name) == active_world.as_ref();
+
+                    worlds.push(WorldItem {
+                        name: profile.name,
+                        seed: profile.seed,
+                        gamemode: profile.gamemode,
+                        difficulty: profile.difficulty,
+                        allow_cheats: profile.allow_cheats,
+                        force_gamemode: profile.force_gamemode,
+                        world_type: profile.world_type,
+                        is_active,
+                        size_formatted,
+                    });
                 }
             }
         }
     }
-    worlds.sort();
-    let active_world = mgr.get_active_world_name();
+    worlds.sort_by(|a, b| a.name.cmp(&b.name));
     Json(WorldsResponse { worlds, active_world })
 }
 
@@ -169,46 +185,46 @@ pub async fn api_set_active_world(
         return Err((StatusCode::NOT_FOUND, Json(json!({"result": "World directory does not exist."}))));
     }
 
-    let mut lines = Vec::new();
-    if mgr.server_properties.exists() {
-        if let Ok(c) = fs::read_to_string(&mgr.server_properties) {
-            lines = c.lines().map(|s| s.to_string()).collect();
-        }
-    }
+    // Load or initialize world profile and sync its exact gamemode, difficulty, cheats, seed
+    let profile = mgr.get_world_profile(&target);
+    mgr.sync_world_profile_to_server_properties(&profile);
 
-    let mut found = false;
-    let mut out = String::new();
-    for line in lines {
-        if line.starts_with("level-name=") {
-            out.push_str(&format!("level-name={}\n", target));
-            found = true;
-        } else {
-            out.push_str(&line);
-            out.push('\n');
-        }
+    // Ensure per-world addons config files exist
+    let res_packs = world_path.join("world_resource_packs.json");
+    if !res_packs.exists() {
+        let _ = fs::write(res_packs, "[]");
     }
-    if !found {
-        out.push_str(&format!("level-name={}\n", target));
-    }
-
-    if let Err(e) = fs::write(&mgr.server_properties, out) {
-        return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"result": format!("Failed to update properties: {}", e)}))));
+    let beh_packs = world_path.join("world_behavior_packs.json");
+    if !beh_packs.exists() {
+        let _ = fs::write(beh_packs, "[]");
     }
 
     if mgr.is_server_running().await {
         let m = Arc::clone(&mgr);
+        let gmode = profile.gamemode.clone();
         tokio::spawn(async move {
             m.restart_server().await;
+            tokio::time::sleep(Duration::from_millis(1500)).await;
+            m.send_server_command(&format!("defaultgamemode {}", gmode)).await;
+            m.send_server_command(&format!("gamemode {} @a", gmode)).await;
         });
     }
 
-    Ok(Json(json!({"result": format!("Active world changed to '{}'.", target)})))
+    Ok(Json(json!({"result": format!("Active world changed to '{}' (Mode: {}, Difficulty: {}).", target, profile.gamemode, profile.difficulty)})))
 }
 
 #[derive(Deserialize)]
 pub struct CreateWorldPayload {
     pub name: Option<String>,
     pub seed: Option<String>,
+    pub gamemode: Option<String>,
+    pub difficulty: Option<String>,
+    pub world_type: Option<String>,
+    pub allow_cheats: Option<bool>,
+    pub force_gamemode: Option<bool>,
+    pub show_coordinates: Option<bool>,
+    pub pvp: Option<bool>,
+    pub activate_now: Option<bool>,
 }
 
 pub async fn api_create_world(
@@ -229,13 +245,48 @@ pub async fn api_create_world(
         return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"result": format!("Failed to create world folder: {}", e)}))));
     }
 
-    if let Some(seed) = payload.seed {
-        if !seed.trim().is_empty() {
-            let _ = fs::write(world_path.join("seed.txt"), seed.trim());
+    let seed = payload.seed.unwrap_or_default().trim().to_string();
+    let gamemode = payload.gamemode.unwrap_or_else(|| "survival".to_string()).to_lowercase();
+    let difficulty = payload.difficulty.unwrap_or_else(|| "easy".to_string()).to_lowercase();
+    let world_type = payload.world_type.unwrap_or_else(|| "default".to_string()).to_lowercase();
+    let allow_cheats = payload.allow_cheats.unwrap_or(false);
+    let force_gamemode = payload.force_gamemode.unwrap_or(true);
+    let show_coordinates = payload.show_coordinates.unwrap_or(true);
+    let pvp = payload.pvp.unwrap_or(true);
+
+    let profile = WorldProfile {
+        name: name.clone(),
+        seed: seed.clone(),
+        gamemode: gamemode.clone(),
+        difficulty: difficulty.clone(),
+        allow_cheats,
+        force_gamemode,
+        world_type,
+        show_coordinates,
+        pvp,
+    };
+
+    let _ = mgr.save_world_profile(&name, &profile);
+    let _ = fs::write(world_path.join("levelname.txt"), &name);
+    let _ = fs::write(world_path.join("world_resource_packs.json"), "[]");
+    let _ = fs::write(world_path.join("world_behavior_packs.json"), "[]");
+
+    let activate_now = payload.activate_now.unwrap_or(false);
+    if activate_now {
+        mgr.sync_world_profile_to_server_properties(&profile);
+        if mgr.is_server_running().await {
+            let m = Arc::clone(&mgr);
+            tokio::spawn(async move {
+                m.restart_server().await;
+            });
         }
     }
 
-    Ok(Json(json!({"result": format!("World '{}' created.", name)})))
+    Ok(Json(json!({
+        "result": format!("World '{}' created successfully.", name),
+        "world": profile,
+        "activated": activate_now,
+    })))
 }
 
 #[derive(Deserialize)]
@@ -714,23 +765,24 @@ pub async fn api_player_command(
         return Err((StatusCode::SERVICE_UNAVAILABLE, Json(json!({"result": "Server is not running."}))));
     }
 
-    let mut cheats = false;
-    if mgr.server_properties.exists() {
-        if let Ok(c) = fs::read_to_string(&mgr.server_properties) {
-            for line in c.lines() {
-                if line.trim().starts_with("allow-cheats=") {
-                    cheats = line.trim()["allow-cheats=".len()..].trim().eq_ignore_ascii_case("true");
-                }
-            }
-        }
-    }
-
-    if !cheats {
-        return Err((StatusCode::FORBIDDEN, Json(json!({"result": "Cheats are not enabled on this world."}))));
-    }
-
+    // Server console stdin has root permissions, dispatch command directly
     mgr.send_server_command(&command).await;
-    Ok(Json(json!({"result": format!("Command sent: {}", command)})))
+    Ok(Json(json!({"result": format!("Command dispatched: {}", command)})))
+}
+
+pub async fn api_toggle_cheats(State(mgr): State<Arc<ServerManager>>) -> Json<Value> {
+    let active = mgr.get_active_world_name().unwrap_or_else(|| "Bedrock level".to_string());
+    let mut profile = mgr.get_world_profile(&active);
+    profile.allow_cheats = !profile.allow_cheats;
+    let _ = mgr.save_world_profile(&active, &profile);
+    mgr.sync_world_profile_to_server_properties(&profile);
+    mgr.send_server_command(&format!("changesetting allow-cheats {}", profile.allow_cheats)).await;
+    Json(json!({
+        "result": "success",
+        "allow_cheats": profile.allow_cheats,
+        "active_world": active,
+        "message": format!("Cheats {} on world '{}'", if profile.allow_cheats { "enabled" } else { "disabled" }, active)
+    }))
 }
 
 #[derive(Deserialize)]

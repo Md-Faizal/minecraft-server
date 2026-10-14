@@ -730,7 +730,7 @@ function serverAction(action) {
 function loadWorlds() {
     const tbody = document.getElementById('worldsTableBody');
     if (tbody) {
-        tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:var(--zentra-muted); padding:16px;"><span class="status-dot-pulse"></span> Loading worlds...</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--zentra-muted); padding:16px;"><span class="status-dot-pulse"></span> Loading worlds...</td></tr>`;
     }
 
     fetch('/api/worlds')
@@ -746,24 +746,43 @@ function loadWorlds() {
             const activeWorld = data.active_world;
 
             if (worlds.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:var(--zentra-muted); padding:16px;">No worlds found on server.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--zentra-muted); padding:16px;">No worlds found on server.</td></tr>`;
                 return;
             }
 
             tbody.innerHTML = worlds.map(w => {
-                const isActive = (w === activeWorld);
+                const wName = typeof w === 'string' ? w : (w.name || '');
+                const wSeed = typeof w === 'object' ? (w.seed || '') : '';
+                const wGamemode = typeof w === 'object' ? (w.gamemode || 'survival') : 'survival';
+                const wDifficulty = typeof w === 'object' ? (w.difficulty || 'easy') : 'easy';
+                const wSize = typeof w === 'object' ? (w.size_formatted || '--') : '--';
+                const isActive = (typeof w === 'object' && w.is_active !== undefined) ? w.is_active : (wName === activeWorld);
+
                 return `
                     <tr>
-                        <td style="font-weight:700;">${escapeHtml(w)}</td>
+                        <td style="font-weight:700;">${escapeHtml(wName)}</td>
+                        <td>
+                            <span class="metric-pill ${wGamemode === 'creative' ? 'amber' : ''}" style="text-transform:capitalize;">${escapeHtml(wGamemode)}</span>
+                        </td>
+                        <td>
+                            <span class="metric-pill neutral" style="text-transform:capitalize;">${escapeHtml(wDifficulty)}</span>
+                        </td>
+                        <td>
+                            <div style="display:flex; align-items:center; gap:6px;">
+                                <span style="font-family:var(--font-mono); font-size:12px;">${escapeHtml(wSeed || '--')}</span>
+                                ${wSeed ? `<button class="zentra-btn secondary" style="padding:2px 6px; font-size:11px;" title="Copy Seed" onclick="copyToClipboard('${escapeHtml(wSeed)}')">📋</button>` : ''}
+                            </div>
+                        </td>
+                        <td style="font-size:12px; color:var(--zentra-muted);">${escapeHtml(wSize)}</td>
                         <td>
                             ${isActive ? '<span class="metric-pill">Active World</span>' : '<span class="metric-pill neutral">Inactive</span>'}
                         </td>
                         <td>
-                            <div style="display:flex; gap:8px;">
-                                ${!isActive ? `<button class="zentra-btn emerald" style="padding:4px 10px; font-size:12px;" onclick="setActiveWorld('${escapeHtml(w)}')">Activate</button>` : ''}
-                                <button class="zentra-btn secondary" style="padding:4px 10px; font-size:12px;" onclick="backupWorld('${escapeHtml(w)}')">Backup</button>
-                                <button class="zentra-btn secondary" style="padding:4px 10px; font-size:12px;" onclick="loadBackups('${escapeHtml(w)}')">Archives</button>
-                                ${!isActive ? `<button class="zentra-btn danger" style="padding:4px 10px; font-size:12px;" onclick="deleteWorld('${escapeHtml(w)}')">Delete</button>` : ''}
+                            <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                                ${!isActive ? `<button class="zentra-btn emerald" style="padding:4px 10px; font-size:12px;" onclick="setActiveWorld('${escapeHtml(wName)}')">Activate</button>` : ''}
+                                <button class="zentra-btn secondary" style="padding:4px 10px; font-size:12px;" onclick="backupWorld('${escapeHtml(wName)}')">Backup</button>
+                                <button class="zentra-btn secondary" style="padding:4px 10px; font-size:12px;" onclick="loadBackups('${escapeHtml(wName)}')">Archives</button>
+                                ${!isActive ? `<button class="zentra-btn danger" style="padding:4px 10px; font-size:12px;" onclick="deleteWorld('${escapeHtml(wName)}')">Delete</button>` : ''}
                             </div>
                         </td>
                     </tr>
@@ -780,7 +799,7 @@ function loadWorlds() {
             if (tbody) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="3" style="text-align:center; color:var(--zentra-red); padding:16px;">
+                        <td colspan="7" style="text-align:center; color:var(--zentra-red); padding:16px;">
                             <div>Failed to load worlds (${escapeHtml(err.message || String(err))})</div>
                             <button class="zentra-btn secondary" style="margin-top:8px; padding:4px 12px; font-size:12px;" onclick="loadWorlds()">↻ Retry</button>
                         </td>
@@ -788,6 +807,27 @@ function loadWorlds() {
                 `;
             }
         });
+}
+
+function generateRandomSeed() {
+    const high = Math.floor(Math.random() * 0x7FFFFFFF);
+    const low = Math.floor(Math.random() * 0xFFFFFFFF);
+    const sign = Math.random() > 0.5 ? '' : '-';
+    const seed = sign + ((BigInt(high) << 32n) | BigInt(low)).toString();
+    const el = document.getElementById('newWorldSeed');
+    if (el) el.value = seed;
+}
+
+function copyToClipboard(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => {
+            showToast(`Seed copied: ${text}`, 'success');
+        }).catch(() => {
+            prompt("Copy seed:", text);
+        });
+    } else {
+        prompt("Copy seed:", text);
+    }
 }
 
 function setActiveWorld(world) {
@@ -801,7 +841,7 @@ function setActiveWorld(world) {
     .then(r => r.json())
     .then(data => {
         showToast(data.result || 'World activated', 'success');
-        setTimeout(() => { loadWorlds(); loadStatus(); }, 2000);
+        setTimeout(() => { loadWorlds(); loadStatus(); checkCheatsStatus(); }, 2500);
     })
     .catch(err => showToast(`Error activating world: ${err}`, 'error'));
 }
@@ -809,18 +849,41 @@ function setActiveWorld(world) {
 function submitCreateWorld() {
     const name = document.getElementById('newWorldName').value.trim();
     const seed = document.getElementById('newWorldSeed').value.trim();
-    if (!name) return alert("Please specify a world name");
+    const gamemode = document.getElementById('newWorldGamemode') ? document.getElementById('newWorldGamemode').value : 'survival';
+    const difficulty = document.getElementById('newWorldDifficulty') ? document.getElementById('newWorldDifficulty').value : 'easy';
+    const world_type = document.getElementById('newWorldType') ? document.getElementById('newWorldType').value : 'default';
+    const force_gamemode = document.getElementById('newWorldForceGamemode') ? (document.getElementById('newWorldForceGamemode').value === 'true') : true;
+    const allow_cheats = document.getElementById('newWorldCheats') ? document.getElementById('newWorldCheats').checked : false;
+    const show_coordinates = document.getElementById('newWorldCoords') ? document.getElementById('newWorldCoords').checked : true;
+    const pvp = document.getElementById('newWorldPvp') ? document.getElementById('newWorldPvp').checked : true;
+    const activate_now = document.getElementById('newWorldActivateNow') ? document.getElementById('newWorldActivateNow').checked : false;
+
+    if (!name) return alert("Please specify a world folder name");
 
     fetch('/api/worlds/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, seed })
+        body: JSON.stringify({
+            name,
+            seed,
+            gamemode,
+            difficulty,
+            world_type,
+            force_gamemode,
+            allow_cheats,
+            show_coordinates,
+            pvp,
+            activate_now
+        })
     })
     .then(r => r.json())
     .then(data => {
-        showToast(data.result || 'Created', 'success');
+        showToast(data.result || 'World created successfully', 'success');
         closeModal('createWorldModal');
         loadWorlds();
+        if (activate_now) {
+            setTimeout(() => { loadStatus(); checkCheatsStatus(); }, 2500);
+        }
     })
     .catch(err => showToast(`Error creating world: ${err}`, 'error'));
 }
@@ -1000,10 +1063,25 @@ function checkCheatsStatus() {
                 badge.textContent = '● Cheats Enabled';
             } else {
                 badge.className = 'metric-pill neutral';
-                badge.textContent = '○ Cheats Disabled (enable in Properties)';
+                badge.textContent = '○ Cheats Disabled';
             }
         })
         .catch(() => {});
+}
+
+function toggleCheats() {
+    showToast("Toggling world cheats...", "info");
+    fetch('/api/cheats/toggle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+    })
+    .then(r => r.json())
+    .then(data => {
+        showToast(data.message || (data.allow_cheats ? "Cheats enabled on world" : "Cheats disabled on world"), 'success');
+        checkCheatsStatus();
+    })
+    .catch(err => showToast(`Failed to toggle cheats: ${err}`, 'error'));
 }
 
 function sendPlayerCommand(cmd) {

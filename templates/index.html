@@ -205,12 +205,16 @@
                             <thead>
                                 <tr>
                                     <th>World Name</th>
+                                    <th>Game Mode</th>
+                                    <th>Difficulty</th>
+                                    <th>Seed</th>
+                                    <th>Size</th>
                                     <th>Status</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody id="worldsTableBody">
-                                <tr><td colspan="3" style="text-align:center;">Loading worlds...</td></tr>
+                                <tr><td colspan="7" style="text-align:center;">Loading worlds...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -241,6 +245,7 @@
                             </div>
                             <p>Dispatch in-game operator commands directly to the active world</p>
                         </div>
+                        <button class="zentra-btn secondary" id="btnToggleCheats" onclick="toggleCheats()" style="padding:4px 12px; font-size:12px;">⚡ Toggle Cheats</button>
                     </div>
                     <div class="actions-pill-grid" style="margin-bottom: 14px;">
                         <button class="zentra-btn secondary" onclick="sendPlayerCommand('time set day')">☀️ Time: Day</button>
@@ -447,25 +452,87 @@
     <!-- MODALS -->
     <!-- Create World Modal -->
     <div class="zentra-modal-backdrop" id="createWorldModal">
-        <div class="zentra-modal">
+        <div class="zentra-modal" style="max-width: 580px;">
             <div class="card-header-bar">
                 <div class="card-title-group">
                     <h3>Create New World</h3>
-                    <p>Initialize a new world directory on the server</p>
+                    <p>Configure and initialize a production-grade Bedrock world</p>
                 </div>
                 <button class="zentra-btn secondary" onclick="closeModal('createWorldModal')" style="padding:4px 10px;">✕</button>
             </div>
-            <div class="zentra-input-group">
-                <label>World Folder Name</label>
-                <input type="text" id="newWorldName" class="zentra-input" placeholder="e.g. SurvivalWorld">
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 10px;">
+                <div class="zentra-input-group" style="grid-column: span 2;">
+                    <label>World Folder Name *</label>
+                    <input type="text" id="newWorldName" class="zentra-input" placeholder="e.g. Realm_Alpha">
+                </div>
+
+                <div class="zentra-input-group" style="grid-column: span 2;">
+                    <label style="display:flex; justify-content:space-between;">
+                        <span>World Seed (Optional)</span>
+                        <a href="javascript:void(0)" onclick="generateRandomSeed()" style="color:var(--zentra-green); text-decoration:none; font-size:11px; font-weight:600;">🎲 Randomize Seed</a>
+                    </label>
+                    <input type="text" id="newWorldSeed" class="zentra-input" placeholder="e.g. 8493581080190741344">
+                </div>
+
+                <div class="zentra-input-group">
+                    <label>Default Game Mode</label>
+                    <select id="newWorldGamemode" class="zentra-input">
+                        <option value="survival" selected>Survival</option>
+                        <option value="creative">Creative</option>
+                        <option value="adventure">Adventure</option>
+                    </select>
+                </div>
+
+                <div class="zentra-input-group">
+                    <label>Difficulty</label>
+                    <select id="newWorldDifficulty" class="zentra-input">
+                        <option value="peaceful">Peaceful</option>
+                        <option value="easy" selected>Easy</option>
+                        <option value="normal">Normal</option>
+                        <option value="hard">Hard</option>
+                    </select>
+                </div>
+
+                <div class="zentra-input-group">
+                    <label>World Type</label>
+                    <select id="newWorldType" class="zentra-input">
+                        <option value="default" selected>Infinite (Default)</option>
+                        <option value="flat">Flat</option>
+                    </select>
+                </div>
+
+                <div class="zentra-input-group">
+                    <label>Force World Gamemode</label>
+                    <select id="newWorldForceGamemode" class="zentra-input">
+                        <option value="true" selected>Yes (Enforce on all players)</option>
+                        <option value="false">No (Keep player custom mode)</option>
+                    </select>
+                </div>
             </div>
-            <div class="zentra-input-group">
-                <label>World Seed (Optional)</label>
-                <input type="text" id="newWorldSeed" class="zentra-input" placeholder="e.g. 123456789">
+
+            <div style="margin-top: 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; background: rgba(0,0,0,0.02); padding: 12px; border-radius: var(--radius-card); border: 1px solid var(--zentra-border);">
+                <label style="display:flex; align-items:center; gap:8px; font-size:12px; cursor:pointer;">
+                    <input type="checkbox" id="newWorldCheats">
+                    <span>Allow Cheats</span>
+                </label>
+                <label style="display:flex; align-items:center; gap:8px; font-size:12px; cursor:pointer;">
+                    <input type="checkbox" id="newWorldCoords" checked>
+                    <span>Show Coordinates</span>
+                </label>
+                <label style="display:flex; align-items:center; gap:8px; font-size:12px; cursor:pointer;">
+                    <input type="checkbox" id="newWorldPvp" checked>
+                    <span>Enable PvP</span>
+                </label>
+                <label style="display:flex; align-items:center; gap:8px; font-size:12px; cursor:pointer; color: var(--zentra-green); font-weight:600;">
+                    <input type="checkbox" id="newWorldActivateNow" checked>
+                    <span>Activate &amp; Launch Now</span>
+                </label>
             </div>
+
             <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:20px;">
                 <button class="zentra-btn secondary" onclick="closeModal('createWorldModal')">Cancel</button>
-                <button class="zentra-btn emerald" onclick="submitCreateWorld()">Create World</button>
+                <button class="zentra-btn emerald" onclick="submitCreateWorld()">+ Create World</button>
             </div>
         </div>
     </div>

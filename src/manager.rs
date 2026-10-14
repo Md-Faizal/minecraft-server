@@ -118,7 +118,10 @@ impl ServerManager {
         }
 
         info!("Starting Bedrock Dedicated Server...");
-        self.ensure_per_world_properties();
+        if let Some(active) = self.get_active_world_name() {
+            let profile = self.get_world_profile(&active);
+            self.sync_world_profile_to_server_properties(&profile);
+        }
 
         let mut cmd = Command::new(&self.server_path);
         cmd.current_dir(&self.base_dir);
@@ -391,26 +394,193 @@ impl ServerManager {
         None
     }
 
-    pub fn ensure_per_world_properties(&self) {
-        if let Some(level_name) = self.get_active_world_name() {
-            let world_config_dir = self.data_dir.join("world_configs");
-            let _ = fs::create_dir_all(&world_config_dir);
-            let world_prop_file = world_config_dir.join(format!("{}.properties", level_name));
-
-            if world_prop_file.exists() {
-                if let Ok(lines) = fs::read_to_string(&world_prop_file) {
-                    let mut out = String::new();
-                    for line in lines.lines() {
-                        if line.starts_with("level-name=") {
-                            out.push_str(&format!("level-name={}\n", level_name));
-                        } else {
-                            out.push_str(line);
-                            out.push('\n');
-                        }
+    pub fn get_world_profile(&self, world_name: &str) -> WorldProfile {
+        let world_dir = self.worlds_dir.join(world_name);
+        let config_file = world_dir.join("world.json");
+        if config_file.exists() {
+            if let Ok(c) = fs::read_to_string(&config_file) {
+                if let Ok(mut profile) = serde_json::from_str::<WorldProfile>(&c) {
+                    profile.name = world_name.to_string();
+                    if profile.seed.is_empty() {
+                        profile.seed = self.get_world_seed(world_name);
                     }
-                    let _ = fs::write(&self.server_properties, out);
+                    return profile;
                 }
             }
+        }
+
+        // Initialize from disk: check seed and level.dat
+        let seed = self.get_world_seed(world_name);
+        let level_dat = world_dir.join("level.dat");
+        let detected_gamemode = Self::extract_gametype_from_level_dat(&level_dat).unwrap_or_else(|| "survival".to_string());
+
+        let profile = WorldProfile {
+            name: world_name.to_string(),
+            seed,
+            gamemode: detected_gamemode,
+            difficulty: "easy".to_string(),
+            allow_cheats: false,
+            force_gamemode: true,
+            world_type: "default".to_string(),
+            show_coordinates: true,
+            pvp: true,
+        };
+
+        let _ = fs::create_dir_all(&world_dir);
+        let _ = fs::write(&config_file, serde_json::to_string_pretty(&profile).unwrap_or_default());
+        profile
+    }
+
+    pub fn save_world_profile(&self, world_name: &str, profile: &WorldProfile) -> Result<(), std::io::Error> {
+        let world_dir = self.worlds_dir.join(world_name);
+        fs::create_dir_all(&world_dir)?;
+        let config_file = world_dir.join("world.json");
+        fs::write(&config_file, serde_json::to_string_pretty(profile).unwrap_or_default())?;
+        if !profile.seed.is_empty() {
+            let _ = fs::write(world_dir.join("seed.txt"), &profile.seed);
+        }
+
+        if let Some(active) = self.get_active_world_name() {
+            if active == world_name {
+                self.sync_world_profile_to_server_properties(profile);
+            }
+        }
+        Ok(())
+    }
+
+    pub fn sync_world_profile_to_server_properties(&self, profile: &WorldProfile) {
+        if !self.server_properties.exists() {
+            return;
+        }
+        let lines: Vec<String> = fs::read_to_string(&self.server_properties)
+            .unwrap_or_default()
+            .lines()
+            .map(|s| s.to_string())
+            .collect();
+
+        let mut map: HashMap<String, String> = HashMap::new();
+        let mut key_order: Vec<String> = Vec::new();
+
+        for line in lines {
+            let trimmed = line.trim();
+            if trimmed.is_empty() || trimmed.starts_with('#') {
+                continue;
+            }
+            if let Some((k, v)) = trimmed.split_once('=') {
+                let k = k.trim().to_string();
+                if !map.contains_key(&k) {
+                    key_order.push(k.clone());
+                }
+                map.insert(k, v.trim().to_string());
+            }
+        }
+
+        // Apply world-specific overrides
+        map.insert("level-name".to_string(), profile.name.clone());
+        map.insert("gamemode".to_string(), profile.gamemode.clone());
+        map.insert("force-gamemode".to_string(), profile.force_gamemode.to_string());
+        map.insert("difficulty".to_string(), profile.difficulty.clone());
+        map.insert("allow-cheats".to_string(), profile.allow_cheats.to_string());
+        if !profile.seed.is_empty() {
+            map.insert("level-seed".to_string(), profile.seed.clone());
+        }
+
+        let mut out = String::new();
+        for k in &key_order {
+            if let Some(v) = map.remove(k) {
+                out.push_str(&format!("{}={}\n", k, v));
+            }
+        }
+        for (k, v) in map {
+            out.push_str(&format!("{}={}\n", k, v));
+        }
+
+        let _ = fs::write(&self.server_properties, out);
+    }
+
+    pub fn get_world_seed(&self, world_name: &str) -> String {
+        let world_dir = self.worlds_dir.join(world_name);
+        let seed_file = world_dir.join("seed.txt");
+        if seed_file.exists() {
+            if let Ok(c) = fs::read_to_string(&seed_file) {
+                let trimmed = c.trim();
+                if !trimmed.is_empty() {
+                    return trimmed.to_string();
+                }
+            }
+        }
+
+        let level_dat = world_dir.join("level.dat");
+        if let Some(seed) = Self::extract_seed_from_level_dat(&level_dat) {
+            let s_str = seed.to_string();
+            let _ = fs::write(&seed_file, &s_str);
+            return s_str;
+        }
+
+        String::new()
+    }
+
+    pub fn extract_seed_from_level_dat(path: &std::path::Path) -> Option<i64> {
+        let data = fs::read(path).ok()?;
+        let pattern = b"RandomSeed";
+        if let Some(pos) = data.windows(pattern.len()).position(|w| w == pattern) {
+            let val_start = pos + pattern.len();
+            if val_start + 8 <= data.len() {
+                let mut bytes = [0u8; 8];
+                bytes.copy_from_slice(&data[val_start..val_start + 8]);
+                return Some(i64::from_le_bytes(bytes));
+            }
+        }
+        None
+    }
+
+    pub fn extract_gametype_from_level_dat(path: &std::path::Path) -> Option<String> {
+        let data = fs::read(path).ok()?;
+        let pattern = b"GameType";
+        if let Some(pos) = data.windows(pattern.len()).position(|w| w == pattern) {
+            let val_start = pos + pattern.len();
+            if val_start + 4 <= data.len() {
+                let mut bytes = [0u8; 4];
+                bytes.copy_from_slice(&data[val_start..val_start + 4]);
+                let gt = i32::from_le_bytes(bytes);
+                return match gt {
+                    1 => Some("creative".to_string()),
+                    2 => Some("adventure".to_string()),
+                    _ => Some("survival".to_string()),
+                };
+            }
+        }
+        None
+    }
+
+    pub fn calculate_folder_size(&self, path: &std::path::Path) -> u64 {
+        let mut total = 0;
+        if let Ok(entries) = fs::read_dir(path) {
+            for entry in entries.flatten() {
+                let p = entry.path();
+                if p.is_dir() {
+                    total += self.calculate_folder_size(&p);
+                } else if let Ok(meta) = p.metadata() {
+                    total += meta.len();
+                }
+            }
+        }
+        total
+    }
+
+    pub fn format_bytes(bytes: u64) -> String {
+        const KB: u64 = 1024;
+        const MB: u64 = KB * 1024;
+        const GB: u64 = MB * 1024;
+
+        if bytes >= GB {
+            format!("{:.2} GB", bytes as f64 / GB as f64)
+        } else if bytes >= MB {
+            format!("{:.1} MB", bytes as f64 / MB as f64)
+        } else if bytes >= KB {
+            format!("{:.0} KB", bytes as f64 / KB as f64)
+        } else {
+            format!("{} B", bytes)
         }
     }
 

@@ -40,9 +40,49 @@ pub struct PropertySchemaItem {
     pub value: Option<serde_json::Value>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorldProfile {
+    #[serde(default)]
+    pub name: String,
+    #[serde(default)]
+    pub seed: String,
+    #[serde(default = "default_gamemode")]
+    pub gamemode: String,
+    #[serde(default = "default_difficulty")]
+    pub difficulty: String,
+    #[serde(default)]
+    pub allow_cheats: bool,
+    #[serde(default = "default_true")]
+    pub force_gamemode: bool,
+    #[serde(default = "default_world_type")]
+    pub world_type: String,
+    #[serde(default = "default_true")]
+    pub show_coordinates: bool,
+    #[serde(default = "default_true")]
+    pub pvp: bool,
+}
+
+fn default_gamemode() -> String { "survival".to_string() }
+fn default_difficulty() -> String { "easy".to_string() }
+fn default_world_type() -> String { "default".to_string() }
+fn default_true() -> bool { true }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorldItem {
+    pub name: String,
+    pub seed: String,
+    pub gamemode: String,
+    pub difficulty: String,
+    pub allow_cheats: bool,
+    pub force_gamemode: bool,
+    pub world_type: String,
+    pub is_active: bool,
+    pub size_formatted: String,
+}
+
 #[derive(Debug, Serialize)]
 pub struct WorldsResponse {
-    pub worlds: Vec<String>,
+    pub worlds: Vec<WorldItem>,
     pub active_world: Option<String>,
 }
 

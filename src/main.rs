@@ -84,6 +84,7 @@ async fn main() {
         .route("/api/allowlist", get(handlers::api_allowlist_get).post(handlers::api_allowlist_post))
         .route("/api/cheats_status", get(handlers::api_cheats_status))
         .route("/api/cheats", get(handlers::api_cheats_status))
+        .route("/api/cheats/toggle", post(handlers::api_toggle_cheats))
         .route("/api/player_command", post(handlers::api_player_command))
         .route("/api/addons", get(handlers::api_get_addons))
         .route("/api/addons/apply", post(handlers::api_apply_addons))

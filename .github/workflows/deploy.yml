@@ -11,11 +11,12 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-and-deploy:
-    name: Build & Deploy
+  detect-changes:
+    name: Detect Changes
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-
+    outputs:
+      rust: ${{ steps.filter.outputs.rust }}
+      frontend: ${{ steps.filter.outputs.frontend }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -34,47 +35,72 @@ jobs:
               - 'static/**'
               - 'templates/**'
 
+  build-backend:
+    name: Build Rust Backend
+    needs: detect-changes
+    if: needs.detect-changes.outputs.rust == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
       - name: Setup Rust Toolchain
-        if: steps.filter.outputs.rust == 'true' || github.event_name == 'workflow_dispatch'
         uses: dtolnay/rust-toolchain@stable
 
       - name: Setup Mold Linker
-        if: steps.filter.outputs.rust == 'true' || github.event_name == 'workflow_dispatch'
         uses: rui314/setup-mold@v1
 
       - name: Rust Cache
-        if: steps.filter.outputs.rust == 'true' || github.event_name == 'workflow_dispatch'
         uses: Swatinem/rust-cache@v2
         with:
           cache-all-crates: "true"
 
       - name: Build Release Binary
-        if: steps.filter.outputs.rust == 'true' || github.event_name == 'workflow_dispatch'
         env:
           RUSTFLAGS: "-C link-arg=-fuse-ld=mold"
         run: cargo build --release
 
-      - name: Setup SSH
-        if: steps.filter.outputs.rust == 'true' || steps.filter.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch'
+      - name: Archive Binary Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: minecraft-server-manager
+          path: target/release/minecraft-server-manager
+          if-no-files-found: error
+          retention-days: 1
+
+  deploy:
+    name: Streamline Deploy & Verify
+    needs: [detect-changes, build-backend]
+    if: always() && !cancelled() && !contains(needs.*.result, 'failure') && (needs.detect-changes.outputs.rust == 'true' || needs.detect-changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Download Built Binary
+        if: needs.detect-changes.outputs.rust == 'true' || github.event_name == 'workflow_dispatch'
+        uses: actions/download-artifact@v4
+        with:
+          name: minecraft-server-manager
+          path: target/release/
+
+      - name: Setup SSH Environment
         env:
           SSH_KEY: ${{ secrets.SSH_KEY }}
           SSH_HOST: ${{ secrets.SSH_HOST }}
-          SSH_USER: ${{ secrets.SSH_USER || 'ubuntu' }}
-          SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
         run: |
-          if [ -z "$SSH_KEY" ]; then
-            echo "::error::SSH_KEY secret is missing! Please add SSH_KEY in GitHub Repository Settings -> Secrets and variables -> Actions."
-            exit 1
-          fi
-          if [ -z "$SSH_HOST" ]; then
-            echo "::error::SSH_HOST secret is missing! Please add SSH_HOST in GitHub Repository Settings -> Secrets and variables -> Actions."
+          if [ -z "$SSH_KEY" ] || [ -z "$SSH_HOST" ]; then
+            echo "::error::SSH_KEY or SSH_HOST secret is missing!"
             exit 1
           fi
 
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
           
-          # Handle raw PEM key or base64 encoded
           if echo "$SSH_KEY" | grep -q "^LS0t"; then
             echo "$SSH_KEY" | base64 -d > ~/.ssh/id_rsa
           else
@@ -82,59 +108,59 @@ jobs:
           fi
           chmod 600 ~/.ssh/id_rsa
 
-          # Configure SSH client with connection multiplexing and compression
           cat << 'EOF' > ~/.ssh/config
           Host *
             StrictHostKeyChecking no
             UserKnownHostsFile=/dev/null
             ControlMaster auto
             ControlPath ~/.ssh/cm-%r@%h:%p
-            ControlPersist 120s
+            ControlPersist 180s
             Compression yes
             LogLevel ERROR
           EOF
           chmod 600 ~/.ssh/config
 
-      - name: Deploy Rust Binary
-        if: steps.filter.outputs.rust == 'true' || github.event_name == 'workflow_dispatch'
+      - name: Deploy Assets & Binaries via Streaming Pipe
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER || 'ubuntu' }}
+          SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
+          RUST_CHANGED: ${{ needs.detect-changes.outputs.rust }}
+        run: |
+          TARGET_DIR="/home/ubuntu/stack/games/minecraft"
+
+          # 1. High-speed tar-stream upload for static assets and templates
+          echo "📁 Streaming frontend templates and static assets to server..."
+          tar -czf - static templates | ssh -p "$SSH_PORT" -i ~/.ssh/id_rsa "$SSH_USER@$SSH_HOST" "tar -xzf - -C $TARGET_DIR"
+
+          # 2. Deploy binary if Rust changed
+          if [ "$RUST_CHANGED" == "true" ] || [ -f "target/release/minecraft-server-manager" ]; then
+            echo "📦 Uploading compiled server manager binary..."
+            scp -P "$SSH_PORT" -i ~/.ssh/id_rsa target/release/minecraft-server-manager "$SSH_USER@$SSH_HOST:$TARGET_DIR/minecraft-server-manager.new"
+            
+            echo "🔄 Swapping binary and restarting mc-manager daemon..."
+            ssh -p "$SSH_PORT" -i ~/.ssh/id_rsa "$SSH_USER@$SSH_HOST" "bash -s" << 'EOF'
+              set -e
+              TARGET_DIR="/home/ubuntu/stack/games/minecraft"
+              chmod +x "$TARGET_DIR/minecraft-server-manager.new"
+              mv "$TARGET_DIR/minecraft-server-manager.new" "$TARGET_DIR/minecraft-server-manager"
+              sudo systemctl restart mc-manager
+  EOF
+          fi
+
+      - name: Health Verification
         env:
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_USER: ${{ secrets.SSH_USER || 'ubuntu' }}
           SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
         run: |
-          TARGET_DIR="/home/ubuntu/stack/games/minecraft"
-
-          echo "📦 Copying compiled binary to VM..."
-          scp -P "$SSH_PORT" -i ~/.ssh/id_rsa target/release/minecraft-server-manager "$SSH_USER@$SSH_HOST:$TARGET_DIR/minecraft-server-manager.new"
-
-          echo "🚀 Activating new binary..."
-          ssh -p "$SSH_PORT" -i ~/.ssh/id_rsa "$SSH_USER@$SSH_HOST" "bash -s" << 'EOF'
-            set -e
-            TARGET_DIR="/home/ubuntu/stack/games/minecraft"
-            chmod +x "$TARGET_DIR/minecraft-server-manager.new"
-            mv "$TARGET_DIR/minecraft-server-manager.new" "$TARGET_DIR/minecraft-server-manager"
-            sudo systemctl restart mc-manager
-          EOF
-
-      - name: Deploy Frontend Assets & Verify Service
-        if: steps.filter.outputs.rust == 'true' || steps.filter.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch'
-        env:
-          SSH_HOST: ${{ secrets.SSH_HOST }}
-          SSH_USER: ${{ secrets.SSH_USER || 'ubuntu' }}
-          SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
-        run: |
-          TARGET_DIR="/home/ubuntu/stack/games/minecraft"
-
-          echo "📁 Syncing static assets and templates..."
-          scp -P "$SSH_PORT" -i ~/.ssh/id_rsa -r static templates "$SSH_USER@$SSH_HOST:$TARGET_DIR/"
-
-          echo "🔍 Verifying service health..."
+          echo "🔍 Verifying remote manager daemon health..."
           ssh -p "$SSH_PORT" -i ~/.ssh/id_rsa "$SSH_USER@$SSH_HOST" "bash -s" << 'EOF'
             sleep 2
             curl -fsS http://127.0.0.1:5000/api/status || {
-              echo "Health check failed! Checking logs:"
-              journalctl -u mc-manager.service --no-pager -n 20
+              echo "Health check failed! Service logs:"
+              journalctl -u mc-manager.service --no-pager -n 25
               exit 1
             }
-            echo "✅ Deployment verified healthy!"
-          EOF
+            echo "✅ Minecraft Server Manager is healthy and active!"
+  EOF
