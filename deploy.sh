@@ -27,8 +27,7 @@ ssh "$REMOTE_HOST" bash << EOF
     source ~/.cargo/env 2>/dev/null || true
     echo "Running cargo build --release..."
     cargo build --release
-    cp target/release/minecraft-server-manager ./minecraft-server-manager
-    chmod +x ./minecraft-server-manager
+    install -m 755 target/release/minecraft-server-manager ./minecraft-server-manager
 EOF
 
 echo -e "\n[3/3] Updating systemd service and restarting..."

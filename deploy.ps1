@@ -31,8 +31,7 @@ ssh $RemoteHost @"
     source ~/.cargo/env 2>/dev/null || true
     echo "Running cargo build --release..."
     cargo build --release
-    cp target/release/minecraft-server-manager ./minecraft-server-manager
-    chmod +x ./minecraft-server-manager
+    install -m 755 target/release/minecraft-server-manager ./minecraft-server-manager
 "@
 
 # Step 3: Update systemd and restart service
