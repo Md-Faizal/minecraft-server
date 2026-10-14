@@ -1013,6 +1013,7 @@ function loadPlayers() {
             const tbody = document.getElementById('playersTableBody');
             if (!tbody) return;
             const players = data.players || [];
+            updatePlayerDropdowns(players);
             if (players.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--zentra-muted); padding:16px;">No player records found.</td></tr>`;
                 return;
@@ -1030,6 +1031,7 @@ function loadPlayers() {
                         <td>${p.in_allowlist ? '<span style="color:#059669; font-weight:600;">Allowed</span>' : '<span style="color:#dc2626; font-weight:600;">Banned</span>'}</td>
                         <td>
                             <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                                <button class="zentra-btn secondary" style="padding:4px 8px; font-size:11px; border-color:#f59e0b; color:#d97706;" onclick="selectGmPlayer('${escapeHtml(p.name)}')">🎮 Arsenal</button>
                                 ${p.in_allowlist 
                                     ? `<button class="zentra-btn danger" style="padding:4px 8px; font-size:11px;" onclick="playerAction('${escapeHtml(p.name)}', 'ban')">Ban</button>`
                                     : `<button class="zentra-btn emerald" style="padding:4px 8px; font-size:11px;" onclick="playerAction('${escapeHtml(p.name)}', 'unban')">Unban</button>`
@@ -2608,6 +2610,9 @@ document.addEventListener('DOMContentLoaded', () => {
         loadGodsEyeData();
     }
 
+    initGameMasterArsenal();
+    updateBroadcastPreview();
+
     // Polling loop for status, lifecycle countdown & logs
     setInterval(() => {
         loadStatus();
@@ -2619,3 +2624,374 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }, pollInterval);
 });
+
+/* =========================================================================
+   13. IN-GAME BROADCASTER & GAME MASTER ARSENAL
+   ========================================================================= */
+let _currentBroadcastType = 'chat';
+let _currentDispenseAmount = 1;
+
+const ARSENAL_ITEMS = [
+    { id: 'netherite_sword', name: 'Netherite Sword', icon: '⚔️', rarity: 'mythic' },
+    { id: 'netherite_pickaxe', name: 'Netherite Pickaxe', icon: '⛏️', rarity: 'mythic' },
+    { id: 'netherite_axe', name: 'Netherite Axe', icon: '🪓', rarity: 'mythic' },
+    { id: 'netherite_chestplate', name: 'Netherite Armor', icon: '🛡️', rarity: 'mythic' },
+    { id: 'elytra', name: 'Elytra Wings', icon: '🪽', rarity: 'legendary' },
+    { id: 'firework_rocket', name: 'Rockets x64', icon: '🎆', rarity: 'epic', defaultAmt: 64 },
+    { id: 'enchanted_golden_apple', name: 'God Apple', icon: '🍏', rarity: 'mythic' },
+    { id: 'totem_of_undying', name: 'Totem Undying', icon: '🧿', rarity: 'legendary' },
+    { id: 'diamond', name: 'Diamond Gem', icon: '💎', rarity: 'rare' },
+    { id: 'ender_pearl', name: 'Ender Pearl x16', icon: '🔮', rarity: 'epic', defaultAmt: 16 },
+    { id: 'tnt', name: 'TNT Block', icon: '🧨', rarity: 'epic' },
+    { id: 'cooked_beef', name: 'Cooked Steak', icon: '🥩', rarity: 'rare' },
+    { id: 'bow', name: 'Master Bow', icon: '🏹', rarity: 'epic' },
+    { id: 'arrow', name: 'Arrows x64', icon: '🎯', rarity: 'rare', defaultAmt: 64 },
+    { id: 'wind_charge', name: 'Wind Charge', icon: '💨', rarity: 'legendary' },
+    { id: 'mace', name: 'Heavy Mace', icon: '🔨', rarity: 'mythic' }
+];
+
+function initGameMasterArsenal() {
+    const grid = document.getElementById('mcArsenalGrid');
+    if (!grid) return;
+
+    grid.innerHTML = ARSENAL_ITEMS.map(item => `
+        <div class="mc-slot ${item.rarity}" onclick="dispenseItem('${item.id}', 'give', ${item.defaultAmt || _currentDispenseAmount})">
+            <div class="mc-slot-icon-row">
+                <span class="mc-slot-icon">${item.icon}</span>
+                <span style="font-size:10px; font-weight:700; opacity:0.6; text-transform:uppercase;">${item.rarity}</span>
+            </div>
+            <div class="mc-slot-name">${escapeHtml(item.name)}</div>
+            <div class="mc-slot-actions" onclick="event.stopPropagation()">
+                <button type="button" class="mc-slot-btn give" onclick="dispenseItem('${item.id}', 'give', ${item.defaultAmt || _currentDispenseAmount})">+ Give</button>
+                <button type="button" class="mc-slot-btn clear" onclick="dispenseItem('${item.id}', 'clear_item', ${item.defaultAmt || _currentDispenseAmount})">- Clear</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function updatePlayerDropdowns(players) {
+    const bcSelect = document.getElementById('bcTargetPlayer');
+    const gmSelect = document.getElementById('gmTargetPlayer');
+    if (!bcSelect || !gmSelect) return;
+
+    const bcVal = bcSelect.value || '@a';
+    const gmVal = gmSelect.value || '@a';
+
+    const opts = ['<option value="@a">👥 @a - All Players</option>'];
+    players.forEach(p => {
+        opts.push(`<option value="${escapeHtml(p.name)}">🎮 ${escapeHtml(p.name)} (${p.status})</option>`);
+    });
+
+    const optHtml = opts.join('');
+    bcSelect.innerHTML = optHtml;
+    gmSelect.innerHTML = optHtml;
+
+    if (Array.from(bcSelect.options).some(o => o.value === bcVal)) bcSelect.value = bcVal;
+    if (Array.from(gmSelect.options).some(o => o.value === gmVal)) gmSelect.value = gmVal;
+}
+
+function selectGmPlayer(playerName) {
+    const gmSelect = document.getElementById('gmTargetPlayer');
+    if (gmSelect) {
+        gmSelect.value = playerName;
+    }
+    const card = document.getElementById('gmArsenalCard');
+    if (card) {
+        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        card.style.outline = '3px solid #f59e0b';
+        setTimeout(() => { card.style.outline = 'none'; }, 1500);
+    }
+    showToast(`Operator controls focused on ${playerName}`, 'info');
+}
+
+function syncGmTarget(val) {
+    // optional sync
+}
+
+/* Broadcaster functions */
+function setBroadcastType(type) {
+    _currentBroadcastType = type;
+    document.querySelectorAll('.bc-type-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.type === type);
+    });
+
+    const subGroup = document.getElementById('bcSubtitleGroup');
+    if (subGroup) {
+        subGroup.style.display = (type === 'title') ? 'block' : 'none';
+    }
+
+    const modeLabel = document.getElementById('previewModeLabel');
+    if (modeLabel) modeLabel.textContent = type.toUpperCase();
+
+    updateBroadcastPreview();
+}
+
+function insertColorCode(code) {
+    const input = document.getElementById('bcMessageInput');
+    if (!input) return;
+
+    const start = input.selectionStart || input.value.length;
+    const end = input.selectionEnd || input.value.length;
+    const val = input.value;
+    input.value = val.substring(0, start) + code + val.substring(end);
+    input.focus();
+    input.selectionStart = input.selectionEnd = start + code.length;
+    updateBroadcastPreview();
+}
+
+function applyBroadcastPreset(key) {
+    const input = document.getElementById('bcMessageInput');
+    const subInput = document.getElementById('bcSubtitleInput');
+    const soundSelect = document.getElementById('bcSoundEffect');
+
+    switch (key) {
+        case 'welcome':
+            setBroadcastType('title');
+            if (input) input.value = "§bWelcome to §eLALALAND§b!";
+            if (subInput) subInput.value = "§aHave fun and respect the community rules!";
+            if (soundSelect) soundSelect.value = "levelup";
+            break;
+        case 'restart':
+            setBroadcastType('title');
+            if (input) input.value = "§c⚠ SERVER RESTART IN 5M ⚠";
+            if (subInput) subInput.value = "§ePlease finish your trades and save!";
+            if (soundSelect) soundSelect.value = "thunder";
+            break;
+        case 'pvp':
+            setBroadcastType('title');
+            if (input) input.value = "§6⚔ PVP ARENA EVENT ⚔";
+            if (subInput) subInput.value = "§fStarting now at World Spawn coordinates!";
+            if (soundSelect) soundSelect.value = "totem";
+            break;
+        case 'night':
+            setBroadcastType('actionbar');
+            if (input) input.value = "§9🌙 Night has fallen! Beware of monsters!";
+            if (soundSelect) soundSelect.value = "orb";
+            break;
+        case 'rules':
+            setBroadcastType('chat');
+            if (input) input.value = "§e[Server Rules] §7No griefing, no hacked clients, keep chat civil. Have fun!";
+            if (soundSelect) soundSelect.value = "none";
+            break;
+    }
+    updateBroadcastPreview();
+}
+
+function updateBroadcastPreview() {
+    const msg = (document.getElementById('bcMessageInput')?.value || '').trim();
+    const sub = (document.getElementById('bcSubtitleInput')?.value || '').trim();
+
+    const titleBox = document.getElementById('previewTitleDisplay');
+    const chatBox = document.getElementById('previewChatDisplay');
+    const actionbarBox = document.getElementById('previewActionbarDisplay');
+
+    if (!titleBox || !chatBox || !actionbarBox) return;
+
+    titleBox.style.display = 'none';
+    chatBox.style.display = 'none';
+    actionbarBox.style.display = 'none';
+
+    if (_currentBroadcastType === 'title') {
+        titleBox.style.display = 'block';
+        const mainEl = document.getElementById('previewMainTitle');
+        const subEl = document.getElementById('previewSubTitle');
+        if (mainEl) mainEl.innerHTML = parseMinecraftColorCodes(msg || "TITLE BANNER");
+        if (subEl) subEl.innerHTML = parseMinecraftColorCodes(sub || "Subtitle text here");
+    } else if (_currentBroadcastType === 'actionbar') {
+        actionbarBox.style.display = 'block';
+        const actEl = document.getElementById('previewActionbarMsg');
+        if (actEl) actEl.innerHTML = parseMinecraftColorCodes(msg || "Actionbar toast notification");
+    } else {
+        // chat or whisper
+        chatBox.style.display = 'block';
+        const chatMsgEl = document.getElementById('previewChatMsg');
+        if (chatMsgEl) chatMsgEl.innerHTML = parseMinecraftColorCodes(msg || "Welcome to the server!");
+    }
+}
+
+function dispatchCustomBroadcast() {
+    const input = document.getElementById('bcMessageInput');
+    const msg = input ? input.value.trim() : '';
+    if (!msg) return showToast("Enter a message to broadcast", "error");
+
+    const target = document.getElementById('bcTargetPlayer')?.value || '@a';
+    const sound = document.getElementById('bcSoundEffect')?.value || 'none';
+    const sub = document.getElementById('bcSubtitleInput')?.value.trim() || undefined;
+
+    const payload = {
+        message: msg,
+        broadcast_type: _currentBroadcastType,
+        target_player: target === '@a' ? null : target,
+        subtitle: (_currentBroadcastType === 'title' && sub) ? sub : null,
+        sound: sound === 'none' ? null : sound
+    };
+
+    showToast("Broadcasting message in-game...", "info");
+    fetch('/api/broadcast/custom', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    })
+    .then(r => r.json())
+    .then(data => {
+        showToast(data.result || "Broadcast sent!", "success");
+        if (input) input.value = '';
+        const subInput = document.getElementById('bcSubtitleInput');
+        if (subInput) subInput.value = '';
+        updateBroadcastPreview();
+    })
+    .catch(err => showToast(`Broadcast failed: ${err}`, "error"));
+}
+
+/* Game Master Arsenal & Controls */
+function setItemDispenseAmount(amt, btn) {
+    _currentDispenseAmount = amt;
+    document.querySelectorAll('.amount-pill-btn').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    initGameMasterArsenal();
+}
+
+function dispenseItem(itemId, action, amount) {
+    const target = document.getElementById('gmTargetPlayer')?.value || '@a';
+    const amt = amount || _currentDispenseAmount || 1;
+
+    showToast(`Sending ${action} for ${amt}x ${itemId}...`, "info");
+    fetch('/api/player/gamemaster', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            player: target,
+            action: action, // "give" or "clear_item"
+            item: itemId,
+            amount: amt
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        showToast(data.result || "Action executed", "success");
+    })
+    .catch(err => showToast(`Action failed: ${err}`, "error"));
+}
+
+function dispenseCustomItem(action) {
+    const itemId = document.getElementById('gmCustomItemId')?.value.trim();
+    if (!itemId) return showToast("Enter an item ID (e.g. mace, breeze_rod)", "error");
+    const amt = parseInt(document.getElementById('gmCustomItemAmt')?.value, 10) || 1;
+    dispenseItem(itemId, action === 'give' ? 'give' : 'clear_item', amt);
+}
+
+function clearPlayerInventoryConfirm() {
+    const target = document.getElementById('gmTargetPlayer')?.value || '@a';
+    if (!confirm(`Are you sure you want to completely clear the inventory of '${target}'?`)) return;
+
+    fetch('/api/player/gamemaster', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            player: target,
+            action: 'clear_all'
+        })
+    })
+    .then(r => r.json())
+    .then(data => showToast(data.result || "Inventory cleared", "success"))
+    .catch(err => showToast(`Clear failed: ${err}`, "error"));
+}
+
+/* XP & Level Scrubber */
+function updateGmLevelInput(val) {
+    const input = document.getElementById('gmLevelInput');
+    const badge = document.getElementById('mcLevelDisplay');
+    const bar = document.getElementById('mcXpBarFill');
+    if (input) input.value = val;
+    if (badge) badge.textContent = val;
+    if (bar) bar.style.width = `${Math.min(100, Math.max(5, (val % 30) / 30 * 100))}%`;
+}
+
+function updateGmLevelSlider(val) {
+    const slider = document.getElementById('gmLevelSlider');
+    const badge = document.getElementById('mcLevelDisplay');
+    const bar = document.getElementById('mcXpBarFill');
+    const num = parseInt(val, 10) || 0;
+    if (slider) slider.value = Math.min(100, num);
+    if (badge) badge.textContent = num;
+    if (bar) bar.style.width = `${Math.min(100, Math.max(5, (num % 30) / 30 * 100))}%`;
+}
+
+function applyGmLevel() {
+    const val = parseInt(document.getElementById('gmLevelInput')?.value, 10) || 0;
+    setGmLevelDirect(val);
+}
+
+function setGmLevelDirect(lvl) {
+    const target = document.getElementById('gmTargetPlayer')?.value || '@a';
+    updateGmLevelInput(lvl);
+
+    showToast(`Setting ${target}'s level to ${lvl}...`, "info");
+    fetch('/api/player/gamemaster', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            player: target,
+            action: 'set_level',
+            level: lvl
+        })
+    })
+    .then(r => r.json())
+    .then(data => showToast(data.result || `Level set to ${lvl}`, "success"))
+    .catch(err => showToast(`Failed to set level: ${err}`, "error"));
+}
+
+function addGmXp(lvl) {
+    const target = document.getElementById('gmTargetPlayer')?.value || '@a';
+    showToast(`Adding ${lvl} levels to ${target}...`, "info");
+
+    fetch('/api/player/gamemaster', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            player: target,
+            action: 'add_xp',
+            level: lvl
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        showToast(data.result || `Added ${lvl} levels`, "success");
+        const cur = parseInt(document.getElementById('gmLevelInput')?.value, 10) || 0;
+        updateGmLevelInput(cur + lvl);
+    })
+    .catch(err => showToast(`Failed to add XP: ${err}`, "error"));
+}
+
+/* God Mode Spells & Trolls */
+function castGmSpell(spellKey) {
+    const target = document.getElementById('gmTargetPlayer')?.value || '@a';
+
+    let action = spellKey;
+    let effect = null;
+    let duration = 30;
+    let amplifier = 1;
+
+    if (spellKey === 'speed') {
+        action = 'effect';
+        effect = 'speed';
+        duration = 30;
+        amplifier = 10;
+    }
+
+    showToast(`Casting ${spellKey} on ${target}...`, "info");
+    fetch('/api/player/gamemaster', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            player: target,
+            action: action,
+            effect: effect,
+            duration: duration,
+            amplifier: amplifier
+        })
+    })
+    .then(r => r.json())
+    .then(data => showToast(data.result || `Spell cast on ${target}`, "success"))
+    .catch(err => showToast(`Spell failed: ${err}`, "error"));
+}

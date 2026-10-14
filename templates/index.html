@@ -591,6 +591,282 @@
                     </div>
                 </div>
 
+                <!-- 1. IN-GAME BROADCASTER & TITLE BANNERS -->
+                <div class="soft-card gm-card" style="margin-bottom: 20px;">
+                    <div class="card-header-bar" style="flex-wrap:wrap; gap:12px;">
+                        <div class="card-title-group">
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <h3>📢 In-Game Broadcaster &amp; Screen Titles</h3>
+                                <span class="metric-pill" style="background:rgba(56,189,248,0.1); border-color:rgba(56,189,248,0.3); color:#0284c7;">● Live Comms</span>
+                            </div>
+                            <p>Dispatch chat messages, giant cinematic title banners, or actionbar toasts directly to online players</p>
+                        </div>
+                    </div>
+
+                    <div class="broadcast-control-deck">
+                        <!-- Channel & Target Controls Row -->
+                        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:14px; margin-bottom:16px;">
+                            <div class="zentra-input-group">
+                                <label style="font-weight:700; font-size:12px; margin-bottom:6px; display:flex; align-items:center; gap:6px;">
+                                    <span>📡 Broadcast Channel:</span>
+                                </label>
+                                <div class="broadcast-type-pills">
+                                    <button type="button" class="bc-type-btn active" data-type="chat" onclick="setBroadcastType('chat')">💬 Chat (say)</button>
+                                    <button type="button" class="bc-type-btn" data-type="title" onclick="setBroadcastType('title')">🎬 Title Banner</button>
+                                    <button type="button" class="bc-type-btn" data-type="actionbar" onclick="setBroadcastType('actionbar')">⚡ Actionbar</button>
+                                    <button type="button" class="bc-type-btn" data-type="whisper" onclick="setBroadcastType('whisper')">🤫 Whisper</button>
+                                </div>
+                            </div>
+
+                            <div class="zentra-input-group">
+                                <label style="font-weight:700; font-size:12px; margin-bottom:6px;">🎯 Target Audience / Player:</label>
+                                <select id="bcTargetPlayer" class="zentra-input" style="height:38px;">
+                                    <option value="@a">👥 @a - All Players</option>
+                                </select>
+                            </div>
+
+                            <div class="zentra-input-group">
+                                <label style="font-weight:700; font-size:12px; margin-bottom:6px;">🔊 Sound Cue Effect:</label>
+                                <select id="bcSoundEffect" class="zentra-input" style="height:38px;">
+                                    <option value="none">🔕 None (Silent)</option>
+                                    <option value="levelup">🆙 Level Up Chime</option>
+                                    <option value="orb">🔮 Experience Orb</option>
+                                    <option value="totem">🛡️ Totem of Undying</option>
+                                    <option value="thunder">⚡ Thunder Strike</option>
+                                    <option value="explode">💥 Explosion</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Message Inputs & Quick Color Palette -->
+                        <div class="zentra-input-group" style="margin-bottom:12px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; flex-wrap:wrap; gap:8px;">
+                                <label style="font-weight:700; font-size:12px;">Broadcast Message:</label>
+                                <div class="mc-color-palette" title="Click to insert Minecraft color formatting code">
+                                    <span style="font-size:11px; color:var(--zentra-muted); margin-right:4px;">Colors:</span>
+                                    <button type="button" class="mc-color-chip" style="background:#55FF55; color:#000;" onclick="insertColorCode('§a')">§a</button>
+                                    <button type="button" class="mc-color-chip" style="background:#55FFFF; color:#000;" onclick="insertColorCode('§b')">§b</button>
+                                    <button type="button" class="mc-color-chip" style="background:#FF5555; color:#fff;" onclick="insertColorCode('§c')">§c</button>
+                                    <button type="button" class="mc-color-chip" style="background:#FFFF55; color:#000;" onclick="insertColorCode('§e')">§e</button>
+                                    <button type="button" class="mc-color-chip" style="background:#FF55FF; color:#000;" onclick="insertColorCode('§d')">§d</button>
+                                    <button type="button" class="mc-color-chip" style="background:#FFAA00; color:#000;" onclick="insertColorCode('§6')">§6</button>
+                                    <button type="button" class="mc-color-chip" style="background:#FFFFFF; color:#000; border:1px solid #ccc;" onclick="insertColorCode('§f')">§f</button>
+                                    <button type="button" class="mc-color-chip" style="background:#333; color:#fff;" onclick="insertColorCode('§l')">§l Bold</button>
+                                </div>
+                            </div>
+                            <input type="text" id="bcMessageInput" class="zentra-input" placeholder="e.g. §aWelcome to the server! Event starting in 5 minutes!" oninput="updateBroadcastPreview()" onkeydown="if(event.key==='Enter') dispatchCustomBroadcast()">
+                        </div>
+
+                        <!-- Subtitle Input (Visible for Title mode) -->
+                        <div id="bcSubtitleGroup" class="zentra-input-group" style="display:none; margin-bottom:12px;">
+                            <label style="font-weight:700; font-size:12px; margin-bottom:6px;">Screen Banner Subtitle (Optional):</label>
+                            <input type="text" id="bcSubtitleInput" class="zentra-input" placeholder="e.g. §eGet your weapons ready!" oninput="updateBroadcastPreview()">
+                        </div>
+
+                        <!-- Quick Announcement Presets -->
+                        <div style="margin-bottom:16px;">
+                            <span style="font-size:11px; font-weight:700; color:var(--zentra-muted); text-transform:uppercase; letter-spacing:0.04em;">Quick Presets:</span>
+                            <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:6px;">
+                                <button type="button" class="preset-chip" onclick="applyBroadcastPreset('welcome')">👋 Welcome Players</button>
+                                <button type="button" class="preset-chip" onclick="applyBroadcastPreset('restart')">⚠️ 5m Restart Warning</button>
+                                <button type="button" class="preset-chip" onclick="applyBroadcastPreset('pvp')">⚔️ PvP Arena Event</button>
+                                <button type="button" class="preset-chip" onclick="applyBroadcastPreset('night')">🌙 Night Caution</button>
+                                <button type="button" class="preset-chip" onclick="applyBroadcastPreset('rules')">📜 Follow Server Rules</button>
+                            </div>
+                        </div>
+
+                        <!-- Live Minecraft In-Game Screen Preview -->
+                        <div class="mc-screen-preview-box">
+                            <div class="mc-preview-header">
+                                <span>IN-GAME HUD PREVIEW (<span id="previewModeLabel">CHAT</span>)</span>
+                                <span style="font-size:10px; opacity:0.7;">Bedrock 1.26</span>
+                            </div>
+                            <div class="mc-preview-viewport">
+                                <div id="previewTitleDisplay" class="mc-preview-title" style="display:none;">
+                                    <div id="previewMainTitle" class="mc-title-text">TITLE BANNER</div>
+                                    <div id="previewSubTitle" class="mc-subtitle-text">Subtitle text here</div>
+                                </div>
+                                <div id="previewChatDisplay" class="mc-preview-chat">
+                                    <div id="previewChatLine"><span style="color:#FFAA00;">[Server]</span> <span id="previewChatMsg">Welcome to the server!</span></div>
+                                </div>
+                                <div id="previewActionbarDisplay" class="mc-preview-actionbar" style="display:none;">
+                                    <span id="previewActionbarMsg">Actionbar toast notification</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Dispatch Button -->
+                        <div style="display:flex; justify-content:flex-end; margin-top:14px;">
+                            <button type="button" class="zentra-btn emerald" style="padding:10px 24px; font-size:14px; font-weight:700; display:flex; align-items:center; gap:8px;" onclick="dispatchCustomBroadcast()">
+                                <span>🚀 Dispatch Broadcast to In-Game</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. GAME MASTER ARSENAL & INVENTORY CONTROLS -->
+                <div class="soft-card gm-card" id="gmArsenalCard" style="margin-bottom: 20px;">
+                    <div class="card-header-bar" style="flex-wrap:wrap; gap:12px;">
+                        <div class="card-title-group">
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <h3>🎮 Game Master Arsenal &amp; Player Controls</h3>
+                                <span class="metric-pill" style="background:rgba(245,158,11,0.12); border-color:rgba(245,158,11,0.3); color:#b45309;">⚔️ Operator Deck</span>
+                            </div>
+                            <p>Give/remove items, edit experience levels, and cast god-mode spells and trolls</p>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <label style="font-size:12px; font-weight:700; color:var(--zentra-foreground);">Target Player:</label>
+                            <select id="gmTargetPlayer" class="zentra-input" style="height:34px; padding:4px 10px; font-weight:600; min-width:160px;" onchange="syncGmTarget(this.value)">
+                                <option value="@a">👥 @a - All Players</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- SUB-DECK 1: EXPERIENCE & LEVEL SCRUBBER -->
+                    <div class="gm-subcard" style="margin-bottom:18px;">
+                        <div class="gm-subcard-header">
+                            <span style="font-weight:700; font-size:13px; display:flex; align-items:center; gap:6px;">
+                                <span>✨ Experience &amp; Level Scrubber</span>
+                            </span>
+                            <span style="font-size:11px; color:var(--zentra-muted);">Instant Level &amp; XP Modification</span>
+                        </div>
+
+                        <!-- Authentic Minecraft XP Bar & Level Badge -->
+                        <div class="mc-xp-container">
+                            <div class="mc-xp-bar-outer">
+                                <div class="mc-xp-bar-inner" id="mcXpBarFill" style="width: 75%;"></div>
+                            </div>
+                            <div class="mc-level-badge" id="mcLevelDisplay">30</div>
+                        </div>
+
+                        <!-- Scrubber Slider & Quick Buttons -->
+                        <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-top:12px;">
+                            <div style="display:flex; align-items:center; gap:8px; flex:1; min-width:240px;">
+                                <label style="font-size:12px; font-weight:600; color:var(--zentra-muted); white-space:nowrap;">Set Level:</label>
+                                <input type="range" id="gmLevelSlider" min="0" max="100" value="30" class="mc-slider" oninput="updateGmLevelInput(this.value)">
+                                <input type="number" id="gmLevelInput" min="0" max="10000" value="30" class="zentra-input" style="width:70px; padding:4px 8px; text-align:center; font-family:var(--font-mono); font-weight:700;" oninput="updateGmLevelSlider(this.value)">
+                                <button type="button" class="zentra-btn emerald" style="padding:6px 12px; font-size:12px;" onclick="applyGmLevel()">Apply</button>
+                            </div>
+                            <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                                <button type="button" class="zentra-btn secondary" style="padding:6px 10px; font-size:11px;" onclick="addGmXp(1)">+1 Lvl</button>
+                                <button type="button" class="zentra-btn secondary" style="padding:6px 10px; font-size:11px;" onclick="addGmXp(5)">+5 Lvl</button>
+                                <button type="button" class="zentra-btn secondary" style="padding:6px 10px; font-size:11px; border-color:#10b981; color:#059669;" onclick="setGmLevelDirect(30)">⭐ Lvl 30 (Max Enchant)</button>
+                                <button type="button" class="zentra-btn secondary" style="padding:6px 10px; font-size:11px; border-color:#f59e0b; color:#d97706;" onclick="setGmLevelDirect(100)">👑 Lvl 100</button>
+                                <button type="button" class="zentra-btn danger" style="padding:6px 10px; font-size:11px;" onclick="setGmLevelDirect(0)">💀 Reset (0)</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- SUB-DECK 2: MINECRAFT ITEM ARSENAL & HOTBAR -->
+                    <div class="gm-subcard" style="margin-bottom:18px;">
+                        <div class="gm-subcard-header" style="flex-wrap:wrap; gap:8px;">
+                            <span style="font-weight:700; font-size:13px; display:flex; align-items:center; gap:6px;">
+                                <span>🎒 Interactive Minecraft Arsenal (Click to Give / Clear)</span>
+                            </span>
+                            <div style="display:flex; align-items:center; gap:6px;">
+                                <span style="font-size:11px; color:var(--zentra-muted);">Stack Amount:</span>
+                                <button type="button" class="amount-pill-btn active" data-amt="1" onclick="setItemDispenseAmount(1, this)">1x</button>
+                                <button type="button" class="amount-pill-btn" data-amt="16" onclick="setItemDispenseAmount(16, this)">16x</button>
+                                <button type="button" class="amount-pill-btn" data-amt="64" onclick="setItemDispenseAmount(64, this)">64x</button>
+                            </div>
+                        </div>
+
+                        <!-- Game-like Item Grid Slots -->
+                        <div class="mc-inventory-grid" id="mcArsenalGrid">
+                            <!-- Injected dynamically by initGameMasterArsenal() -->
+                        </div>
+
+                        <!-- Custom Item ID Dispenser Bar & Clear All -->
+                        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:14px; padding-top:12px; border-top:1px solid var(--zentra-border);">
+                            <div style="display:flex; gap:8px; flex:1; min-width:260px; align-items:center;">
+                                <input type="text" id="gmCustomItemId" class="zentra-input" placeholder="Custom item ID (e.g. mace, breeze_rod, shield, beacon)" style="padding:6px 10px; font-size:12px;">
+                                <input type="number" id="gmCustomItemAmt" min="1" max="64" value="1" class="zentra-input" style="width:65px; padding:6px 8px; font-size:12px; text-align:center;">
+                                <button type="button" class="zentra-btn emerald" style="padding:6px 14px; font-size:12px; white-space:nowrap;" onclick="dispenseCustomItem('give')">+ Give</button>
+                                <button type="button" class="zentra-btn secondary" style="padding:6px 10px; font-size:12px; white-space:nowrap;" onclick="dispenseCustomItem('clear')">- Clear</button>
+                            </div>
+                            <button type="button" class="zentra-btn danger" style="padding:6px 14px; font-size:12px; white-space:nowrap;" onclick="clearPlayerInventoryConfirm()">
+                                🗑️ Clear Entire Inventory
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- SUB-DECK 3: GOD-MODE SPELLS & TROLL POWERS -->
+                    <div class="gm-subcard">
+                        <div class="gm-subcard-header">
+                            <span style="font-weight:700; font-size:13px; display:flex; align-items:center; gap:6px;">
+                                <span>⚡ God-Mode Spells &amp; Troll Powers</span>
+                            </span>
+                            <span style="font-size:11px; color:var(--zentra-muted);">1-Click In-Game Effects</span>
+                        </div>
+
+                        <div class="gm-spells-grid">
+                            <button type="button" class="gm-spell-card smite" onclick="castGmSpell('smite')">
+                                <div class="spell-icon">⚡</div>
+                                <div class="spell-meta">
+                                    <span class="spell-title">Smite with Lightning</span>
+                                    <span class="spell-desc">Summon bolt on player</span>
+                                </div>
+                            </button>
+
+                            <button type="button" class="gm-spell-card launch" onclick="castGmSpell('launch')">
+                                <div class="spell-icon">🚀</div>
+                                <div class="spell-meta">
+                                    <span class="spell-title">Launch to Orbit</span>
+                                    <span class="spell-desc">High altitude launch</span>
+                                </div>
+                            </button>
+
+                            <button type="button" class="gm-spell-card heal" onclick="castGmSpell('heal')">
+                                <div class="spell-icon">💖</div>
+                                <div class="spell-meta">
+                                    <span class="spell-title">Full Heal &amp; Buff</span>
+                                    <span class="spell-desc">Instant HP + Golden Hearts</span>
+                                </div>
+                            </button>
+
+                            <button type="button" class="gm-spell-card godmode" onclick="castGmSpell('godmode')">
+                                <div class="spell-icon">🛡️</div>
+                                <div class="spell-meta">
+                                    <span class="spell-title">5-Min God Mode</span>
+                                    <span class="spell-desc">Invulnerability + Fire Resist</span>
+                                </div>
+                            </button>
+
+                            <button type="button" class="gm-spell-card troll" onclick="castGmSpell('troll_freeze')">
+                                <div class="spell-icon">🧊</div>
+                                <div class="spell-meta">
+                                    <span class="spell-title">Freeze &amp; Blind Troll</span>
+                                    <span class="spell-desc">Slowness 255 for 15s</span>
+                                </div>
+                            </button>
+
+                            <button type="button" class="gm-spell-card fireworks" onclick="castGmSpell('fireworks')">
+                                <div class="spell-icon">🎆</div>
+                                <div class="spell-meta">
+                                    <span class="spell-title">Victory Fireworks</span>
+                                    <span class="spell-desc">Rocket celebration salute</span>
+                                </div>
+                            </button>
+
+                            <button type="button" class="gm-spell-card speed" onclick="castGmSpell('speed')">
+                                <div class="spell-icon">💨</div>
+                                <div class="spell-meta">
+                                    <span class="spell-title">Sonic Speed (X)</span>
+                                    <span class="spell-desc">Speed 10 for 30s</span>
+                                </div>
+                            </button>
+
+                            <button type="button" class="gm-spell-card dispel" onclick="castGmSpell('clear_effects')">
+                                <div class="spell-icon">🧹</div>
+                                <div class="spell-meta">
+                                    <span class="spell-title">Dispel All Effects</span>
+                                    <span class="spell-desc">Cleanse all potion buffs/debuffs</span>
+                                </div>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Player Directory & Permissions -->
                 <div class="soft-card" style="margin-bottom: 20px;">
                     <div class="card-header-bar">

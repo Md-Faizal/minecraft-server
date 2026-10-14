@@ -1549,3 +1549,24 @@ pub async fn api_map_delete_waypoint(
         Err(err) => Err((StatusCode::BAD_REQUEST, Json(json!({"result": err})))),
     }
 }
+
+pub async fn api_custom_broadcast(
+    State(mgr): State<Arc<ServerManager>>,
+    Json(req): Json<CustomBroadcastRequest>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    match mgr.execute_custom_broadcast(req).await {
+        Ok(msg) => Ok(Json(json!({"result": msg}))),
+        Err(err) => Err((StatusCode::BAD_REQUEST, Json(json!({"result": err})))),
+    }
+}
+
+pub async fn api_gamemaster_action(
+    State(mgr): State<Arc<ServerManager>>,
+    Json(req): Json<GameMasterActionRequest>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    match mgr.execute_gamemaster_action(req).await {
+        Ok(msg) => Ok(Json(json!({"result": msg}))),
+        Err(err) => Err((StatusCode::BAD_REQUEST, Json(json!({"result": err})))),
+    }
+}
+

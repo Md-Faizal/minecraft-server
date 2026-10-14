@@ -295,3 +295,40 @@ pub struct AddWaypointRequest {
 fn default_waypoint_icon() -> String { "📍".to_string() }
 fn default_waypoint_color() -> String { "#10b981".to_string() }
 
+#[derive(Debug, Deserialize)]
+pub struct CustomBroadcastRequest {
+    pub message: String,
+    #[serde(default = "default_broadcast_type")]
+    pub broadcast_type: String, // "chat", "title", "actionbar", "whisper"
+    #[serde(default)]
+    pub target_player: Option<String>,
+    #[serde(default)]
+    pub subtitle: Option<String>,
+    #[serde(default)]
+    pub sound: Option<String>, // "levelup", "orb", "thunder", "totem", "explode"
+}
+
+fn default_broadcast_type() -> String { "chat".to_string() }
+
+#[derive(Debug, Deserialize)]
+pub struct GameMasterActionRequest {
+    pub player: String,
+    pub action: String, // "give", "clear_item", "clear_all", "set_level", "add_xp", "effect", "clear_effects", "smite", "launch", "heal", "godmode", "troll_freeze", "fireworks"
+    #[serde(default)]
+    pub item: Option<String>,
+    #[serde(default = "default_amount_one")]
+    pub amount: i32,
+    #[serde(default)]
+    pub level: Option<i32>,
+    #[serde(default)]
+    pub effect: Option<String>,
+    #[serde(default = "default_duration")]
+    pub duration: i32,
+    #[serde(default = "default_amplifier")]
+    pub amplifier: i32,
+}
+
+fn default_amount_one() -> i32 { 1 }
+fn default_duration() -> i32 { 30 }
+fn default_amplifier() -> i32 { 1 }
+

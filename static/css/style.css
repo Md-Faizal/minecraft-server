@@ -1345,3 +1345,413 @@ body {
   background: rgba(16, 185, 129, 0.15);
   transform: scale(1.08);
 }
+
+/* =========================================================================
+   12. IN-GAME BROADCASTER & GAME MASTER ARSENAL (Interactive Gamified UI)
+   ========================================================================= */
+.gm-card {
+  border-left: 3px solid #f59e0b;
+}
+
+.broadcast-type-pills {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.bc-type-btn {
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--zentra-border);
+  background: var(--zentra-surface, rgba(255, 255, 255, 0.7));
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--zentra-foreground);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.bc-type-btn:hover {
+  border-color: #38bdf8;
+  background: rgba(56, 189, 248, 0.08);
+}
+
+.bc-type-btn.active {
+  background: #0284c7;
+  color: #fff;
+  border-color: #0284c7;
+  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.3);
+}
+
+.mc-color-palette {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.mc-color-chip {
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  transition: transform 0.12s ease;
+}
+
+.mc-color-chip:hover {
+  transform: scale(1.15);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.preset-chip {
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  background: rgba(0, 0, 0, 0.04);
+  border: 1px solid var(--zentra-border);
+  color: var(--zentra-foreground);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.preset-chip:hover {
+  border-color: var(--zentra-accent);
+  background: rgba(255, 128, 0, 0.08);
+}
+
+/* In-Game Minecraft Screen Preview Box */
+.mc-screen-preview-box {
+  background: #11141a;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.5);
+  margin-top: 10px;
+}
+
+.mc-preview-header {
+  background: rgba(255, 255, 255, 0.05);
+  padding: 6px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: #94a3b8;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.mc-preview-viewport {
+  position: relative;
+  min-height: 100px;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background: radial-gradient(circle at center, rgba(30, 41, 59, 0.6) 0%, rgba(15, 23, 42, 0.95) 100%);
+}
+
+.mc-preview-title {
+  text-align: center;
+  animation: mcTitlePulse 2s infinite ease-in-out;
+}
+
+@keyframes mcTitlePulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.02); }
+}
+
+.mc-title-text {
+  font-family: 'Minecraft', 'Courier New', monospace;
+  font-size: 24px;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: 0.05em;
+  text-shadow: 2px 2px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 0 4px 12px rgba(255, 255, 255, 0.3);
+}
+
+.mc-subtitle-text {
+  font-family: 'Minecraft', 'Courier New', monospace;
+  font-size: 15px;
+  font-weight: 700;
+  color: #ffaa00;
+  margin-top: 4px;
+  text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
+}
+
+.mc-preview-chat {
+  width: 100%;
+  text-align: left;
+}
+
+.mc-preview-chat #previewChatLine {
+  font-family: 'Minecraft', 'Courier New', monospace;
+  font-size: 14px;
+  color: #ffffff;
+  background: rgba(0, 0, 0, 0.45);
+  padding: 6px 12px;
+  border-radius: 4px;
+  display: inline-block;
+  text-shadow: 1px 1px 0 #000;
+}
+
+.mc-preview-actionbar {
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  padding: 4px 16px;
+  border-radius: 6px;
+  font-family: 'Minecraft', 'Courier New', monospace;
+  font-size: 13px;
+  color: #55ffff;
+  text-shadow: 1px 1px 0 #000;
+  animation: mcActionbarFade 2.5s infinite;
+}
+
+@keyframes mcActionbarFade {
+  0%, 100% { opacity: 0.9; }
+  50% { opacity: 1; }
+}
+
+/* GM Subcards & Layout */
+.gm-subcard {
+  background: rgba(0, 0, 0, 0.02);
+  border: 1px solid var(--zentra-border);
+  border-radius: 14px;
+  padding: 14px;
+}
+
+.gm-subcard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--zentra-border);
+}
+
+/* Minecraft XP Bar & Level Badge */
+.mc-xp-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #18181b;
+  padding: 10px 14px;
+  border-radius: 12px;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.5);
+}
+
+.mc-xp-bar-outer {
+  flex: 1;
+  height: 12px;
+  background: #27272a;
+  border: 1px solid #09090b;
+  border-radius: 3px;
+  overflow: hidden;
+  position: relative;
+}
+
+.mc-xp-bar-inner {
+  height: 100%;
+  background: linear-gradient(90deg, #10b981 0%, #84cc16 70%, #a3e635 100%);
+  box-shadow: 0 0 10px #84cc16;
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+.mc-level-badge {
+  font-family: 'Minecraft', 'Courier New', monospace;
+  font-size: 18px;
+  font-weight: 800;
+  color: #84cc16;
+  text-shadow: 1.5px 1.5px 0 #000, -1.5px -1.5px 0 #000, 1.5px -1.5px 0 #000, -1.5px 1.5px 0 #000, 0 0 8px rgba(132, 204, 22, 0.6);
+  min-width: 44px;
+  text-align: center;
+  background: #09090b;
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(132, 204, 22, 0.3);
+}
+
+.mc-slider {
+  flex: 1;
+  accent-color: #10b981;
+  cursor: pointer;
+}
+
+/* Amount Pills */
+.amount-pill-btn {
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--zentra-border);
+  background: var(--zentra-surface, rgba(255, 255, 255, 0.8));
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.amount-pill-btn.active {
+  background: var(--zentra-accent);
+  color: #fff;
+  border-color: var(--zentra-accent);
+}
+
+/* Game-like Inventory Grid */
+.mc-inventory-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 8px;
+}
+
+.mc-slot {
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid var(--zentra-border);
+  border-radius: 10px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 6px;
+  transition: all 0.18s ease;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+
+.mc-slot:hover {
+  transform: translateY(-2px);
+  border-color: #38bdf8;
+  box-shadow: 0 4px 12px rgba(56, 189, 248, 0.15);
+  background: rgba(255, 255, 255, 0.95);
+}
+
+.mc-slot.mythic {
+  border-color: rgba(239, 68, 68, 0.35);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9) 0%, rgba(254, 226, 226, 0.4) 100%);
+}
+.mc-slot.mythic:hover { border-color: #ef4444; box-shadow: 0 4px 14px rgba(239, 68, 68, 0.2); }
+
+.mc-slot.legendary {
+  border-color: rgba(245, 158, 11, 0.35);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9) 0%, rgba(254, 243, 199, 0.4) 100%);
+}
+.mc-slot.legendary:hover { border-color: #f59e0b; box-shadow: 0 4px 14px rgba(245, 158, 11, 0.2); }
+
+.mc-slot.epic {
+  border-color: rgba(168, 85, 247, 0.35);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9) 0%, rgba(243, 232, 255, 0.4) 100%);
+}
+.mc-slot.epic:hover { border-color: #a855f7; box-shadow: 0 4px 14px rgba(168, 85, 247, 0.2); }
+
+.mc-slot.rare {
+  border-color: rgba(14, 165, 233, 0.35);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9) 0%, rgba(224, 242, 254, 0.4) 100%);
+}
+.mc-slot.rare:hover { border-color: #0ea5e9; box-shadow: 0 4px 14px rgba(14, 165, 233, 0.2); }
+
+.mc-slot-icon-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.mc-slot-icon {
+  font-size: 22px;
+}
+
+.mc-slot-name {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--zentra-foreground);
+  line-height: 1.2;
+}
+
+.mc-slot-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.mc-slot-btn {
+  flex: 1;
+  padding: 3px 0;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 4px;
+  border: 1px solid var(--zentra-border);
+  background: var(--zentra-surface, rgba(255, 255, 255, 0.8));
+  color: var(--zentra-foreground);
+  cursor: pointer;
+  transition: all 0.12s ease;
+  text-align: center;
+}
+
+.mc-slot-btn.give:hover {
+  background: #10b981;
+  color: #fff;
+  border-color: #10b981;
+}
+
+.mc-slot-btn.clear:hover {
+  background: #ef4444;
+  color: #fff;
+  border-color: #ef4444;
+}
+
+/* GM Superpower Spells Grid */
+.gm-spells-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.gm-spell-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--zentra-border);
+  background: var(--zentra-surface, rgba(255, 255, 255, 0.8));
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.gm-spell-card:hover {
+  transform: translateY(-2px) scale(1.02);
+}
+
+.gm-spell-card.smite:hover { border-color: #eab308; box-shadow: 0 4px 16px rgba(234, 179, 8, 0.25); }
+.gm-spell-card.launch:hover { border-color: #f97316; box-shadow: 0 4px 16px rgba(249, 115, 22, 0.25); }
+.gm-spell-card.heal:hover { border-color: #ec4899; box-shadow: 0 4px 16px rgba(236, 72, 153, 0.25); }
+.gm-spell-card.godmode:hover { border-color: #eab308; box-shadow: 0 4px 16px rgba(234, 179, 8, 0.35); }
+.gm-spell-card.troll:hover { border-color: #06b6d4; box-shadow: 0 4px 16px rgba(6, 182, 212, 0.25); }
+.gm-spell-card.fireworks:hover { border-color: #8b5cf6; box-shadow: 0 4px 16px rgba(139, 92, 246, 0.25); }
+.gm-spell-card.speed:hover { border-color: #3b82f6; box-shadow: 0 4px 16px rgba(59, 130, 246, 0.25); }
+.gm-spell-card.dispel:hover { border-color: #64748b; box-shadow: 0 4px 16px rgba(100, 116, 139, 0.25); }
+
+.spell-icon {
+  font-size: 24px;
+}
+
+.spell-meta {
+  display: flex;
+  flex-direction: column;
+}
+
+.spell-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--zentra-foreground);
+}
+
+.spell-desc {
+  font-size: 10px;
+  color: var(--zentra-muted);
+  margin-top: 2px;
+}

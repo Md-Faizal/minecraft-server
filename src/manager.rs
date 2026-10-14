@@ -67,6 +67,53 @@ impl ServerManager {
             let _ = fs::write(&hist_json, "{}");
         }
 
+        // Auto-optimize server.properties for zero chunk lag on boot
+        if server_properties.exists() {
+            if let Ok(content) = fs::read_to_string(&server_properties) {
+                let mut map: HashMap<String, String> = HashMap::new();
+                let mut key_order: Vec<String> = Vec::new();
+                for line in content.lines() {
+                    let trimmed = line.trim();
+                    if trimmed.is_empty() || trimmed.starts_with('#') {
+                        continue;
+                    }
+                    if let Some((k, v)) = trimmed.split_once('=') {
+                        let k = k.trim().to_string();
+                        if !map.contains_key(&k) {
+                            key_order.push(k.clone());
+                        }
+                        map.insert(k, v.trim().to_string());
+                    }
+                }
+                map.insert("client-side-chunk-generation-enabled".to_string(), "false".to_string());
+                if let Some(vd) = map.get("view-distance") {
+                    if let Ok(v) = vd.parse::<i32>() {
+                        if v > 7 {
+                            map.insert("view-distance".to_string(), "7".to_string());
+                        }
+                    }
+                } else {
+                    map.insert("view-distance".to_string(), "7".to_string());
+                }
+                map.insert("max-threads".to_string(), "0".to_string());
+                map.insert("sync-chunk-writes".to_string(), "false".to_string());
+                if !map.contains_key("transport") {
+                    map.insert("transport".to_string(), "nethernet".to_string());
+                }
+
+                let mut out = String::new();
+                for k in &key_order {
+                    if let Some(v) = map.remove(k) {
+                        out.push_str(&format!("{}={}\n", k, v));
+                    }
+                }
+                for (k, v) in map {
+                    out.push_str(&format!("{}={}\n", k, v));
+                }
+                let _ = fs::write(&server_properties, out);
+            }
+        }
+
         let waypoints_file = data_dir.join("waypoints.json");
         let initial_waypoints = if waypoints_file.exists() {
             fs::read_to_string(&waypoints_file)
@@ -692,6 +739,24 @@ impl ServerManager {
             map.insert("level-seed".to_string(), profile.seed.clone());
         }
 
+        // Apply performance optimizations to eliminate chunk loading stutter and lag:
+        map.insert("client-side-chunk-generation-enabled".to_string(), "false".to_string());
+        if let Some(vd) = map.get("view-distance") {
+            if let Ok(v) = vd.parse::<i32>() {
+                if v > 7 {
+                    map.insert("view-distance".to_string(), "7".to_string());
+                }
+            }
+        } else {
+            map.insert("view-distance".to_string(), "7".to_string());
+        }
+        map.insert("max-threads".to_string(), "0".to_string());
+        map.insert("sync-chunk-writes".to_string(), "false".to_string());
+        if !map.contains_key("transport") {
+            map.insert("transport".to_string(), "nethernet".to_string());
+        }
+
+
         let mut out = String::new();
         for k in &key_order {
             if let Some(v) = map.remove(k) {
@@ -1028,5 +1093,134 @@ impl ServerManager {
             Err("Waypoint not found".to_string())
         }
     }
+
+    pub async fn execute_custom_broadcast(&self, req: CustomBroadcastRequest) -> Result<String, String> {
+        let clean_msg = req.message.trim();
+        if clean_msg.is_empty() {
+            return Err("Broadcast message cannot be empty".to_string());
+        }
+
+        match req.broadcast_type.as_str() {
+            "title" => {
+                let target = req.target_player.as_deref().unwrap_or("@a");
+                self.send_server_command(&format!("title {} title {}", target, clean_msg)).await;
+                if let Some(sub) = req.subtitle {
+                    self.send_server_command(&format!("title {} subtitle {}", target, sub)).await;
+                }
+            }
+            "actionbar" => {
+                let target = req.target_player.as_deref().unwrap_or("@a");
+                self.send_server_command(&format!("title {} actionbar {}", target, clean_msg)).await;
+            }
+            "whisper" => {
+                if let Some(p) = req.target_player {
+                    self.send_server_command(&format!("tell \"{}\" {}", p, clean_msg)).await;
+                } else {
+                    return Err("Target player required for whisper".to_string());
+                }
+            }
+            _ => {
+                // Default to chat announcement
+                self.send_server_command(&format!("say {}", clean_msg)).await;
+            }
+        }
+
+        // Play optional sound effect
+        if let Some(s) = req.sound {
+            let sound_id = match s.as_str() {
+                "levelup" => "random.levelup",
+                "orb" => "random.orb",
+                "thunder" => "ambient.weather.thunder",
+                "totem" => "random.totem",
+                "explode" => "random.explode",
+                other => other,
+            };
+            self.send_server_command(&format!("playsound {} @a", sound_id)).await;
+        }
+
+        Ok(format!("Broadcast dispatched ({})", req.broadcast_type))
+    }
+
+    pub async fn execute_gamemaster_action(&self, req: GameMasterActionRequest) -> Result<String, String> {
+        let player = req.player.trim();
+        if player.is_empty() {
+            return Err("Player name is required".to_string());
+        }
+
+        match req.action.as_str() {
+            "give" => {
+                let item = req.item.unwrap_or_else(|| "diamond".to_string());
+                let cmd = format!("give \"{}\" {} {}", player, item, req.amount);
+                self.send_server_command(&cmd).await;
+                Ok(format!("Gave {}x {} to {}", req.amount, item, player))
+            }
+            "clear_item" => {
+                let item = req.item.unwrap_or_else(|| "diamond".to_string());
+                let cmd = format!("clear \"{}\" {} {}", player, item, req.amount);
+                self.send_server_command(&cmd).await;
+                Ok(format!("Cleared {} from {}", item, player))
+            }
+            "clear_all" => {
+                let cmd = format!("clear \"{}\"", player);
+                self.send_server_command(&cmd).await;
+                Ok(format!("Cleared all items from {}", player))
+            }
+            "set_level" => {
+                let lvl = req.level.unwrap_or(0);
+                self.send_server_command(&format!("xp -100000L \"{}\"", player)).await;
+                self.send_server_command(&format!("xp {}L \"{}\"", lvl, player)).await;
+                self.send_server_command(&format!("playsound random.levelup \"{}\"", player)).await;
+                Ok(format!("Set {}'s level to {}", player, lvl))
+            }
+            "add_xp" => {
+                let lvl = req.level.unwrap_or(5);
+                self.send_server_command(&format!("xp {}L \"{}\"", lvl, player)).await;
+                self.send_server_command(&format!("playsound random.orb \"{}\"", player)).await;
+                Ok(format!("Added {} levels to {}", lvl, player))
+            }
+            "effect" => {
+                let eff = req.effect.unwrap_or_else(|| "speed".to_string());
+                let cmd = format!("effect \"{}\" {} {} {}", player, eff, req.duration, req.amplifier);
+                self.send_server_command(&cmd).await;
+                Ok(format!("Applied effect {} to {}", eff, player))
+            }
+            "clear_effects" => {
+                self.send_server_command(&format!("effect \"{}\" clear", player)).await;
+                Ok(format!("Cleared all effects from {}", player))
+            }
+            "smite" => {
+                self.send_server_command(&format!("execute at \"{}\" run summon lightning_bolt ~ ~ ~", player)).await;
+                Ok(format!("Smited {} with lightning!", player))
+            }
+            "launch" => {
+                self.send_server_command(&format!("effect \"{}\" jump_boost 10 20", player)).await;
+                self.send_server_command(&format!("effect \"{}\" slow_falling 20 1", player)).await;
+                Ok(format!("Launched {} into low orbit!", player))
+            }
+            "heal" => {
+                self.send_server_command(&format!("effect \"{}\" instant_health 1 255", player)).await;
+                self.send_server_command(&format!("effect \"{}\" absorption 120 4", player)).await;
+                self.send_server_command(&format!("effect \"{}\" saturation 120 255", player)).await;
+                Ok(format!("Fully healed and buffed {}!", player))
+            }
+            "godmode" => {
+                self.send_server_command(&format!("effect \"{}\" resistance 300 255", player)).await;
+                self.send_server_command(&format!("effect \"{}\" fire_resistance 300 1", player)).await;
+                self.send_server_command(&format!("effect \"{}\" water_breathing 300 1", player)).await;
+                Ok(format!("Granted 5-minute God Mode to {}!", player))
+            }
+            "troll_freeze" => {
+                self.send_server_command(&format!("effect \"{}\" slowness 15 10", player)).await;
+                self.send_server_command(&format!("effect \"{}\" blindness 15 1", player)).await;
+                Ok(format!("Froze and blinded {}!", player))
+            }
+            "fireworks" => {
+                self.send_server_command(&format!("execute at \"{}\" run summon fireworks_rocket ~ ~1 ~", player)).await;
+                Ok(format!("Launched victory fireworks above {}!", player))
+            }
+            _ => Err("Unknown Game Master action".to_string()),
+        }
+    }
 }
+
 
