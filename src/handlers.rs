@@ -1512,3 +1512,40 @@ pub async fn api_set_gamerule(
         "result": format!("Gamerule '{}' updated to '{}'", req.rule, req.value)
     })))
 }
+
+pub async fn api_map_data(
+    State(mgr): State<Arc<ServerManager>>,
+) -> Json<MapDataResponse> {
+    Json(mgr.get_map_data().await)
+}
+
+pub async fn api_map_action(
+    State(mgr): State<Arc<ServerManager>>,
+    Json(req): Json<MapActionRequest>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    match mgr.execute_map_action(req).await {
+        Ok(msg) => Ok(Json(json!({"result": msg}))),
+        Err(err) => Err((StatusCode::BAD_REQUEST, Json(json!({"result": err})))),
+    }
+}
+
+pub async fn api_map_add_waypoint(
+    State(mgr): State<Arc<ServerManager>>,
+    Json(req): Json<AddWaypointRequest>,
+) -> Result<Json<MapWaypoint>, (StatusCode, Json<Value>)> {
+    match mgr.add_map_waypoint(req).await {
+        Ok(wp) => Ok(Json(wp)),
+        Err(err) => Err((StatusCode::BAD_REQUEST, Json(json!({"result": err})))),
+    }
+}
+
+pub async fn api_map_delete_waypoint(
+    State(mgr): State<Arc<ServerManager>>,
+    Json(req): Json<Value>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    let id = req.get("id").and_then(|v| v.as_str()).unwrap_or("");
+    match mgr.delete_map_waypoint(id).await {
+        Ok(()) => Ok(Json(json!({"result": "Waypoint removed"}))),
+        Err(err) => Err((StatusCode::BAD_REQUEST, Json(json!({"result": err})))),
+    }
+}

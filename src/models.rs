@@ -224,3 +224,74 @@ pub struct SetGameruleRequest {
     pub value: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MapPlayer {
+    pub name: String,
+    pub x: f64,
+    pub y: f64,
+    pub z: f64,
+    pub yaw: f64,
+    pub dimension: String,
+    pub health: u32,
+    pub gamemode: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MapWaypoint {
+    pub id: String,
+    pub name: String,
+    pub x: f64,
+    pub y: f64,
+    pub z: f64,
+    pub icon: String,
+    pub color: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MapDataResponse {
+    pub world_name: String,
+    pub spawn_x: f64,
+    pub spawn_y: f64,
+    pub spawn_z: f64,
+    pub time_ticks: u64,
+    pub time_formatted: String,
+    pub weather: String,
+    pub players: Vec<MapPlayer>,
+    pub waypoints: Vec<MapWaypoint>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct MapActionRequest {
+    pub action: String, // "teleport", "lightning", "tnt", "set_spawn", "summon", "weather", "time"
+    #[serde(default)]
+    pub player: Option<String>,
+    #[serde(default)]
+    pub x: f64,
+    #[serde(default = "default_map_y")]
+    pub y: f64,
+    #[serde(default)]
+    pub z: f64,
+    #[serde(default)]
+    pub entity: Option<String>,
+    #[serde(default)]
+    pub value: Option<String>,
+}
+
+fn default_map_y() -> f64 { 64.0 }
+
+#[derive(Debug, Deserialize)]
+pub struct AddWaypointRequest {
+    pub name: String,
+    pub x: f64,
+    #[serde(default = "default_map_y")]
+    pub y: f64,
+    pub z: f64,
+    #[serde(default = "default_waypoint_icon")]
+    pub icon: String,
+    #[serde(default = "default_waypoint_color")]
+    pub color: String,
+}
+
+fn default_waypoint_icon() -> String { "📍".to_string() }
+fn default_waypoint_color() -> String { "#10b981".to_string() }
+

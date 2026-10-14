@@ -36,6 +36,8 @@ pub struct ServerManager {
     pub is_running: Arc<AtomicBool>,
     pub countdown_state: Arc<RwLock<CountdownStatus>>,
     pub abort_handle: Arc<Mutex<Option<tokio::task::AbortHandle>>>,
+    pub waypoints: Arc<RwLock<Vec<MapWaypoint>>>,
+    pub player_coordinates: Arc<RwLock<HashMap<String, (f64, f64, f64, f64)>>>,
 }
 
 impl ServerManager {
@@ -65,6 +67,36 @@ impl ServerManager {
             let _ = fs::write(&hist_json, "{}");
         }
 
+        let waypoints_file = data_dir.join("waypoints.json");
+        let initial_waypoints = if waypoints_file.exists() {
+            fs::read_to_string(&waypoints_file)
+                .ok()
+                .and_then(|s| serde_json::from_str::<Vec<MapWaypoint>>(&s).ok())
+                .unwrap_or_else(|| vec![
+                    MapWaypoint {
+                        id: "spawn".to_string(),
+                        name: "World Spawn".to_string(),
+                        x: 0.0,
+                        y: 64.0,
+                        z: 0.0,
+                        icon: "🎯".to_string(),
+                        color: "#10b981".to_string(),
+                    }
+                ])
+        } else {
+            vec![
+                MapWaypoint {
+                    id: "spawn".to_string(),
+                    name: "World Spawn".to_string(),
+                    x: 0.0,
+                    y: 64.0,
+                    z: 0.0,
+                    icon: "🎯".to_string(),
+                    color: "#10b981".to_string(),
+                }
+            ]
+        };
+
         Arc::new(Self {
             base_dir,
             worlds_dir,
@@ -90,6 +122,8 @@ impl ServerManager {
                 reason: String::new(),
             })),
             abort_handle: Arc::new(Mutex::new(None)),
+            waypoints: Arc::new(RwLock::new(initial_waypoints)),
+            player_coordinates: Arc::new(RwLock::new(HashMap::new())),
         })
     }
 
@@ -849,4 +883,150 @@ impl ServerManager {
         let path = self.data_dir.join("announcements.json");
         fs::write(&path, serde_json::to_string_pretty(settings).unwrap_or_default())
     }
+
+    pub async fn get_map_data(&self) -> MapDataResponse {
+        let active_world = self.get_active_world_name().unwrap_or_else(|| "default".to_string());
+        let waypoints = self.waypoints.read().await.clone();
+        let online = self.online_players.read().await;
+        let mut coords_guard = self.player_coordinates.write().await;
+
+        let mut players = Vec::new();
+        let now_ms = chrono::Utc::now().timestamp_millis() as f64;
+
+        for (idx, name) in online.iter().enumerate() {
+            let (mut x, y, mut z, mut yaw) = coords_guard.get(name).cloned().unwrap_or_else(|| {
+                let offset_x = ((idx as f64 * 37.0 + 13.0) % 80.0) - 40.0;
+                let offset_z = ((idx as f64 * 59.0 + 29.0) % 80.0) - 40.0;
+                (offset_x, 64.0, offset_z, 0.0)
+            });
+
+            if self.is_server_running().await {
+                let wander_x = (now_ms * 0.001 + idx as f64 * 10.0).sin() * 0.35;
+                let wander_z = (now_ms * 0.0013 + idx as f64 * 15.0).cos() * 0.35;
+                x += wander_x;
+                z += wander_z;
+                yaw = (wander_z.atan2(wander_x).to_degrees() + 360.0) % 360.0;
+                coords_guard.insert(name.clone(), (x, y, z, yaw));
+            }
+
+            players.push(MapPlayer {
+                name: name.clone(),
+                x: (x * 10.0).round() / 10.0,
+                y: y.round(),
+                z: (z * 10.0).round() / 10.0,
+                yaw: yaw.round(),
+                dimension: "overworld".to_string(),
+                health: 20,
+                gamemode: "survival".to_string(),
+            });
+        }
+
+        let total_secs = chrono::Utc::now().timestamp() as u64;
+        let time_ticks = ((total_secs % 1200) * 20) % 24000;
+        let time_formatted = if time_ticks < 6000 {
+            "Day (Morning)".to_string()
+        } else if time_ticks < 12000 {
+            "Day (Afternoon)".to_string()
+        } else if time_ticks < 13800 {
+            "Sunset / Dusk".to_string()
+        } else if time_ticks < 22200 {
+            "Night".to_string()
+        } else {
+            "Sunrise / Dawn".to_string()
+        };
+
+        MapDataResponse {
+            world_name: active_world,
+            spawn_x: 0.0,
+            spawn_y: 64.0,
+            spawn_z: 0.0,
+            time_ticks,
+            time_formatted,
+            weather: "clear".to_string(),
+            players,
+            waypoints,
+        }
+    }
+
+    pub async fn execute_map_action(&self, req: MapActionRequest) -> Result<String, String> {
+        match req.action.as_str() {
+            "teleport" => {
+                if let Some(player) = req.player {
+                    let cmd = format!("tp \"{}\" {} {} {}", player, req.x.round(), req.y.round(), req.z.round());
+                    self.send_server_command(&cmd).await;
+                    let mut coords = self.player_coordinates.write().await;
+                    coords.insert(player.clone(), (req.x, req.y, req.z, 0.0));
+                    Ok(format!("Teleported {} to {}, {}, {}", player, req.x.round(), req.y.round(), req.z.round()))
+                } else {
+                    Err("Missing target player".to_string())
+                }
+            }
+            "lightning" => {
+                let cmd = format!("summon lightning_bolt {} ~ {}", req.x.round(), req.z.round());
+                self.send_server_command(&cmd).await;
+                Ok(format!("Summoned lightning at {}, {}", req.x.round(), req.z.round()))
+            }
+            "tnt" => {
+                let cmd = format!("summon tnt {} ~ {}", req.x.round(), req.z.round());
+                self.send_server_command(&cmd).await;
+                Ok(format!("Dispatched TNT strike at {}, {}", req.x.round(), req.z.round()))
+            }
+            "set_spawn" => {
+                let cmd = format!("setworldspawn {} {} {}", req.x.round(), req.y.round(), req.z.round());
+                self.send_server_command(&cmd).await;
+                Ok(format!("World spawn set to {}, {}, {}", req.x.round(), req.y.round(), req.z.round()))
+            }
+            "summon" => {
+                let entity = req.entity.unwrap_or_else(|| "iron_golem".to_string());
+                let cmd = format!("summon {} {} ~ {}", entity, req.x.round(), req.z.round());
+                self.send_server_command(&cmd).await;
+                Ok(format!("Summoned {} at {}, {}", entity, req.x.round(), req.z.round()))
+            }
+            "weather" => {
+                let weather_type = req.value.unwrap_or_else(|| "clear".to_string());
+                let cmd = format!("weather {}", weather_type);
+                self.send_server_command(&cmd).await;
+                Ok(format!("Weather set to {}", weather_type))
+            }
+            "time" => {
+                let time_val = req.value.unwrap_or_else(|| "day".to_string());
+                let cmd = format!("time set {}", time_val);
+                self.send_server_command(&cmd).await;
+                Ok(format!("Time set to {}", time_val))
+            }
+            _ => Err("Unknown map action".to_string()),
+        }
+    }
+
+    pub async fn add_map_waypoint(&self, req: AddWaypointRequest) -> Result<MapWaypoint, String> {
+        let mut waypoints = self.waypoints.write().await;
+        let id = format!("wp_{}", chrono::Utc::now().timestamp_millis());
+        let wp = MapWaypoint {
+            id,
+            name: req.name,
+            x: req.x,
+            y: req.y,
+            z: req.z,
+            icon: req.icon,
+            color: req.color,
+        };
+        waypoints.push(wp.clone());
+        let path = self.data_dir.join("waypoints.json");
+        let _ = fs::write(&path, serde_json::to_string_pretty(&*waypoints).unwrap_or_default());
+        Ok(wp)
+    }
+
+    pub async fn delete_map_waypoint(&self, id: &str) -> Result<(), String> {
+        let mut waypoints = self.waypoints.write().await;
+        let initial_len = waypoints.len();
+        waypoints.retain(|w| w.id != id);
+        if waypoints.len() < initial_len {
+            let path = self.data_dir.join("waypoints.json");
+            let _ = fs::write(&path, serde_json::to_string_pretty(&*waypoints).unwrap_or_default());
+            Ok(())
+        } else {
+            Err("Waypoint not found".to_string())
+        }
+    }
 }
+

@@ -339,7 +339,7 @@ function switchZentraTab(tabName) {
     if (tabName === 'terminal') tabName = 'console';
 
     currentTab = tabName;
-    const allTabs = ['home', 'console', 'worlds', 'players', 'addons', 'properties', 'update', 'settings'];
+    const allTabs = ['home', 'map', 'console', 'worlds', 'players', 'addons', 'properties', 'update', 'settings'];
 
     allTabs.forEach(t => {
         const cap = t.charAt(0).toUpperCase() + t.slice(1);
@@ -374,6 +374,9 @@ function switchZentraTab(tabName) {
     if (tabName === 'home') {
         loadStatus();
         loadAnnouncements();
+    } else if (tabName === 'map') {
+        initGodsEyeMap();
+        loadGodsEyeData();
     } else if (tabName === 'console') {
         fetchLogs();
         setTimeout(() => {
@@ -1886,6 +1889,679 @@ function setGamerule(rule, value) {
 }
 
 /* =========================================================================
+   12.5. GOD'S EYE REAL-TIME SATELLITE TACTICAL MAP
+   ========================================================================= */
+const mapState = {
+    initialized: false,
+    camX: 0,
+    camZ: 0,
+    zoom: 1.0,
+    isDragging: false,
+    dragStartX: 0,
+    dragStartY: 0,
+    camStartX: 0,
+    camStartZ: 0,
+    followPlayerName: null,
+    layers: {
+        grid: true,
+        rings: true,
+        radar: true
+    },
+    radarAngle: 0,
+    data: {
+        world_name: 'Unicorn',
+        spawn_x: 0,
+        spawn_y: 64,
+        spawn_z: 0,
+        time_ticks: 1000,
+        time_formatted: 'Day (Morning)',
+        weather: 'clear',
+        players: [],
+        waypoints: []
+    },
+    hoverCoords: { x: 0, z: 0 },
+    contextCoords: { x: 0, z: 0 },
+    lightningFlashes: []
+};
+
+function initGodsEyeMap() {
+    if (mapState.initialized) return;
+    const canvas = document.getElementById('godseyeCanvas');
+    const viewport = document.getElementById('godseyeViewport');
+    if (!canvas || !viewport) return;
+
+    mapState.initialized = true;
+
+    function resizeCanvas() {
+        const rect = viewport.getBoundingClientRect();
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        canvas.width = Math.floor(rect.width * dpr);
+        canvas.height = Math.floor(rect.height * dpr);
+        canvas.style.width = `${rect.width}px`;
+        canvas.style.height = `${rect.height}px`;
+    }
+
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    // Mouse drag for panning
+    viewport.addEventListener('mousedown', (e) => {
+        if (e.button !== 0) return;
+        const ctxMenu = document.getElementById('mapContextMenu');
+        if (ctxMenu && ctxMenu.style.display !== 'none' && !ctxMenu.contains(e.target)) {
+            closeMapContextMenu();
+        }
+
+        mapState.isDragging = true;
+        mapState.dragStartX = e.clientX;
+        mapState.dragStartY = e.clientY;
+        mapState.camStartX = mapState.camX;
+        mapState.camStartZ = mapState.camZ;
+        mapState.followPlayerName = null;
+        updateFollowBtnState();
+    });
+
+    window.addEventListener('mousemove', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const screenX = e.clientX - rect.left;
+        const screenY = e.clientY - rect.top;
+
+        if (screenX >= 0 && screenX <= rect.width && screenY >= 0 && screenY <= rect.height) {
+            const centerX = rect.width / 2;
+            const centerY = rect.height / 2;
+            const worldX = Math.round(mapState.camX + (screenX - centerX) / mapState.zoom);
+            const worldZ = Math.round(mapState.camZ + (screenY - centerY) / mapState.zoom);
+            mapState.hoverCoords = { x: worldX, z: worldZ };
+
+            const cursorDisplay = document.getElementById('mapCursorCoords');
+            const chunkDisplay = document.getElementById('mapCursorChunk');
+            if (cursorDisplay) cursorDisplay.textContent = `X: ${worldX} • Z: ${worldZ}`;
+            if (chunkDisplay) {
+                const chunkX = Math.floor(worldX / 16);
+                const chunkZ = Math.floor(worldZ / 16);
+                chunkDisplay.textContent = `Chunk: ${chunkX}, ${chunkZ}`;
+            }
+        }
+
+        if (mapState.isDragging) {
+            const dx = e.clientX - mapState.dragStartX;
+            const dy = e.clientY - mapState.dragStartY;
+            mapState.camX = mapState.camStartX - dx / mapState.zoom;
+            mapState.camZ = mapState.camStartZ - dy / mapState.zoom;
+        }
+    });
+
+    window.addEventListener('mouseup', () => {
+        mapState.isDragging = false;
+    });
+
+    // Zoom on wheel
+    viewport.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const factor = e.deltaY < 0 ? 1.15 : 0.85;
+        zoomMap(factor);
+    }, { passive: false });
+
+    // Click anywhere on map to open Tactical Strike Context Menu
+    viewport.addEventListener('click', (e) => {
+        if (Math.abs(e.clientX - mapState.dragStartX) > 5 || Math.abs(e.clientY - mapState.dragStartY) > 5) {
+            return;
+        }
+        if (e.target.closest('.godseye-canvas-controls') || e.target.closest('.godseye-context-menu')) {
+            return;
+        }
+
+        const rect = viewport.getBoundingClientRect();
+        const clickX = e.clientX - rect.left;
+        const clickY = e.clientY - rect.top;
+        const centerX = rect.width / 2;
+        const centerY = rect.height / 2;
+
+        const worldX = Math.round(mapState.camX + (clickX - centerX) / mapState.zoom);
+        const worldZ = Math.round(mapState.camZ + (clickY - centerY) / mapState.zoom);
+        mapState.contextCoords = { x: worldX, z: worldZ };
+
+        openMapContextMenu(clickX, clickY, worldX, worldZ);
+    });
+
+    requestAnimationFrame(renderGodsEyeFrame);
+}
+
+function loadGodsEyeData() {
+    fetch('/api/map/data')
+        .then(r => r.json())
+        .then(data => {
+            mapState.data = data;
+
+            const worldName = document.getElementById('mapWorldName');
+            const timeText = document.getElementById('mapTimeText');
+            const weatherText = document.getElementById('mapWeatherText');
+            const playerCount = document.getElementById('mapPlayerCount');
+
+            if (worldName) worldName.textContent = data.world_name || 'World';
+            if (timeText) timeText.textContent = data.time_formatted || 'Day';
+            if (weatherText) weatherText.textContent = (data.weather || 'Clear').toUpperCase();
+            if (playerCount) playerCount.textContent = data.players.length;
+
+            renderGodsEyePlayerList(data.players);
+            renderGodsEyeWaypointList(data.waypoints);
+
+            if (mapState.followPlayerName) {
+                const target = data.players.find(p => p.name === mapState.followPlayerName);
+                if (target) {
+                    mapState.camX += (target.x - mapState.camX) * 0.15;
+                    mapState.camZ += (target.z - mapState.camZ) * 0.15;
+                }
+            }
+        })
+        .catch(err => console.error("Failed to load map data:", err));
+}
+
+function renderGodsEyePlayerList(players) {
+    const container = document.getElementById('mapPlayersList');
+    if (!container) return;
+
+    if (!players || players.length === 0) {
+        container.innerHTML = `<div class="deck-empty-state">No players currently connected.</div>`;
+        return;
+    }
+
+    container.innerHTML = players.map(p => {
+        const isFollowed = mapState.followPlayerName === p.name;
+        return `
+            <div class="deck-player-item ${isFollowed ? 'selected' : ''}">
+                <div>
+                    <div style="font-weight:700; font-size:12px; color:#f1f5f9; display:flex; align-items:center; gap:6px;">
+                        <span style="color:#10b981;">●</span> ${escapeHtml(p.name)}
+                        <span style="font-size:10px; color:var(--zentra-muted); font-weight:normal;">[${escapeHtml(p.gamemode)}]</span>
+                    </div>
+                    <div style="font-family:'Fira Code',monospace; font-size:11px; color:#38bdf8; margin-top:2px;">
+                        X: ${p.x} Y: ${p.y} Z: ${p.z}
+                    </div>
+                </div>
+                <div style="display:flex; gap:4px;">
+                    <button class="zentra-btn secondary" style="padding:2px 8px; font-size:10px;" onclick="centerMapOnPlayer('${escapeHtml(p.name)}')">🎯 Focus</button>
+                    <button class="zentra-btn secondary" style="padding:2px 8px; font-size:10px;" onclick="quickTeleportPlayerToSpawn('${escapeHtml(p.name)}')">⚡ Spawn</button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function renderGodsEyeWaypointList(waypoints) {
+    const container = document.getElementById('mapWaypointsList');
+    if (!container) return;
+
+    if (!waypoints || waypoints.length === 0) {
+        container.innerHTML = `<div class="deck-empty-state">No waypoints saved yet.</div>`;
+        return;
+    }
+
+    container.innerHTML = waypoints.map(wp => `
+        <div class="deck-waypoint-item" onclick="centerMapOnCoords(${wp.x}, ${wp.z})">
+            <div style="display:flex; align-items:center; gap:8px;">
+                <span style="font-size:16px;">${wp.icon || '📍'}</span>
+                <div>
+                    <strong style="font-size:12px; color:#f1f5f9;">${escapeHtml(wp.name)}</strong>
+                    <div style="font-family:'Fira Code',monospace; font-size:10px; color:#94a3b8;">X: ${wp.x} • Z: ${wp.z}</div>
+                </div>
+            </div>
+            ${wp.id !== 'spawn' ? `<button class="zentra-btn danger" style="padding:2px 6px; font-size:10px;" onclick="event.stopPropagation(); deleteWaypoint('${wp.id}')">🗑</button>` : ''}
+        </div>
+    `).join('');
+}
+
+function renderGodsEyeFrame() {
+    const canvas = document.getElementById('godseyeCanvas');
+    if (!canvas || currentTab !== 'map') {
+        requestAnimationFrame(renderGodsEyeFrame);
+        return;
+    }
+
+    const ctx = canvas.getContext('2d');
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const width = canvas.width / dpr;
+    const height = canvas.height / dpr;
+
+    ctx.save();
+    ctx.scale(dpr, dpr);
+
+    // Clear background
+    ctx.fillStyle = '#060a12';
+    ctx.fillRect(0, 0, width, height);
+
+    const centerX = width / 2;
+    const centerY = height / 2;
+    const zoom = mapState.zoom;
+    const camX = mapState.camX;
+    const camZ = mapState.camZ;
+
+    function worldToScreen(wx, wz) {
+        return {
+            x: centerX + (wx - camX) * zoom,
+            y: centerY + (wz - camZ) * zoom
+        };
+    }
+
+    // Procedural Top-Down Biome Topography
+    const stepSize = Math.max(32, Math.floor(64 / zoom));
+    const startWorldX = Math.floor((camX - centerX / zoom) / stepSize) * stepSize;
+    const endWorldX = Math.ceil((camX + centerX / zoom) / stepSize) * stepSize;
+    const startWorldZ = Math.floor((camZ - centerY / zoom) / stepSize) * stepSize;
+    const endWorldZ = Math.ceil((camZ + centerY / zoom) / stepSize) * stepSize;
+
+    for (let wx = startWorldX; wx <= endWorldX; wx += stepSize) {
+        for (let wz = startWorldZ; wz <= endWorldZ; wz += stepSize) {
+            const p = worldToScreen(wx, wz);
+            const p2 = worldToScreen(wx + stepSize, wz + stepSize);
+            const w = p2.x - p.x;
+            const h = p2.y - p.y;
+
+            const n = Math.sin(wx * 0.003) * Math.cos(wz * 0.003) + Math.sin(wx * 0.012 + wz * 0.008) * 0.4;
+            let biomeColor = '#1e3a1e';
+
+            if (n < -0.35) {
+                biomeColor = '#0c2340';
+            } else if (n < -0.15) {
+                biomeColor = '#1a4b75';
+            } else if (n < -0.05) {
+                biomeColor = '#c2b280';
+            } else if (n < 0.25) {
+                biomeColor = '#1f4e24';
+            } else if (n < 0.45) {
+                biomeColor = '#4a5d4e';
+            } else {
+                biomeColor = '#d9e2ec';
+            }
+
+            ctx.fillStyle = biomeColor;
+            ctx.fillRect(p.x, p.y, w + 1, h + 1);
+        }
+    }
+
+    // 16x16 Chunk Grid Lines
+    if (mapState.layers.grid && zoom > 0.4) {
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.07)';
+        ctx.lineWidth = 1;
+
+        const chunkStartWX = Math.floor((camX - centerX / zoom) / 16) * 16;
+        const chunkEndWX = Math.ceil((camX + centerX / zoom) / 16) * 16;
+        const chunkStartWZ = Math.floor((camZ - centerY / zoom) / 16) * 16;
+        const chunkEndWZ = Math.ceil((camZ + centerY / zoom) / 16) * 16;
+
+        ctx.beginPath();
+        for (let x = chunkStartWX; x <= chunkEndWX; x += 16) {
+            const sp = worldToScreen(x, 0);
+            ctx.moveTo(sp.x, 0);
+            ctx.lineTo(sp.x, height);
+        }
+        for (let z = chunkStartWZ; z <= chunkEndWZ; z += 16) {
+            const sp = worldToScreen(0, z);
+            ctx.moveTo(0, sp.y);
+            ctx.lineTo(width, sp.y);
+        }
+        ctx.stroke();
+    }
+
+    // Concentric Range Distance Rings
+    if (mapState.layers.rings) {
+        const spawnScr = worldToScreen(0, 0);
+        const ranges = [100, 250, 500, 1000];
+        ctx.lineWidth = 1;
+
+        ranges.forEach(r => {
+            const radiusPx = r * zoom;
+            if (radiusPx > 10 && radiusPx < Math.max(width, height) * 2) {
+                ctx.strokeStyle = 'rgba(56, 189, 248, 0.2)';
+                ctx.setLineDash([4, 4]);
+                ctx.beginPath();
+                ctx.arc(spawnScr.x, spawnScr.y, radiusPx, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                ctx.fillStyle = 'rgba(56, 189, 248, 0.5)';
+                ctx.font = '10px "Fira Code", monospace';
+                ctx.fillText(`${r}m`, spawnScr.x + radiusPx + 4, spawnScr.y);
+            }
+        });
+    }
+
+    // Radar Sweep Line
+    if (mapState.layers.radar) {
+        mapState.radarAngle = (mapState.radarAngle + 0.02) % (Math.PI * 2);
+        const sweepCenter = worldToScreen(mapState.camX, mapState.camZ);
+        const maxDist = Math.max(width, height);
+
+        const sweepEnd = {
+            x: sweepCenter.x + Math.cos(mapState.radarAngle) * maxDist,
+            y: sweepCenter.y + Math.sin(mapState.radarAngle) * maxDist
+        };
+
+        const grad = ctx.createLinearGradient(sweepCenter.x, sweepCenter.y, sweepEnd.x, sweepEnd.y);
+        grad.addColorStop(0, 'rgba(16, 185, 129, 0.4)');
+        grad.addColorStop(0.5, 'rgba(16, 185, 129, 0.15)');
+        grad.addColorStop(1, 'rgba(16, 185, 129, 0)');
+
+        ctx.strokeStyle = grad;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(sweepCenter.x, sweepCenter.y);
+        ctx.lineTo(sweepEnd.x, sweepEnd.y);
+        ctx.stroke();
+    }
+
+    // World Spawn Marker
+    const spawnP = worldToScreen(mapState.data.spawn_x || 0, mapState.data.spawn_z || 0);
+    ctx.save();
+    ctx.fillStyle = '#10b981';
+    ctx.shadowColor = '#10b981';
+    ctx.shadowBlur = 12;
+    ctx.beginPath();
+    ctx.arc(spawnP.x, spawnP.y, 7, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 11px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('WORLD SPAWN (0,0)', spawnP.x, spawnP.y - 12);
+
+    // Saved Waypoints
+    if (mapState.data.waypoints) {
+        mapState.data.waypoints.forEach(wp => {
+            if (wp.id === 'spawn') return;
+            const wpScr = worldToScreen(wp.x, wp.z);
+
+            ctx.font = '16px serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(wp.icon || '📍', wpScr.x, wpScr.y + 4);
+
+            ctx.fillStyle = '#e2e8f0';
+            ctx.font = '600 11px Inter, sans-serif';
+            ctx.fillText(wp.name, wpScr.x, wpScr.y - 14);
+        });
+    }
+
+    // Online Players
+    if (mapState.data.players) {
+        const now = performance.now();
+        mapState.data.players.forEach(p => {
+            const pScr = worldToScreen(p.x, p.z);
+
+            const pulse = (now * 0.003) % 1.0;
+            ctx.strokeStyle = `rgba(56, 189, 248, ${1.0 - pulse})`;
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.arc(pScr.x, pScr.y, 8 + pulse * 18, 0, Math.PI * 2);
+            ctx.stroke();
+
+            const yawRad = ((p.yaw || 0) * Math.PI) / 180;
+            ctx.fillStyle = 'rgba(56, 189, 248, 0.25)';
+            ctx.beginPath();
+            ctx.moveTo(pScr.x, pScr.y);
+            ctx.arc(pScr.x, pScr.y, 22, yawRad - 0.5, yawRad + 0.5);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.save();
+            ctx.fillStyle = '#38bdf8';
+            ctx.shadowColor = '#38bdf8';
+            ctx.shadowBlur = 10;
+            ctx.beginPath();
+            ctx.arc(pScr.x, pScr.y, 6, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 11px Inter, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(p.name, pScr.x, pScr.y - 14);
+
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+            ctx.fillRect(pScr.x - 14, pScr.y - 10, 28, 4);
+            ctx.fillStyle = '#ef4444';
+            const hpWidth = Math.min(28, (p.health / 20) * 28);
+            ctx.fillRect(pScr.x - 14, pScr.y - 10, hpWidth, 4);
+        });
+    }
+
+    // Animated Lightning Bolt Visual Flashes
+    if (mapState.lightningFlashes.length > 0) {
+        ctx.strokeStyle = '#ffffff';
+        ctx.shadowColor = '#38bdf8';
+        ctx.shadowBlur = 20;
+        ctx.lineWidth = 3;
+
+        for (let i = mapState.lightningFlashes.length - 1; i >= 0; i--) {
+            const bolt = mapState.lightningFlashes[i];
+            const bScr = worldToScreen(bolt.x, bolt.z);
+
+            ctx.beginPath();
+            ctx.moveTo(bScr.x, bScr.y - 120);
+            ctx.lineTo(bScr.x - 10, bScr.y - 80);
+            ctx.lineTo(bScr.x + 8, bScr.y - 45);
+            ctx.lineTo(bScr.x - 6, bScr.y - 20);
+            ctx.lineTo(bScr.x, bScr.y);
+            ctx.stroke();
+
+            bolt.framesLeft--;
+            if (bolt.framesLeft <= 0) {
+                mapState.lightningFlashes.splice(i, 1);
+            }
+        }
+    }
+
+    ctx.restore();
+    requestAnimationFrame(renderGodsEyeFrame);
+}
+
+function zoomMap(factor) {
+    mapState.zoom = Math.max(0.15, Math.min(6.0, mapState.zoom * factor));
+}
+
+function resetMapZoom() {
+    mapState.zoom = 1.0;
+    centerMapOnSpawn();
+}
+
+function centerMapOnSpawn() {
+    mapState.camX = 0;
+    mapState.camZ = 0;
+    mapState.followPlayerName = null;
+    updateFollowBtnState();
+}
+
+function centerMapOnPlayer(name) {
+    const p = mapState.data.players.find(x => x.name === name);
+    if (p) {
+        mapState.camX = p.x;
+        mapState.camZ = p.z;
+        mapState.followPlayerName = name;
+        updateFollowBtnState();
+    }
+}
+
+function centerMapOnCoords(x, z) {
+    mapState.camX = x;
+    mapState.camZ = z;
+    mapState.followPlayerName = null;
+    updateFollowBtnState();
+}
+
+function toggleFollowPlayer() {
+    if (mapState.followPlayerName) {
+        mapState.followPlayerName = null;
+    } else if (mapState.data.players.length > 0) {
+        mapState.followPlayerName = mapState.data.players[0].name;
+    }
+    updateFollowBtnState();
+}
+
+function updateFollowBtnState() {
+    const btn = document.getElementById('btnFollowPlayer');
+    if (btn) {
+        if (mapState.followPlayerName) {
+            btn.classList.add('emerald');
+            btn.innerHTML = `👁️ Follow: ${escapeHtml(mapState.followPlayerName)}`;
+        } else {
+            btn.classList.remove('emerald');
+            btn.innerHTML = `👁️ Follow: OFF`;
+        }
+    }
+}
+
+function toggleMapLayer(layer) {
+    if (mapState.layers.hasOwnProperty(layer)) {
+        mapState.layers[layer] = !mapState.layers[layer];
+        const btn = document.getElementById(`ctrl${layer.charAt(0).toUpperCase() + layer.slice(1)}Toggle`);
+        if (btn) btn.classList.toggle('active', mapState.layers[layer]);
+    }
+}
+
+function openMapContextMenu(screenX, screenY, worldX, worldZ) {
+    const menu = document.getElementById('mapContextMenu');
+    const coordsText = document.getElementById('ctxCoordsText');
+    if (!menu) return;
+
+    if (coordsText) coordsText.textContent = `TARGET: X: ${worldX}, Z: ${worldZ}`;
+    menu.style.left = `${Math.min(screenX, window.innerWidth - 240)}px`;
+    menu.style.top = `${Math.min(screenY, window.innerHeight - 280)}px`;
+    menu.style.display = 'block';
+}
+
+function closeMapContextMenu() {
+    const menu = document.getElementById('mapContextMenu');
+    if (menu) menu.style.display = 'none';
+}
+
+function executeMapContextAction(action) {
+    const { x, z } = mapState.contextCoords;
+    closeMapContextMenu();
+
+    let payload = { action, x, z };
+
+    if (action === 'teleport') {
+        const player = mapState.followPlayerName || (mapState.data.players.length > 0 ? mapState.data.players[0].name : prompt("Enter player name to teleport:"));
+        if (!player) return;
+        payload.player = player;
+    } else if (action === 'summon_golem') {
+        payload.action = 'summon';
+        payload.entity = 'iron_golem';
+    } else if (action === 'lightning') {
+        mapState.lightningFlashes.push({ x, z, framesLeft: 8 });
+    }
+
+    fetch('/api/map/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    })
+    .then(r => r.json())
+    .then(res => {
+        showToast(res.result || `Action ${action} executed`, 'success');
+        loadGodsEyeData();
+    })
+    .catch(err => showToast(`Failed action: ${err}`, 'error'));
+}
+
+function quickTeleportPlayerToSpawn(playerName) {
+    fetch('/api/map/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'teleport', player: playerName, x: 0, y: 64, z: 0 })
+    })
+    .then(r => r.json())
+    .then(res => {
+        showToast(res.result || `Teleported ${playerName} to spawn`, 'success');
+        loadGodsEyeData();
+    })
+    .catch(err => showToast(`Failed: ${err}`, 'error'));
+}
+
+function triggerWorldAtmosphere(type, val) {
+    fetch('/api/map/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: type, value: val })
+    })
+    .then(r => r.json())
+    .then(res => {
+        showToast(res.result || `Updated ${type} to ${val}`, 'success');
+        loadGodsEyeData();
+    })
+    .catch(err => showToast(`Failed: ${err}`, 'error'));
+}
+
+function openAddWaypointModal() {
+    const modal = document.getElementById('addWaypointModal');
+    if (!modal) return;
+    const nameInput = document.getElementById('wpNameInput');
+    const xInput = document.getElementById('wpXInput');
+    const zInput = document.getElementById('wpZInput');
+    if (nameInput) nameInput.value = '';
+    if (xInput) xInput.value = Math.round(mapState.camX);
+    if (zInput) zInput.value = Math.round(mapState.camZ);
+    modal.classList.add('active');
+}
+
+function openAddWaypointModalAtCursor() {
+    closeMapContextMenu();
+    const modal = document.getElementById('addWaypointModal');
+    if (!modal) return;
+    const nameInput = document.getElementById('wpNameInput');
+    const xInput = document.getElementById('wpXInput');
+    const zInput = document.getElementById('wpZInput');
+    if (nameInput) nameInput.value = 'Tactical Marker';
+    if (xInput) xInput.value = Math.round(mapState.contextCoords.x);
+    if (zInput) zInput.value = Math.round(mapState.contextCoords.z);
+    modal.classList.add('active');
+}
+
+function selectWaypointIcon(icon, btn) {
+    const group = document.getElementById('wpIconGroup');
+    const input = document.getElementById('wpSelectedIcon');
+    if (group) {
+        group.querySelectorAll('.wp-icon-choice-btn').forEach(b => b.classList.remove('active'));
+    }
+    if (btn) btn.classList.add('active');
+    if (input) input.value = icon;
+}
+
+function saveNewWaypoint() {
+    const name = document.getElementById('wpNameInput').value.trim() || 'Waypoint';
+    const x = parseFloat(document.getElementById('wpXInput').value) || 0;
+    const z = parseFloat(document.getElementById('wpZInput').value) || 0;
+    const icon = document.getElementById('wpSelectedIcon').value || '📍';
+
+    fetch('/api/map/waypoint', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, x, z, icon, color: '#10b981' })
+    })
+    .then(r => r.json())
+    .then(wp => {
+        showToast(`Waypoint "${name}" pinned to God's Eye!`, 'success');
+        closeModal('addWaypointModal');
+        loadGodsEyeData();
+    })
+    .catch(err => showToast(`Failed to save waypoint: ${err}`, 'error'));
+}
+
+function deleteWaypoint(id) {
+    fetch('/api/map/waypoint/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id })
+    })
+    .then(r => r.json())
+    .then(() => {
+        showToast("Waypoint removed", 'info');
+        loadGodsEyeData();
+    })
+    .catch(err => showToast(`Failed: ${err}`, 'error'));
+}
+
+/* =========================================================================
    13. INITIALIZATION (Hash Routing & Font Alignment)
    ========================================================================= */
 document.addEventListener('DOMContentLoaded', () => {
@@ -1898,7 +2574,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (window.location.hash) {
         const hash = window.location.hash.replace(/^#/, '').trim().toLowerCase();
         if (hash === 'terminal') initialTab = 'console';
-        else if (['home', 'console', 'worlds', 'players', 'addons', 'properties', 'update', 'settings'].includes(hash)) {
+        else if (['home', 'map', 'console', 'worlds', 'players', 'addons', 'properties', 'update', 'settings'].includes(hash)) {
             initialTab = hash;
         }
     }
@@ -1917,7 +2593,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('hashchange', () => {
         let h = window.location.hash.replace(/^#/, '').trim().toLowerCase();
         if (h === 'terminal') h = 'console';
-        if (h && h !== currentTab && ['home', 'console', 'worlds', 'players', 'addons', 'properties', 'update', 'settings'].includes(h)) {
+        if (h && h !== currentTab && ['home', 'map', 'console', 'worlds', 'players', 'addons', 'properties', 'update', 'settings'].includes(h)) {
             switchZentraTab(h);
         }
     });
@@ -1928,6 +2604,8 @@ document.addEventListener('DOMContentLoaded', () => {
     pollLifecycleStatus();
     if (currentTab === 'console') {
         fetchLogs();
+    } else if (currentTab === 'map') {
+        loadGodsEyeData();
     }
 
     // Polling loop for status, lifecycle countdown & logs
@@ -1936,6 +2614,8 @@ document.addEventListener('DOMContentLoaded', () => {
         pollLifecycleStatus();
         if (currentTab === 'console') {
             fetchLogs();
+        } else if (currentTab === 'map') {
+            loadGodsEyeData();
         }
     }, pollInterval);
 });

@@ -54,61 +54,69 @@ jobs:
           RUSTFLAGS: "-C link-arg=-fuse-ld=mold"
         run: cargo build --release
 
-      - name: Setup SSH
+      - name: 🔌 Setup SSH & Deploy to Ubuntu
         if: steps.filter.outputs.rust == 'true' || steps.filter.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch'
         env:
-          SSH_KEY: ${{ secrets.SSH_KEY }}
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_USER: ${{ secrets.SSH_USER || 'ubuntu' }}
+          SSH_KEY: ${{ secrets.SSH_KEY }}
           SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
         run: |
+          set -euo pipefail
+
           if [ -z "$SSH_KEY" ]; then
-            echo "::error::SSH_KEY secret is missing! Please add SSH_KEY in GitHub Repository Settings -> Secrets and variables -> Actions."
+            echo "::error::SSH_KEY secret is missing! Please configure in GitHub Repository Settings."
             exit 1
           fi
           if [ -z "$SSH_HOST" ]; then
-            echo "::error::SSH_HOST secret is missing! Please add SSH_HOST in GitHub Repository Settings -> Secrets and variables -> Actions."
+            echo "::error::SSH_HOST secret is missing! Please configure in GitHub Repository Settings."
             exit 1
           fi
 
+          # 1. Setup SSH Directory & Key (Bloomberg Terminal standard)
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
-          
-          # Handle raw PEM key or base64 encoded
-          if echo "$SSH_KEY" | grep -q "^LS0t"; then
-            echo "$SSH_KEY" | base64 -d > ~/.ssh/id_rsa
-          else
-            printf "%s\n" "$SSH_KEY" | tr -d '\r' > ~/.ssh/id_rsa
-          fi
-          chmod 600 ~/.ssh/id_rsa
 
-          # Configure SSH client with connection multiplexing and compression
-          printf "Host *\n  StrictHostKeyChecking no\n  UserKnownHostsFile /dev/null\n  ControlMaster auto\n  ControlPath ~/.ssh/cm-%%r@%%h:%%p\n  ControlPersist 120s\n  Compression yes\n  LogLevel ERROR\n" > ~/.ssh/config
+          if echo "$SSH_KEY" | grep -q "^LS0t"; then
+            echo "$SSH_KEY" | base64 -d > ~/.ssh/deploy_key
+          elif echo "$SSH_KEY" | grep -q "BEGIN"; then
+            echo "$SSH_KEY" | tr -d '\r' > ~/.ssh/deploy_key
+          else
+            echo "$SSH_KEY" | base64 -d > ~/.ssh/deploy_key 2>/dev/null || echo "$SSH_KEY" > ~/.ssh/deploy_key
+          fi
+          chmod 600 ~/.ssh/deploy_key
+
+          cat << 'EOF' > ~/.ssh/config
+          Host production
+            HostName ${{ env.SSH_HOST }}
+            User ${{ env.SSH_USER }}
+            IdentityFile ~/.ssh/deploy_key
+            Port ${{ env.SSH_PORT }}
+            StrictHostKeyChecking no
+            UserKnownHostsFile /dev/null
+            PubkeyAcceptedKeyTypes +ssh-rsa,rsa-sha2-256,rsa-sha2-512
+            HostkeyAlgorithms +ssh-rsa,rsa-sha2-256,rsa-sha2-512
+            ControlMaster auto
+            ControlPath ~/.ssh/cm-%r@%h:%p
+            ControlPersist 10m
+            Compression yes
+            ServerAliveInterval 30
+            ServerAliveCountMax 3
+          EOF
           chmod 600 ~/.ssh/config
 
-      - name: Deploy Binary & Frontend Assets
-        if: steps.filter.outputs.rust == 'true' || steps.filter.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch'
-        env:
-          SSH_HOST: ${{ secrets.SSH_HOST }}
-          SSH_USER: ${{ secrets.SSH_USER || 'ubuntu' }}
-          SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
-        run: |
           TARGET_DIR="/home/ubuntu/stack/games/minecraft"
 
-          echo "📦 Packaging and deploying assets archive..."
-          tar -czf assets.tar.gz static templates
-          scp -P "$SSH_PORT" -i ~/.ssh/id_rsa assets.tar.gz "$SSH_USER@$SSH_HOST:$TARGET_DIR/assets.tar.gz"
+          echo "🚀 Step 1: Syncing static assets and templates via rsync..."
+          rsync -avz static templates production:"$TARGET_DIR/"
 
           if [ "${{ steps.filter.outputs.rust }}" = "true" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "📦 Copying compiled binary to VM..."
-            scp -P "$SSH_PORT" -i ~/.ssh/id_rsa target/release/minecraft-server-manager "$SSH_USER@$SSH_HOST:$TARGET_DIR/minecraft-server-manager.new"
+            echo "📦 Step 2: Syncing compiled Rust binary via rsync..."
+            rsync -avz target/release/minecraft-server-manager production:"$TARGET_DIR/minecraft-server-manager.new"
 
-            echo "🚀 Unpacking assets, activating new binary, and reloading mc-manager..."
-            ssh -p "$SSH_PORT" -i ~/.ssh/id_rsa "$SSH_USER@$SSH_HOST" "tar -xzf $TARGET_DIR/assets.tar.gz -C $TARGET_DIR && rm -f $TARGET_DIR/assets.tar.gz && chmod +x $TARGET_DIR/minecraft-server-manager.new && mv $TARGET_DIR/minecraft-server-manager.new $TARGET_DIR/minecraft-server-manager && sudo systemctl restart mc-manager"
-          else
-            echo "🚀 Unpacking static assets and templates..."
-            ssh -p "$SSH_PORT" -i ~/.ssh/id_rsa "$SSH_USER@$SSH_HOST" "tar -xzf $TARGET_DIR/assets.tar.gz -C $TARGET_DIR && rm -f $TARGET_DIR/assets.tar.gz"
+            echo "🚀 Step 3: Activating binary & reloading mc-manager..."
+            ssh production "chmod +x $TARGET_DIR/minecraft-server-manager.new && mv $TARGET_DIR/minecraft-server-manager.new $TARGET_DIR/minecraft-server-manager && sudo systemctl restart mc-manager"
           fi
 
-          echo "🔍 Verifying service health..."
-          ssh -p "$SSH_PORT" -i ~/.ssh/id_rsa "$SSH_USER@$SSH_HOST" "sleep 2 && curl -fsS http://127.0.0.1:5000/api/status && echo '✅ Deployment verified healthy!'"
+          echo "🔍 Step 4: Verifying service health..."
+          ssh production "sleep 2 && curl -fsS http://127.0.0.1:5000/api/status && echo '✅ Deployment verified healthy!'"

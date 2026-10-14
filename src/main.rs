@@ -111,6 +111,10 @@ async fn main() {
         .route("/api/lifecycle/execute", post(handlers::api_lifecycle_execute))
         .route("/api/lifecycle/abort", post(handlers::api_lifecycle_abort))
         .route("/api/gamerules/set", post(handlers::api_set_gamerule))
+        .route("/api/map/data", get(handlers::api_map_data))
+        .route("/api/map/action", post(handlers::api_map_action))
+        .route("/api/map/waypoint", post(handlers::api_map_add_waypoint))
+        .route("/api/map/waypoint/delete", post(handlers::api_map_delete_waypoint))
         .nest_service("/static", ServeDir::new(static_dir))
         .layer(DefaultBodyLimit::max(500 * 1024 * 1024)) // 500 MB max for world uploads
         .layer(cors)

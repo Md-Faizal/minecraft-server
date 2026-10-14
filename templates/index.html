@@ -30,6 +30,7 @@
             <div class="tab-switcher-pill" id="tabSwitcher">
                 <div class="tab-slider-pill" id="tabSliderPill"></div>
                 <button class="nav-tab-btn active" data-tab="home" onclick="switchZentraTab('home')">Home</button>
+                <button class="nav-tab-btn" data-tab="map" onclick="switchZentraTab('map')">🗺️ God's Eye</button>
                 <button class="nav-tab-btn" data-tab="console" onclick="switchZentraTab('console')">Terminal</button>
                 <button class="nav-tab-btn" data-tab="worlds" onclick="switchZentraTab('worlds')">Worlds</button>
                 <button class="nav-tab-btn" data-tab="players" onclick="switchZentraTab('players')">Players</button>
@@ -291,6 +292,147 @@
                             <div style="display:flex; gap:6px;">
                                 <button class="zentra-btn secondary" style="padding:4px 10px; font-size:11px;" onclick="setGamerule('doweathercycle', 'true')">ON</button>
                                 <button class="zentra-btn secondary" style="padding:4px 10px; font-size:11px;" onclick="setGamerule('doweathercycle', 'false')">OFF</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 1.5. GOD'S EYE TACTICAL REAL-TIME SATELLITE MAP -->
+            <section id="viewMap" class="tab-content" style="display:none;">
+                <div class="godseye-container">
+                    <!-- Top Reconnaissance HUD Bar -->
+                    <div class="godseye-hud-bar">
+                        <div class="godseye-hud-left">
+                            <div class="godseye-radar-indicator">
+                                <span class="radar-dot-live"></span>
+                                <span style="font-weight: 800; font-size: 13px; letter-spacing: 0.05em; color: #10b981;">GOD'S EYE RECON</span>
+                            </div>
+                            <div class="godseye-badge">
+                                <span>🌍 World:</span> <strong id="mapWorldName">Unicorn</strong>
+                            </div>
+                            <div class="godseye-badge">
+                                <span>☀️ Time:</span> <strong id="mapTimeText">Day (Morning)</strong>
+                            </div>
+                            <div class="godseye-badge">
+                                <span>🌦️ Weather:</span> <strong id="mapWeatherText">Clear</strong>
+                            </div>
+                        </div>
+
+                        <div class="godseye-hud-center">
+                            <div class="godseye-coords-display">
+                                <span style="color:var(--zentra-muted);">CURSOR:</span>
+                                <span id="mapCursorCoords" style="font-family:'Fira Code',monospace; font-weight:700; color:#38bdf8;">X: 0 &bull; Z: 0</span>
+                                <span style="color:rgba(255,255,255,0.25);">|</span>
+                                <span id="mapCursorChunk" style="font-family:'Fira Code',monospace; font-size:11px; color:#94a3b8;">Chunk: 0, 0</span>
+                            </div>
+                        </div>
+
+                        <div class="godseye-hud-right">
+                            <button class="zentra-btn secondary" style="padding: 5px 10px; font-size: 11px;" onclick="centerMapOnSpawn()" title="Center Camera on World Spawn">
+                                🎯 Spawn (0,0)
+                            </button>
+                            <button class="zentra-btn secondary" id="btnFollowPlayer" style="padding: 5px 10px; font-size: 11px;" onclick="toggleFollowPlayer()" title="Lock Camera onto Selected Player">
+                                👁️ Follow: OFF
+                            </button>
+                            <button class="zentra-btn primary" style="padding: 5px 10px; font-size: 11px;" onclick="openAddWaypointModal()">
+                                📍 + Add Waypoint
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Main Tactical Body (Canvas Viewport + Command Deck) -->
+                    <div class="godseye-main-grid">
+                        <!-- Top-down Canvas Map Viewport -->
+                        <div class="godseye-viewport-card" id="godseyeViewport">
+                            <canvas id="godseyeCanvas"></canvas>
+
+                            <!-- Floating HUD Crosshair Context Action Menu (shown on click) -->
+                            <div id="mapContextMenu" class="godseye-context-menu" style="display:none;">
+                                <div class="context-menu-header">
+                                    <span id="ctxCoordsText">X: 0, Z: 0</span>
+                                    <button onclick="closeMapContextMenu()" class="ctx-close-btn">✕</button>
+                                </div>
+                                <div class="context-menu-actions">
+                                    <button class="ctx-btn" onclick="executeMapContextAction('teleport')">
+                                        ⚡ Teleport Player Here
+                                    </button>
+                                    <button class="ctx-btn" onclick="executeMapContextAction('lightning')">
+                                        🌩️ Strike Lightning
+                                    </button>
+                                    <button class="ctx-btn" onclick="executeMapContextAction('tnt')">
+                                        💥 Detonate TNT Strike
+                                    </button>
+                                    <button class="ctx-btn" onclick="executeMapContextAction('set_spawn')">
+                                        🎯 Set World Spawn Here
+                                    </button>
+                                    <button class="ctx-btn" onclick="openAddWaypointModalAtCursor()">
+                                        📍 Drop Tactical Waypoint
+                                    </button>
+                                    <button class="ctx-btn" onclick="executeMapContextAction('summon_golem')">
+                                        🛡️ Air Drop Iron Golem
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- In-Canvas Floating Map Controls Overlay (Zoom, Layers, Compass) -->
+                            <div class="godseye-canvas-controls">
+                                <button class="canvas-ctrl-btn" onclick="zoomMap(1.25)" title="Zoom In">+</button>
+                                <button class="canvas-ctrl-btn" onclick="zoomMap(0.8)" title="Zoom Out">-</button>
+                                <button class="canvas-ctrl-btn" onclick="resetMapZoom()" title="Reset Zoom">⟲</button>
+                                <div class="canvas-ctrl-divider"></div>
+                                <button class="canvas-ctrl-btn active" id="ctrlGridToggle" onclick="toggleMapLayer('grid')" title="Toggle 16x16 Chunk Grid">#</button>
+                                <button class="canvas-ctrl-btn active" id="ctrlRingsToggle" onclick="toggleMapLayer('rings')" title="Toggle Distance Rings">◎</button>
+                                <button class="canvas-ctrl-btn active" id="ctrlRadarToggle" onclick="toggleMapLayer('radar')" title="Toggle Radar Sweep">📡</button>
+                            </div>
+
+                            <!-- Real-time Compass Rose / Cardinal Indicator -->
+                            <div class="godseye-compass">
+                                <span class="compass-n">N</span>
+                                <div class="compass-needle"></div>
+                            </div>
+                        </div>
+
+                        <!-- Right Tactical Control Deck Sidebar -->
+                        <div class="godseye-sidebar">
+                            <!-- 1. Real-Time Online Players Radar Deck -->
+                            <div class="tactical-deck-card">
+                                <div class="deck-header">
+                                    <span style="font-weight: 700; font-size: 13px;">👥 LIVE OPERATORS (<span id="mapPlayerCount">0</span>)</span>
+                                    <span class="status-pill-badge" style="font-size:10px; padding:2px 8px;">TRACKING</span>
+                                </div>
+                                <div id="mapPlayersList" class="deck-player-list">
+                                    <div class="deck-empty-state">No players currently connected.</div>
+                                </div>
+                            </div>
+
+                            <!-- 2. Tactical Waypoints Registry -->
+                            <div class="tactical-deck-card" style="margin-top: 14px;">
+                                <div class="deck-header">
+                                    <span style="font-weight: 700; font-size: 13px;">📍 WAYPOINTS &amp; BASES</span>
+                                    <button class="zentra-btn secondary" style="padding:2px 8px; font-size:10px;" onclick="openAddWaypointModal()">+ ADD</button>
+                                </div>
+                                <div id="mapWaypointsList" class="deck-waypoint-list">
+                                    <!-- Waypoints injected dynamically -->
+                                </div>
+                            </div>
+
+                            <!-- 3. Atmosphere & World Controls -->
+                            <div class="tactical-deck-card" style="margin-top: 14px;">
+                                <div class="deck-header">
+                                    <span style="font-weight: 700; font-size: 13px;">☀️ ATMOSPHERE CONTROL</span>
+                                </div>
+                                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:6px; margin-top:8px;">
+                                    <button class="zentra-btn secondary" style="padding:6px; font-size:11px;" onclick="triggerWorldAtmosphere('time', 'day')">🌅 Day</button>
+                                    <button class="zentra-btn secondary" style="padding:6px; font-size:11px;" onclick="triggerWorldAtmosphere('time', 'noon')">☀️ Noon</button>
+                                    <button class="zentra-btn secondary" style="padding:6px; font-size:11px;" onclick="triggerWorldAtmosphere('time', 'sunset')">🌇 Sunset</button>
+                                    <button class="zentra-btn secondary" style="padding:6px; font-size:11px;" onclick="triggerWorldAtmosphere('time', 'midnight')">🌙 Night</button>
+                                </div>
+                                <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:6px; margin-top:8px;">
+                                    <button class="zentra-btn secondary" style="padding:6px; font-size:11px;" onclick="triggerWorldAtmosphere('weather', 'clear')">☀️ Clear</button>
+                                    <button class="zentra-btn secondary" style="padding:6px; font-size:11px;" onclick="triggerWorldAtmosphere('weather', 'rain')">🌧️ Rain</button>
+                                    <button class="zentra-btn secondary" style="padding:6px; font-size:11px;" onclick="triggerWorldAtmosphere('weather', 'thunder')">⛈️ Thunder</button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -872,6 +1014,51 @@
                     <button class="zentra-btn primary" id="lifecycleConfirmBtn" type="button" onclick="confirmLifecycleAction()">
                         🚀 Confirm &amp; Broadcast
                     </button>
+                </div>
+            </div>
+        </div>
+    <!-- Add Tactical Waypoint Modal -->
+    <div class="zentra-modal-backdrop" id="addWaypointModal">
+        <div class="zentra-modal" style="max-width: 440px;">
+            <div class="card-header-bar">
+                <div class="card-title-group">
+                    <h3>📍 New Tactical Waypoint</h3>
+                    <p>Mark an important base, portal, or landmark on God's Eye</p>
+                </div>
+                <button class="zentra-btn secondary" onclick="closeModal('addWaypointModal')" style="padding:4px 10px;">✕</button>
+            </div>
+            <div style="margin-top: 14px;">
+                <label style="font-size:12px; font-weight:700; color:var(--zentra-text); display:block; margin-bottom:6px;">Waypoint Name</label>
+                <input type="text" id="wpNameInput" class="zentra-input" placeholder="e.g. Castle Base, Nether Portal, Mob Farm">
+
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top: 12px;">
+                    <div>
+                        <label style="font-size:11px; font-weight:700; color:var(--zentra-muted); display:block; margin-bottom:4px;">X Coordinate</label>
+                        <input type="number" id="wpXInput" class="zentra-input" value="0">
+                    </div>
+                    <div>
+                        <label style="font-size:11px; font-weight:700; color:var(--zentra-muted); display:block; margin-bottom:4px;">Z Coordinate</label>
+                        <input type="number" id="wpZInput" class="zentra-input" value="0">
+                    </div>
+                </div>
+
+                <div style="margin-top: 12px;">
+                    <label style="font-size:11px; font-weight:700; color:var(--zentra-muted); display:block; margin-bottom:6px;">Pin Icon</label>
+                    <div style="display:flex; gap:8px;" id="wpIconGroup">
+                        <button type="button" class="wp-icon-choice-btn active" onclick="selectWaypointIcon('📍', this)">📍</button>
+                        <button type="button" class="wp-icon-choice-btn" onclick="selectWaypointIcon('🏰', this)">🏰</button>
+                        <button type="button" class="wp-icon-choice-btn" onclick="selectWaypointIcon('🔮', this)">🔮</button>
+                        <button type="button" class="wp-icon-choice-btn" onclick="selectWaypointIcon('💎', this)">💎</button>
+                        <button type="button" class="wp-icon-choice-btn" onclick="selectWaypointIcon('⚔️', this)">⚔️</button>
+                        <button type="button" class="wp-icon-choice-btn" onclick="selectWaypointIcon('🏠', this)">🏠</button>
+                        <button type="button" class="wp-icon-choice-btn" onclick="selectWaypointIcon('💀', this)">💀</button>
+                    </div>
+                    <input type="hidden" id="wpSelectedIcon" value="📍">
+                </div>
+
+                <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+                    <button class="zentra-btn secondary" type="button" onclick="closeModal('addWaypointModal')">Cancel</button>
+                    <button class="zentra-btn emerald" type="button" onclick="saveNewWaypoint()">💾 Save Waypoint</button>
                 </div>
             </div>
         </div>
