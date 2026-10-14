@@ -709,6 +709,36 @@ function loadStatus() {
                     statePill.textContent = '○ Stopped';
                 }
             }
+
+            const heroServerName = document.getElementById('heroServerName');
+            const heroOnlineBadge = document.getElementById('heroOnlineBadge');
+            const heroPlayerCountText = document.getElementById('heroPlayerCountText');
+            const heroMotdPreview = document.getElementById('heroMotdPreview');
+
+            if (heroPlayerCountText) heroPlayerCountText.textContent = `👥 ${onlineCount} / 10 Players`;
+
+            if (heroOnlineBadge) {
+                if (isRunning) {
+                    heroOnlineBadge.className = 'status-pill-badge';
+                    heroOnlineBadge.textContent = '● ONLINE';
+                    heroOnlineBadge.style.background = 'rgba(16,185,129,0.2)';
+                    heroOnlineBadge.style.color = '#10b981';
+                    heroOnlineBadge.style.borderColor = 'rgba(16,185,129,0.4)';
+                } else {
+                    heroOnlineBadge.className = 'status-pill-badge stopped';
+                    heroOnlineBadge.textContent = '○ OFFLINE';
+                    heroOnlineBadge.style.background = 'rgba(239,68,68,0.2)';
+                    heroOnlineBadge.style.color = '#ef4444';
+                    heroOnlineBadge.style.borderColor = 'rgba(239,68,68,0.4)';
+                }
+            }
+
+            if (window._currentServerName) {
+                if (heroServerName) heroServerName.textContent = window._currentServerName.replace(/§[0-9a-zA-Z]/g, '');
+                if (heroMotdPreview) heroMotdPreview.innerHTML = parseMinecraftColorCodes(window._currentServerName);
+            }
+
+            pollLifecycleStatus();
         })
         .catch(err => console.error("Status fetch error:", err));
 }
@@ -819,32 +849,20 @@ function generateRandomSeed() {
     if (el) el.value = seed;
 }
 
-function copyToClipboard(text) {
+function copyToClipboard(text, customMsg) {
     if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(text).then(() => {
-            showToast(`Seed copied: ${text}`, 'success');
+            showToast(customMsg || `Copied to clipboard: ${text}`, 'success');
         }).catch(() => {
-            prompt("Copy seed:", text);
+            prompt("Copy:", text);
         });
     } else {
-        prompt("Copy seed:", text);
+        prompt("Copy:", text);
     }
 }
 
 function setActiveWorld(world) {
-    if (!confirm(`Switch active world to '${world}'? The server will restart automatically.`)) return;
-    showToast(`Activating world '${world}'...`, 'info');
-    fetch('/api/set_active_world', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ world: world })
-    })
-    .then(r => r.json())
-    .then(data => {
-        showToast(data.result || 'World activated', 'success');
-        setTimeout(() => { loadWorlds(); loadStatus(); checkCheatsStatus(); }, 2500);
-    })
-    .catch(err => showToast(`Error activating world: ${err}`, 'error'));
+    openLifecycleModal('switch_world', world);
 }
 
 function submitCreateWorld() {
@@ -1351,6 +1369,14 @@ function loadProperties() {
             const props = data.properties || [];
             _allPropertiesCache = props;
             renderProperties(props);
+            const serverNameProp = props.find(p => p.key === 'server-name');
+            if (serverNameProp && serverNameProp.value) {
+                window._currentServerName = serverNameProp.value;
+                const heroServerName = document.getElementById('heroServerName');
+                const heroMotdPreview = document.getElementById('heroMotdPreview');
+                if (heroServerName) heroServerName.textContent = serverNameProp.value.replace(/§[0-9a-zA-Z]/g, '');
+                if (heroMotdPreview) heroMotdPreview.innerHTML = parseMinecraftColorCodes(serverNameProp.value);
+            }
         })
         .catch(err => {
             console.error("Failed to load properties:", err);
@@ -1641,7 +1667,226 @@ function escapeHtml(str) {
 }
 
 /* =========================================================================
-   12. INITIALIZATION (Hash Routing & Font Alignment)
+   12. MOTD, BRANDING, LIFECYCLE COUNTDOWN & GAMERULES
+   ========================================================================= */
+function parseMinecraftColorCodes(text) {
+    if (!text) return '';
+    const colorMap = {
+        '0': '#000000', '1': '#0000AA', '2': '#00AA00', '3': '#00AAAA',
+        '4': '#AA0000', '5': '#AA00AA', '6': '#FFAA00', '7': '#AAAAAA',
+        '8': '#555555', '9': '#5555FF', 'a': '#55FF55', 'b': '#55FFFF',
+        'c': '#FF5555', 'd': '#FF55FF', 'e': '#FFFF55', 'f': '#FFFFFF'
+    };
+    let html = '';
+    let currentColor = '#FFFFFF';
+    let isBold = false;
+    let isItalic = false;
+
+    const parts = text.split(/(§[0-9a-zA-Z])/g);
+    for (const part of parts) {
+        if (part.startsWith('§')) {
+            const code = part.charAt(1).toLowerCase();
+            if (code === 'r') {
+                currentColor = '#FFFFFF';
+                isBold = false;
+                isItalic = false;
+            } else if (code === 'l') {
+                isBold = true;
+            } else if (code === 'o') {
+                isItalic = true;
+            } else if (colorMap[code]) {
+                currentColor = colorMap[code];
+            }
+        } else if (part.length > 0) {
+            let style = `color:${currentColor};`;
+            if (isBold) style += 'font-weight:bold;';
+            if (isItalic) style += 'font-style:italic;';
+            html += `<span style="${style}">${escapeHtml(part)}</span>`;
+        }
+    }
+    return html || escapeHtml(text);
+}
+
+function updateMotdModalPreview(val) {
+    const preview = document.getElementById('motdLiveModalPreview');
+    if (preview) {
+        preview.innerHTML = parseMinecraftColorCodes(val) || '<span style="color:#6e7681;">Preview will appear here...</span>';
+    }
+}
+
+function openMotdModal() {
+    fetch('/api/properties')
+        .then(r => r.json())
+        .then(data => {
+            const props = data.properties || [];
+            const serverNameProp = props.find(p => p.key === 'server-name');
+            const currentMotd = serverNameProp && serverNameProp.value ? serverNameProp.value : (window._currentServerName || 'LALALAND');
+            const input = document.getElementById('motdInput');
+            if (input) input.value = currentMotd;
+            updateMotdModalPreview(currentMotd);
+            openModal('motdModal');
+        })
+        .catch(() => {
+            openModal('motdModal');
+        });
+}
+
+function insertMotdCode(code) {
+    const input = document.getElementById('motdInput');
+    if (!input) return;
+    const start = input.selectionStart || input.value.length;
+    const end = input.selectionEnd || input.value.length;
+    input.value = input.value.substring(0, start) + code + input.value.substring(end);
+    input.focus();
+    input.setSelectionRange(start + code.length, start + code.length);
+    updateMotdModalPreview(input.value);
+}
+
+function autoGenerateMotdTemplate() {
+    const templates = [
+        "§b§lAETERNA SURVIVAL§r §8| §eSurvival SMP §a[1.26] §f• §6Zero Lag",
+        "§e§lARCANE REALMS§r §8| §bNetherNet WebRTC §8• §dActive Community",
+        "§a§lBEDROCK EXPEDITION§r §8| §6Custom Biomes §8• §eHardcore SMP",
+        "§c§lLEGENDS BEDROCK§r §8| §bFast Chunks §8• §a24/7 Dedicated"
+    ];
+    const picked = templates[Math.floor(Math.random() * templates.length)];
+    const input = document.getElementById('motdInput');
+    if (input) {
+        input.value = picked;
+        updateMotdModalPreview(picked);
+    }
+}
+
+function saveMotdSettings() {
+    const input = document.getElementById('motdInput');
+    const newMotd = input ? input.value.trim() : '';
+    if (!newMotd) {
+        showToast("MOTD cannot be empty", "error");
+        return;
+    }
+
+    fetch('/api/properties', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ properties: { "server-name": newMotd } })
+    })
+    .then(r => r.json())
+    .then(res => {
+        showToast("MOTD saved and applied to server!", "success");
+        window._currentServerName = newMotd;
+        closeModal('motdModal');
+        loadProperties();
+        loadStatus();
+    })
+    .catch(err => showToast(`Failed to update MOTD: ${err}`, "error"));
+}
+
+function openLifecycleModal(action, targetWorld = '') {
+    const title = document.getElementById('lifecycleModalTitle');
+    const desc = document.getElementById('lifecycleModalDesc');
+    const actionInput = document.getElementById('lifecycleActionType');
+    const targetInput = document.getElementById('lifecycleTargetWorld');
+    const reasonInput = document.getElementById('lifecycleReasonInput');
+
+    if (actionInput) actionInput.value = action;
+    if (targetInput) targetInput.value = targetWorld;
+
+    if (action === 'stop') {
+        if (title) title.textContent = "Schedule Server Shutdown";
+        if (desc) desc.textContent = "Broadcasts in-game countdown alerts to players and saves world data before stopping.";
+        if (reasonInput) reasonInput.value = "Scheduled server maintenance";
+    } else if (action === 'restart') {
+        if (title) title.textContent = "Schedule Server Restart";
+        if (desc) desc.textContent = "Warns active players, flushes chunks, and safely boots back up.";
+        if (reasonInput) reasonInput.value = "Restarting for performance optimization";
+    } else if (action === 'switch_world') {
+        if (title) title.textContent = `Schedule World Switch to '${targetWorld}'`;
+        if (desc) desc.textContent = `Alerts players, saves current world, and boots into '${targetWorld}'.`;
+        if (reasonInput) reasonInput.value = `Switching world to ${targetWorld}`;
+    }
+
+    openModal('lifecycleModal');
+}
+
+function confirmLifecycleAction() {
+    const action = document.getElementById('lifecycleActionType').value;
+    const targetWorld = document.getElementById('lifecycleTargetWorld').value;
+    const timerSelect = document.getElementById('lifecycleTimerSelect');
+    const countdown_seconds = timerSelect ? parseInt(timerSelect.value, 10) : 10;
+    const reasonInput = document.getElementById('lifecycleReasonInput');
+    const reason = reasonInput ? reasonInput.value.trim() : "Scheduled maintenance";
+
+    const payload = {
+        action,
+        countdown_seconds,
+        reason,
+        target_world: targetWorld ? targetWorld : undefined,
+        force: countdown_seconds === 0
+    };
+
+    fetch('/api/lifecycle/execute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    })
+    .then(r => r.json())
+    .then(res => {
+        closeModal('lifecycleModal');
+        showToast(res.result || "Action scheduled!", "success");
+        pollLifecycleStatus();
+    })
+    .catch(err => showToast(`Action failed: ${err}`, "error"));
+}
+
+function abortLifecycleCountdown() {
+    fetch('/api/lifecycle/abort', { method: 'POST' })
+        .then(r => r.json())
+        .then(res => {
+            showToast(res.result || "Cancelled", res.aborted ? "success" : "info");
+            pollLifecycleStatus();
+        })
+        .catch(err => showToast(`Abort failed: ${err}`, "error"));
+}
+
+function pollLifecycleStatus() {
+    fetch('/api/lifecycle/status')
+        .then(r => r.json())
+        .then(status => {
+            const banner = document.getElementById('lifecycleCountdownBanner');
+            const titleEl = document.getElementById('lifecycleActionTitle');
+            const badgeEl = document.getElementById('lifecycleSecondsBadge');
+            const reasonEl = document.getElementById('lifecycleReasonText');
+
+            if (!banner) return;
+
+            if (status.active) {
+                banner.style.display = 'flex';
+                if (titleEl) titleEl.textContent = `Server ${status.action.toUpperCase()} in progress`;
+                if (badgeEl) badgeEl.textContent = `${status.seconds_remaining}s remaining`;
+                if (reasonEl) reasonEl.textContent = `Reason: ${status.reason || 'Server maintenance'}`;
+            } else {
+                banner.style.display = 'none';
+            }
+        })
+        .catch(() => {});
+}
+
+function setGamerule(rule, value) {
+    showToast(`Setting gamerule ${rule} to ${value}...`, 'info');
+    fetch('/api/gamerules/set', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rule, value })
+    })
+    .then(r => r.json())
+    .then(data => {
+        showToast(data.result || `Gamerule ${rule} updated`, 'success');
+    })
+    .catch(err => showToast(`Failed to set gamerule: ${err}`, 'error'));
+}
+
+/* =========================================================================
+   13. INITIALIZATION (Hash Routing & Font Alignment)
    ========================================================================= */
 document.addEventListener('DOMContentLoaded', () => {
     initZentraHalftoneBackground();
@@ -1679,13 +1924,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     loadStatus();
     loadAnnouncements();
+    loadProperties();
+    pollLifecycleStatus();
     if (currentTab === 'console') {
         fetchLogs();
     }
 
-    // Polling loop for status & logs
+    // Polling loop for status, lifecycle countdown & logs
     setInterval(() => {
         loadStatus();
+        pollLifecycleStatus();
         if (currentTab === 'console') {
             fetchLogs();
         }

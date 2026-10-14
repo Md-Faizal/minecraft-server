@@ -34,6 +34,8 @@ pub struct ServerManager {
     pub player_session_times: Arc<RwLock<HashMap<String, (DateTime<Local>, String)>>>,
     pub update_state: Arc<RwLock<UpdateState>>,
     pub is_running: Arc<AtomicBool>,
+    pub countdown_state: Arc<RwLock<CountdownStatus>>,
+    pub abort_handle: Arc<Mutex<Option<tokio::task::AbortHandle>>>,
 }
 
 impl ServerManager {
@@ -79,6 +81,15 @@ impl ServerManager {
             player_session_times: Arc::new(RwLock::new(HashMap::new())),
             update_state: Arc::new(RwLock::new(UpdateState::default())),
             is_running: Arc::new(AtomicBool::new(false)),
+            countdown_state: Arc::new(RwLock::new(CountdownStatus {
+                active: false,
+                action: String::new(),
+                target_world: None,
+                seconds_remaining: 0,
+                total_seconds: 0,
+                reason: String::new(),
+            })),
+            abort_handle: Arc::new(Mutex::new(None)),
         })
     }
 
@@ -272,18 +283,152 @@ impl ServerManager {
         self.start_server().await
     }
 
-    pub fn graceful_stop_server(self: &Arc<Self>) {
-        let mgr = Arc::clone(self);
-        tokio::spawn(async move {
-            if !mgr.is_server_running().await {
-                return;
+    pub async fn get_countdown_status(&self) -> CountdownStatus {
+        self.countdown_state.read().await.clone()
+    }
+
+    pub async fn abort_countdown(&self) -> bool {
+        let mut handle_guard = self.abort_handle.lock().await;
+        if let Some(handle) = handle_guard.take() {
+            handle.abort();
+            let mut state = self.countdown_state.write().await;
+            state.active = false;
+            state.seconds_remaining = 0;
+            self.send_server_command("say §a§l[Server] §eThe scheduled server operation was CANCELLED by admin. Normal gameplay resumed!").await;
+            self.send_server_command("title @a title §a§lOPERATION CANCELLED").await;
+            self.send_server_command("title @a subtitle §eResume gameplay!").await;
+            return true;
+        }
+        false
+    }
+
+    pub async fn trigger_lifecycle_action(self: &Arc<Self>, req: LifecycleRequest) -> Result<String, String> {
+        let action = req.action.to_lowercase();
+        if !["stop", "restart", "switch_world"].contains(&action.as_str()) {
+            return Err("Invalid action. Must be 'stop', 'restart', or 'switch_world'.".to_string());
+        }
+
+        if action == "switch_world" && req.target_world.is_none() {
+            return Err("target_world is required when action is 'switch_world'.".to_string());
+        }
+
+        let is_running = self.is_server_running().await;
+        if !is_running || req.countdown_seconds == 0 || req.force {
+            // Cancel any pending countdown
+            let mut handle_guard = self.abort_handle.lock().await;
+            if let Some(handle) = handle_guard.take() {
+                handle.abort();
             }
-            for i in (1..=5).rev() {
-                mgr.send_server_command(&format!("say Server stopping in {} seconds...", i)).await;
-                tokio::time::sleep(Duration::from_secs(1)).await;
+            let mut state = self.countdown_state.write().await;
+            state.active = false;
+
+            match action.as_str() {
+                "stop" => {
+                    self.stop_server().await;
+                    Ok("Server stopped immediately.".to_string())
+                }
+                "restart" => {
+                    self.restart_server().await;
+                    Ok("Server restarted immediately.".to_string())
+                }
+                "switch_world" => {
+                    let world = req.target_world.unwrap();
+                    self.set_active_world(&world).await;
+                    Ok(format!("Switched to world '{}' immediately.", world))
+                }
+                _ => Err("Unknown action".to_string()),
             }
-            mgr.stop_server().await;
-        });
+        } else {
+            // Cancel any previous countdown
+            let mut handle_guard = self.abort_handle.lock().await;
+            if let Some(handle) = handle_guard.take() {
+                handle.abort();
+            }
+
+            let countdown_secs = req.countdown_seconds;
+            let reason = req.reason.unwrap_or_else(|| "Scheduled server maintenance".to_string());
+            let target_world = req.target_world.clone();
+
+            {
+                let mut state = self.countdown_state.write().await;
+                state.active = true;
+                state.action = action.clone();
+                state.target_world = target_world.clone();
+                state.seconds_remaining = countdown_secs;
+                state.total_seconds = countdown_secs;
+                state.reason = reason.clone();
+            }
+
+            let mgr = Arc::clone(self);
+            let action_clone = action.clone();
+            let reason_clone = reason.clone();
+
+            let join_handle = tokio::spawn(async move {
+                let verb = match action_clone.as_str() {
+                    "stop" => "stopping",
+                    "restart" => "restarting",
+                    "switch_world" => "switching worlds",
+                    _ => "updating",
+                };
+
+                let mut remaining = countdown_secs;
+                while remaining > 0 {
+                    {
+                        let mut state = mgr.countdown_state.write().await;
+                        state.seconds_remaining = remaining;
+                    }
+
+                    if remaining == countdown_secs {
+                        let alert_msg = format!("say §c§l[Server Alert] §e§lAttention! Server is {} in {} seconds!", verb, remaining);
+                        let reason_msg = format!("say §c§l[Server] §eReason: {}", reason_clone);
+                        mgr.send_server_command(&alert_msg).await;
+                        mgr.send_server_command(&reason_msg).await;
+                        mgr.send_server_command("say §7Please find a safe location to prevent item loss.").await;
+                        mgr.send_server_command(&format!("title @a title §c§lSERVER {}", action_clone.to_uppercase())).await;
+                        mgr.send_server_command(&format!("title @a subtitle §eIn {} seconds!", remaining)).await;
+                    } else if remaining == 30 || remaining == 20 || remaining == 10 || remaining == 5 {
+                        let alert_msg = format!("say §6§l[Server] §eServer {} in {} seconds...", verb, remaining);
+                        mgr.send_server_command(&alert_msg).await;
+                        mgr.send_server_command(&format!("title @a subtitle §6In {} seconds!", remaining)).await;
+                    } else if remaining <= 3 {
+                        mgr.send_server_command(&format!("say §c§l[Server] §e{}...", remaining)).await;
+                        mgr.send_server_command(&format!("title @a title §c§l{}", remaining)).await;
+                    }
+
+                    tokio::time::sleep(Duration::from_secs(1)).await;
+                    remaining = remaining.saturating_sub(1);
+                }
+
+                // Countdown finished: save chunks
+                mgr.send_server_command("say §c§l[Server] §6Saving world chunks...").await;
+                mgr.send_server_command("save-all").await;
+                tokio::time::sleep(Duration::from_millis(1500)).await;
+
+                {
+                    let mut state = mgr.countdown_state.write().await;
+                    state.active = false;
+                    state.seconds_remaining = 0;
+                }
+
+                match action_clone.as_str() {
+                    "stop" => {
+                        mgr.stop_server().await;
+                    }
+                    "restart" => {
+                        mgr.restart_server().await;
+                    }
+                    "switch_world" => {
+                        if let Some(ref w) = target_world {
+                            mgr.set_active_world(w).await;
+                        }
+                    }
+                    _ => {}
+                }
+            });
+
+            *handle_guard = Some(join_handle.abort_handle());
+            Ok(format!("Countdown of {} seconds started for action '{}'.", countdown_secs, action))
+        }
     }
 
     pub async fn send_server_command(&self, cmd: &str) -> bool {
@@ -377,6 +522,34 @@ impl ServerManager {
         if let Ok(content) = serde_json::to_string_pretty(&map) {
             let _ = fs::write(global_json, content);
         }
+    }
+
+    pub async fn set_active_world(self: &Arc<Self>, target: &str) -> bool {
+        let world_path = self.worlds_dir.join(target);
+        if !world_path.exists() {
+            return false;
+        }
+        let profile = self.get_world_profile(target);
+        self.sync_world_profile_to_server_properties(&profile);
+
+        let res_packs = world_path.join("world_resource_packs.json");
+        if !res_packs.exists() {
+            let _ = fs::write(res_packs, "[]");
+        }
+        let beh_packs = world_path.join("world_behavior_packs.json");
+        if !beh_packs.exists() {
+            let _ = fs::write(beh_packs, "[]");
+        }
+
+        if self.is_server_running().await {
+            let m = Arc::clone(self);
+            let gmode = profile.gamemode.clone();
+            m.restart_server().await;
+            tokio::time::sleep(Duration::from_millis(1500)).await;
+            m.send_server_command(&format!("defaultgamemode {}", gmode)).await;
+            m.send_server_command(&format!("gamemode {} @a", gmode)).await;
+        }
+        true
     }
 
     pub fn get_active_world_name(&self) -> Option<String> {

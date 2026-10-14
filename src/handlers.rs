@@ -84,7 +84,16 @@ pub async fn api_start(State(mgr): State<Arc<ServerManager>>) -> Json<Value> {
 
 pub async fn api_stop(State(mgr): State<Arc<ServerManager>>) -> Json<Value> {
     if mgr.is_server_running().await {
-        mgr.graceful_stop_server();
+        let m = Arc::clone(&mgr);
+        tokio::spawn(async move {
+            let _ = m.trigger_lifecycle_action(LifecycleRequest {
+                action: "stop".to_string(),
+                countdown_seconds: 5,
+                reason: Some("Manual stop from dashboard".to_string()),
+                target_world: None,
+                force: false,
+            }).await;
+        });
         Json(json!({"result": "stopping"}))
     } else {
         Json(json!({"result": "already stopped"}))
@@ -95,7 +104,13 @@ pub async fn api_restart(State(mgr): State<Arc<ServerManager>>) -> Json<Value> {
     if mgr.is_server_running().await {
         let m = Arc::clone(&mgr);
         tokio::spawn(async move {
-            m.restart_server().await;
+            let _ = m.trigger_lifecycle_action(LifecycleRequest {
+                action: "restart".to_string(),
+                countdown_seconds: 5,
+                reason: Some("Manual restart from dashboard".to_string()),
+                target_world: None,
+                force: false,
+            }).await;
         });
         Json(json!({"result": "restarting"}))
     } else {
@@ -1458,5 +1473,42 @@ pub async fn api_broadcast_now(
     Ok(Json(json!({
         "result": "Broadcast sent to all players.",
         "message": text
+    })))
+}
+
+pub async fn api_lifecycle_status(
+    State(mgr): State<Arc<ServerManager>>,
+) -> Json<CountdownStatus> {
+    Json(mgr.get_countdown_status().await)
+}
+
+pub async fn api_lifecycle_execute(
+    State(mgr): State<Arc<ServerManager>>,
+    Json(req): Json<LifecycleRequest>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    match mgr.trigger_lifecycle_action(req).await {
+        Ok(msg) => Ok(Json(json!({"result": msg}))),
+        Err(err) => Err((StatusCode::BAD_REQUEST, Json(json!({"result": err})))),
+    }
+}
+
+pub async fn api_lifecycle_abort(
+    State(mgr): State<Arc<ServerManager>>,
+) -> Json<Value> {
+    let aborted = mgr.abort_countdown().await;
+    Json(json!({
+        "result": if aborted { "Scheduled countdown successfully cancelled." } else { "No active countdown to cancel." },
+        "aborted": aborted
+    }))
+}
+
+pub async fn api_set_gamerule(
+    State(mgr): State<Arc<ServerManager>>,
+    Json(req): Json<SetGameruleRequest>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    let cmd = format!("gamerule {} {}", req.rule, req.value);
+    mgr.send_server_command(&cmd).await;
+    Ok(Json(json!({
+        "result": format!("Gamerule '{}' updated to '{}'", req.rule, req.value)
     })))
 }

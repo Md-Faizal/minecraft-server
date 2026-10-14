@@ -954,3 +954,46 @@ body {
     padding-top: 140px;
   }
 }
+
+/* Server Hero Card & Branding */
+.server-hero-card {
+  position: relative;
+  border-radius: 20px;
+  overflow: hidden;
+  margin-bottom: 24px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--zentra-border);
+}
+
+.motd-palette-btn {
+  border: none;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s ease, filter 0.15s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+.motd-palette-btn:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.1);
+}
+
+.gamerule-toggle-card {
+  background: var(--zentra-surface);
+  border: 1px solid var(--zentra-border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  transition: all 0.2s ease;
+}
+
+.gamerule-toggle-card:hover {
+  border-color: var(--zentra-accent);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04);
+}

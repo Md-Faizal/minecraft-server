@@ -50,10 +50,73 @@
     </header>
 
     <div class="app-wrapper">
+        <!-- Global Lifecycle Countdown Banner (Appears during restart / stop / world swap) -->
+        <div id="lifecycleCountdownBanner" style="display:none; margin-bottom: 20px; background: linear-gradient(135deg, rgba(239, 68, 68, 0.12), rgba(245, 158, 11, 0.15)); border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 14px; padding: 14px 20px; align-items: center; justify-content: space-between; box-shadow: 0 4px 24px rgba(239, 68, 68, 0.12); flex-wrap: wrap; gap: 12px;">
+            <div style="display:flex; align-items:center; gap:14px;">
+                <span style="font-size: 26px;">⏳</span>
+                <div>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span id="lifecycleActionTitle" style="font-weight: 800; font-size: 15px; color: #ef4444; text-transform: uppercase;">Server Restart Scheduled</span>
+                        <span id="lifecycleSecondsBadge" style="background:#ef4444; color:#fff; font-weight:700; font-size:12px; padding:2px 8px; border-radius:20px;">10s remaining</span>
+                    </div>
+                    <div id="lifecycleReasonText" style="font-size: 13px; color: var(--zentra-text); opacity: 0.85; margin-top: 2px;">
+                        Broadcasting countdown alerts to in-game players...
+                    </div>
+                </div>
+            </div>
+            <div style="display:flex; gap:10px; align-items:center;">
+                <button class="zentra-btn danger" style="padding: 6px 14px; font-size: 12px;" onclick="abortLifecycleCountdown()">
+                    🛑 Cancel Abort
+                </button>
+            </div>
+        </div>
+
         <!-- MAIN SPA CONTENT VIEWS -->
         <main id="spaContent">
             <!-- 1. HOME VIEW -->
             <section id="viewHome" class="tab-content">
+                <!-- Server Hero Branding Card -->
+                <div class="server-hero-card">
+                    <div style="height: 190px; background: url('/static/img/server_banner.jpg') center/cover no-repeat; position: relative;">
+                        <div style="position: absolute; inset: 0; background: linear-gradient(180deg, rgba(15,23,42,0.2) 0%, rgba(15,23,42,0.85) 100%);"></div>
+                        <div style="position: absolute; bottom: 16px; left: 24px; right: 24px; display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 16px;">
+                            <div style="display: flex; align-items: center; gap: 18px;">
+                                <img src="/static/img/server_icon.jpg" alt="Server Icon" style="width: 72px; height: 72px; border-radius: 16px; border: 2px solid rgba(255,255,255,0.3); box-shadow: 0 4px 16px rgba(0,0,0,0.4); object-fit: cover;">
+                                <div>
+                                    <div style="display: flex; align-items: center; gap: 10px;">
+                                        <h2 id="heroServerName" style="color: #ffffff; font-size: 24px; font-weight: 800; letter-spacing: -0.02em; margin: 0; text-shadow: 0 2px 4px rgba(0,0,0,0.6);">LALALAND</h2>
+                                        <span class="status-pill-badge" id="heroOnlineBadge" style="background: rgba(16,185,129,0.2); color: #10b981; border: 1px solid rgba(16,185,129,0.4); font-size: 11px; padding: 3px 10px;">● ONLINE</span>
+                                    </div>
+                                    <div style="color: rgba(255,255,255,0.75); font-size: 13px; margin-top: 4px;">
+                                        Bedrock Dedicated Server 1.26.52.3 &bull; Oracle Cloud Infrastructure
+                                    </div>
+                                </div>
+                            </div>
+                            <div style="display: flex; gap: 10px; align-items: center;">
+                                <button class="zentra-btn secondary" style="background: rgba(255,255,255,0.15); color: #fff; border: 1px solid rgba(255,255,255,0.25); backdrop-filter: blur(8px);" onclick="copyToClipboard('68.233.115.138:19132', 'Server Address copied!')">
+                                    📋 Copy: 68.233.115.138:19132
+                                </button>
+                                <button class="zentra-btn primary" onclick="openMotdModal()">
+                                    ✨ Customize MOTD
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- In-Game Multiplayer List Card Preview -->
+                    <div style="background: #18181b; padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; border-top: 1px solid rgba(255,255,255,0.08); flex-wrap: wrap; gap: 12px;">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <span style="font-size: 11px; text-transform: uppercase; font-weight: 700; color: #a1a1aa; letter-spacing: 0.05em;">In-Game MOTD Preview:</span>
+                            <div id="heroMotdPreview" style="font-family: 'Minecraft', 'Courier New', monospace; font-size: 13px; color: #f4f4f5; background: #09090b; padding: 6px 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);">
+                                <span style="color:#55FFFF; font-weight:bold;">LALALAND</span> <span style="color:#888888;">|</span> <span style="color:#FFFF55;">Survival SMP</span> <span style="color:#55FF55;">[1.26]</span> <span style="color:#FFAA00;">• NetherNet WebRTC</span>
+                            </div>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 16px; font-size: 12px; color: #a1a1aa;">
+                            <span>📶 12ms</span>
+                            <span id="heroPlayerCountText">👥 0 / 10 Players</span>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Metrics Bar -->
                 <div class="metrics-grid">
                     <div class="stat-box">
@@ -88,10 +151,10 @@
                         <button class="zentra-btn emerald" onclick="serverAction('start')">
                             <span>▶</span> Start Server
                         </button>
-                        <button class="zentra-btn danger" onclick="serverAction('stop')">
+                        <button class="zentra-btn danger" onclick="openLifecycleModal('stop')">
                             <span>⏹</span> Stop Server
                         </button>
-                        <button class="zentra-btn primary" onclick="serverAction('restart')">
+                        <button class="zentra-btn primary" onclick="openLifecycleModal('restart')">
                             <span>🔄</span> Restart Server
                         </button>
                     </div>
@@ -156,6 +219,80 @@
                     <div>
                         <label style="font-size:12px; font-weight:700; color:var(--zentra-text); display:block; margin-bottom:6px;">Announcement Messages (One per line)</label>
                         <textarea id="annMessages" class="zentra-textarea" rows="4" placeholder="Enter one announcement per line..."></textarea>
+                    </div>
+                </div>
+
+                <!-- Fast Gamerules Manager Card -->
+                <div class="soft-card" style="margin-top: 20px;">
+                    <div class="card-header-bar" style="flex-wrap:wrap; gap:12px;">
+                        <div class="card-title-group">
+                            <h3>🎮 Quick World Gamerules</h3>
+                            <p>Instant in-game rule toggles applied dynamically via server console</p>
+                        </div>
+                        <span class="metric-pill">Real-Time Control</span>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px;">
+                        <div class="gamerule-toggle-card">
+                            <div>
+                                <strong style="font-size: 13px;">Keep Inventory</strong>
+                                <p style="font-size: 11px; color: var(--zentra-muted); margin: 2px 0 0;">Save items & XP on death</p>
+                            </div>
+                            <div style="display:flex; gap:6px;">
+                                <button class="zentra-btn secondary" style="padding:4px 10px; font-size:11px;" onclick="setGamerule('keepinventory', 'true')">ON</button>
+                                <button class="zentra-btn secondary" style="padding:4px 10px; font-size:11px;" onclick="setGamerule('keepinventory', 'false')">OFF</button>
+                            </div>
+                        </div>
+                        <div class="gamerule-toggle-card">
+                            <div>
+                                <strong style="font-size: 13px;">Show Coordinates</strong>
+                                <p style="font-size: 11px; color: var(--zentra-muted); margin: 2px 0 0;">XYZ display on player HUD</p>
+                            </div>
+                            <div style="display:flex; gap:6px;">
+                                <button class="zentra-btn secondary" style="padding:4px 10px; font-size:11px;" onclick="setGamerule('showcoordinates', 'true')">ON</button>
+                                <button class="zentra-btn secondary" style="padding:4px 10px; font-size:11px;" onclick="setGamerule('showcoordinates', 'false')">OFF</button>
+                            </div>
+                        </div>
+                        <div class="gamerule-toggle-card">
+                            <div>
+                                <strong style="font-size: 13px;">Mob Griefing</strong>
+                                <p style="font-size: 11px; color: var(--zentra-muted); margin: 2px 0 0;">Creepers & Ghasts break blocks</p>
+                            </div>
+                            <div style="display:flex; gap:6px;">
+                                <button class="zentra-btn secondary" style="padding:4px 10px; font-size:11px;" onclick="setGamerule('mobgriefing', 'true')">ON</button>
+                                <button class="zentra-btn secondary" style="padding:4px 10px; font-size:11px;" onclick="setGamerule('mobgriefing', 'false')">OFF</button>
+                            </div>
+                        </div>
+                        <div class="gamerule-toggle-card">
+                            <div>
+                                <strong style="font-size: 13px;">PvP Damage</strong>
+                                <p style="font-size: 11px; color: var(--zentra-muted); margin: 2px 0 0;">Player combat attack damage</p>
+                            </div>
+                            <div style="display:flex; gap:6px;">
+                                <button class="zentra-btn secondary" style="padding:4px 10px; font-size:11px;" onclick="setGamerule('pvp', 'true')">ON</button>
+                                <button class="zentra-btn secondary" style="padding:4px 10px; font-size:11px;" onclick="setGamerule('pvp', 'false')">OFF</button>
+                            </div>
+                        </div>
+                        <div class="gamerule-toggle-card">
+                            <div>
+                                <strong style="font-size: 13px;">Daylight Cycle</strong>
+                                <p style="font-size: 11px; color: var(--zentra-muted); margin: 2px 0 0;">Sun/moon time progression</p>
+                            </div>
+                            <div style="display:flex; gap:6px;">
+                                <button class="zentra-btn secondary" style="padding:4px 10px; font-size:11px;" onclick="setGamerule('dodaylightcycle', 'true')">ON</button>
+                                <button class="zentra-btn secondary" style="padding:4px 10px; font-size:11px;" onclick="setGamerule('dodaylightcycle', 'false')">OFF</button>
+                            </div>
+                        </div>
+                        <div class="gamerule-toggle-card">
+                            <div>
+                                <strong style="font-size: 13px;">Weather Cycle</strong>
+                                <p style="font-size: 11px; color: var(--zentra-muted); margin: 2px 0 0;">Dynamic rain and thunderstorms</p>
+                            </div>
+                            <div style="display:flex; gap:6px;">
+                                <button class="zentra-btn secondary" style="padding:4px 10px; font-size:11px;" onclick="setGamerule('doweathercycle', 'true')">ON</button>
+                                <button class="zentra-btn secondary" style="padding:4px 10px; font-size:11px;" onclick="setGamerule('doweathercycle', 'false')">OFF</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -650,6 +787,92 @@
                         <tr><td colspan="3" style="text-align:center;">Loading session entries...</td></tr>
                     </tbody>
                 </table>
+    <!-- Customize MOTD Modal -->
+    <div class="zentra-modal-backdrop" id="motdModal">
+        <div class="zentra-modal" style="max-width: 580px;">
+            <div class="card-header-bar">
+                <div class="card-title-group">
+                    <h3>✨ Server MOTD & Branding</h3>
+                    <p>Customize the server title and multiplayer list appearance</p>
+                </div>
+                <button class="zentra-btn secondary" onclick="closeModal('motdModal')" style="padding:4px 10px;">✕</button>
+            </div>
+            <div style="margin-top: 14px;">
+                <label style="font-size:12px; font-weight:700; color:var(--zentra-text); display:block; margin-bottom:6px;">Server MOTD (Name in Server List)</label>
+                <input type="text" id="motdInput" class="zentra-input" placeholder="e.g. §b§lLALALAND§r §8| §eSurvival SMP" oninput="updateMotdModalPreview(this.value)">
+
+                <!-- Color Palette Insert Buttons -->
+                <div style="margin-top: 12px;">
+                    <span style="font-size:11px; color:var(--zentra-muted); display:block; margin-bottom:6px;">Click color code to insert:</span>
+                    <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                        <button type="button" class="motd-palette-btn" style="background:#55FFFF; color:#000;" onclick="insertMotdCode('§b')">§b Cyan</button>
+                        <button type="button" class="motd-palette-btn" style="background:#55FF55; color:#000;" onclick="insertMotdCode('§a')">§a Green</button>
+                        <button type="button" class="motd-palette-btn" style="background:#FFFF55; color:#000;" onclick="insertMotdCode('§e')">§e Yellow</button>
+                        <button type="button" class="motd-palette-btn" style="background:#FFAA00; color:#000;" onclick="insertMotdCode('§6')">§6 Gold</button>
+                        <button type="button" class="motd-palette-btn" style="background:#FF5555; color:#fff;" onclick="insertMotdCode('§c')">§c Red</button>
+                        <button type="button" class="motd-palette-btn" style="background:#FF55FF; color:#000;" onclick="insertMotdCode('§d')">§d Pink</button>
+                        <button type="button" class="motd-palette-btn" style="background:#AA00AA; color:#fff;" onclick="insertMotdCode('§5')">§5 Purple</button>
+                        <button type="button" class="motd-palette-btn" style="background:#FFFFFF; color:#000;" onclick="insertMotdCode('§f')">§f White</button>
+                        <button type="button" class="motd-palette-btn" style="background:#555555; color:#fff;" onclick="insertMotdCode('§8')">§8 Gray</button>
+                        <button type="button" class="motd-palette-btn" style="background:#111827; color:#fff; font-weight:bold;" onclick="insertMotdCode('§l')">§l Bold</button>
+                        <button type="button" class="motd-palette-btn" style="background:#e5e7eb; color:#000;" onclick="insertMotdCode('§r')">§r Reset</button>
+                    </div>
+                </div>
+
+                <!-- Live Preview Box -->
+                <div style="margin-top: 16px;">
+                    <span style="font-size:11px; color:var(--zentra-muted); display:block; margin-bottom:6px;">Live In-Game Preview:</span>
+                    <div id="motdLiveModalPreview" style="font-family: 'Minecraft', 'Courier New', monospace; font-size: 14px; background: #09090b; padding: 12px 16px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); min-height: 44px; display:flex; align-items:center;">
+                    </div>
+                </div>
+
+                <div style="display:flex; justify-content:space-between; margin-top:20px; align-items:center; flex-wrap:wrap; gap:10px;">
+                    <button class="zentra-btn secondary" type="button" onclick="autoGenerateMotdTemplate()">🎲 Auto-Generate Template</button>
+                    <div style="display:flex; gap:10px;">
+                        <button class="zentra-btn secondary" type="button" onclick="closeModal('motdModal')">Cancel</button>
+                        <button class="zentra-btn emerald" type="button" onclick="saveMotdSettings()">💾 Save & Apply MOTD</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lifecycle Action Modal (Countdown options for stop, restart, world switch) -->
+    <div class="zentra-modal-backdrop" id="lifecycleModal">
+        <div class="zentra-modal" style="max-width: 500px;">
+            <div class="card-header-bar">
+                <div class="card-title-group">
+                    <h3 id="lifecycleModalTitle">Schedule Server Action</h3>
+                    <p id="lifecycleModalDesc">Broadcasts automated countdown warnings to in-game players</p>
+                </div>
+                <button class="zentra-btn secondary" onclick="closeModal('lifecycleModal')" style="padding:4px 10px;">✕</button>
+            </div>
+            <div style="margin-top: 14px;">
+                <div style="margin-bottom: 14px;">
+                    <label style="font-size:12px; font-weight:700; color:var(--zentra-text); display:block; margin-bottom:6px;">Warning Countdown Timer</label>
+                    <select id="lifecycleTimerSelect" class="zentra-select">
+                        <option value="10">⏱ 10 Seconds (Recommended)</option>
+                        <option value="5">⏱ 5 Seconds (Quick)</option>
+                        <option value="30">⏱ 30 Seconds (Maintenance Notice)</option>
+                        <option value="60">⏱ 60 Seconds (Full Warning)</option>
+                        <option value="0">⚡ Instant (0s - Immediate)</option>
+                    </select>
+                </div>
+
+                <div style="margin-bottom: 14px;">
+                    <label style="font-size:12px; font-weight:700; color:var(--zentra-text); display:block; margin-bottom:6px;">Reason (Broadcasted In-Game)</label>
+                    <input type="text" id="lifecycleReasonInput" class="zentra-input" value="Applying updates and maintenance">
+                </div>
+
+                <input type="hidden" id="lifecycleActionType" value="restart">
+                <input type="hidden" id="lifecycleTargetWorld" value="">
+
+                <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+                    <button class="zentra-btn secondary" type="button" onclick="closeModal('lifecycleModal')">Cancel</button>
+                    <button class="zentra-btn primary" id="lifecycleConfirmBtn" type="button" onclick="confirmLifecycleAction()">
+                        🚀 Confirm &amp; Broadcast
+                    </button>
+                </div>
             </div>
         </div>
     </div>

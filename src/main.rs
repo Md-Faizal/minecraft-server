@@ -107,6 +107,10 @@ async fn main() {
             get(handlers::api_get_announcements).post(handlers::api_set_announcements),
         )
         .route("/api/announcements/broadcast_now", post(handlers::api_broadcast_now))
+        .route("/api/lifecycle/status", get(handlers::api_lifecycle_status))
+        .route("/api/lifecycle/execute", post(handlers::api_lifecycle_execute))
+        .route("/api/lifecycle/abort", post(handlers::api_lifecycle_abort))
+        .route("/api/gamerules/set", post(handlers::api_set_gamerule))
         .nest_service("/static", ServeDir::new(static_dir))
         .layer(DefaultBodyLimit::max(500 * 1024 * 1024)) // 500 MB max for world uploads
         .layer(cors)

@@ -194,3 +194,33 @@ fn default_messages() -> Vec<String> {
         "Check your world stats and controls on the Bedrock Manager dashboard!".to_string(),
     ]
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CountdownStatus {
+    pub active: bool,
+    pub action: String,
+    pub target_world: Option<String>,
+    pub seconds_remaining: u32,
+    pub total_seconds: u32,
+    pub reason: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct LifecycleRequest {
+    pub action: String,
+    #[serde(default)]
+    pub countdown_seconds: u32,
+    #[serde(default)]
+    pub reason: Option<String>,
+    #[serde(default)]
+    pub target_world: Option<String>,
+    #[serde(default)]
+    pub force: bool,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SetGameruleRequest {
+    pub rule: String,
+    pub value: String,
+}
+
