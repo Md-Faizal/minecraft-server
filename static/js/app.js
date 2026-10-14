@@ -433,6 +433,16 @@ function renderTerminalLines(lines) {
     const screen = document.getElementById('terminalScreen');
     if (!screen) return;
 
+    if (!lines || lines.length === 0) {
+        screen.innerHTML = `
+            <div style="color:var(--zentra-muted); font-style:italic; padding:24px; text-align:center;">
+                <p style="margin-bottom:8px; font-weight:600;">Console buffer is currently empty.</p>
+                <p style="font-size:12px; color:#8b949e;">If the server was recently restarted or stopped, logs will stream here as the Bedrock Dedicated Server processes events.</p>
+            </div>
+        `;
+        return;
+    }
+
     const timeRegex = /\[(\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}:\d{3})\]/;
     const levelRegex = /\[(INFO|WARN|ERROR|DEBUG)\]/i;
 
@@ -898,13 +908,16 @@ function deleteWorld(world) {
 }
 
 /* =========================================================================
-   7. PLAYERS MANAGEMENT
+   7. PLAYERS MANAGEMENT (Directory, Cheats, Allowlist & History)
    ========================================================================= */
 function loadPlayers() {
     const tbody = document.getElementById('playersTableBody');
     if (tbody) {
         tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--zentra-muted); padding:16px;"><span class="status-dot-pulse"></span> Loading players...</td></tr>`;
     }
+
+    checkCheatsStatus();
+    loadAllowlist();
 
     fetch('/api/players')
         .then(r => {
@@ -931,13 +944,14 @@ function loadPlayers() {
                         <td>${escapeHtml(p.session_time || '--')}</td>
                         <td>${p.in_allowlist ? '<span style="color:#059669; font-weight:600;">Allowed</span>' : '<span style="color:#dc2626; font-weight:600;">Banned</span>'}</td>
                         <td>
-                            <div style="display:flex; gap:6px;">
+                            <div style="display:flex; gap:6px; flex-wrap:wrap;">
                                 ${p.in_allowlist 
                                     ? `<button class="zentra-btn danger" style="padding:4px 8px; font-size:11px;" onclick="playerAction('${escapeHtml(p.name)}', 'ban')">Ban</button>`
                                     : `<button class="zentra-btn emerald" style="padding:4px 8px; font-size:11px;" onclick="playerAction('${escapeHtml(p.name)}', 'unban')">Unban</button>`
                                 }
                                 <button class="zentra-btn secondary" style="padding:4px 8px; font-size:11px;" onclick="playerAction('${escapeHtml(p.name)}', 'promote')">Promote</button>
                                 <button class="zentra-btn secondary" style="padding:4px 8px; font-size:11px;" onclick="playerAction('${escapeHtml(p.name)}', 'demote')">Demote</button>
+                                <button class="zentra-btn secondary" style="padding:4px 8px; font-size:11px;" onclick="openPlayerHistory('${escapeHtml(p.name)}')">📜 History</button>
                             </div>
                         </td>
                     </tr>
@@ -972,6 +986,166 @@ function playerAction(player, action) {
         loadPlayers();
     })
     .catch(err => showToast(`Player action failed: ${err}`, 'error'));
+}
+
+/* Cheats Controller */
+function checkCheatsStatus() {
+    fetch('/api/cheats_status')
+        .then(r => r.json())
+        .then(data => {
+            const badge = document.getElementById('cheatsStatusBadge');
+            if (!badge) return;
+            if (data.cheats_enabled) {
+                badge.className = 'metric-pill';
+                badge.textContent = '● Cheats Enabled';
+            } else {
+                badge.className = 'metric-pill neutral';
+                badge.textContent = '○ Cheats Disabled (enable in Properties)';
+            }
+        })
+        .catch(() => {});
+}
+
+function sendPlayerCommand(cmd) {
+    if (!cmd) return;
+    fetch('/api/player_command', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ command: cmd })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.result) {
+            showToast(data.result, 'success');
+        } else if (data.error) {
+            showToast(data.error, 'error');
+        }
+    })
+    .catch(err => showToast(`Failed to run command: ${err}`, 'error'));
+}
+
+function executeCustomCheat() {
+    const input = document.getElementById('customCheatCmd');
+    if (!input || !input.value.trim()) return;
+    const cmd = input.value.trim();
+    sendPlayerCommand(cmd);
+    input.value = '';
+}
+
+/* Allowlist Management */
+function loadAllowlist() {
+    const tbody = document.getElementById('allowlistTableBody');
+    if (!tbody) return;
+
+    fetch('/api/allowlist')
+        .then(r => r.json())
+        .then(data => {
+            const list = data.allowlist || [];
+            if (list.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--zentra-muted); padding:14px;">Allowlist is currently empty.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = list.map(item => `
+                <tr>
+                    <td style="font-weight:700;">${escapeHtml(item.name || '--')}</td>
+                    <td style="font-family:var(--font-mono); font-size:11px; color:var(--zentra-muted);">${escapeHtml(item.xuid || '--')}</td>
+                    <td>${item.ignoresPlayerLimit ? '<span style="color:#10b981; font-weight:600;">Yes</span>' : '<span style="color:var(--zentra-muted);">No</span>'}</td>
+                    <td>
+                        <button class="zentra-btn danger" style="padding:3px 8px; font-size:11px;" onclick="removeFromAllowlist('${escapeHtml(item.name || '')}', '${escapeHtml(item.xuid || '')}')">Remove</button>
+                    </td>
+                </tr>
+            `).join('');
+        })
+        .catch(err => {
+            tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--zentra-red);">Failed to load allowlist.</td></tr>`;
+        });
+}
+
+function submitAddToAllowlist(e) {
+    if (e) e.preventDefault();
+    const nameInput = document.getElementById('allowlistNewName');
+    const xuidInput = document.getElementById('allowlistNewXuid');
+    const limitCheck = document.getElementById('allowlistIgnoreLimit');
+
+    const name = nameInput ? nameInput.value.trim() : '';
+    const xuid = xuidInput ? xuidInput.value.trim() : '';
+    const ignoresPlayerLimit = limitCheck ? limitCheck.checked : false;
+
+    if (!name) return alert("Please specify a player name");
+
+    fetch('/api/allowlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, xuid, ignoresPlayerLimit, action: 'add' })
+    })
+    .then(r => r.json())
+    .then(data => {
+        showToast(data.result || 'Added to allowlist', 'success');
+        if (nameInput) nameInput.value = '';
+        if (xuidInput) xuidInput.value = '';
+        if (limitCheck) limitCheck.checked = false;
+        loadAllowlist();
+        loadPlayers();
+    })
+    .catch(err => showToast(`Failed to add: ${err}`, 'error'));
+}
+
+function removeFromAllowlist(name, xuid) {
+    if (!confirm(`Remove '${name || xuid}' from allowlist?`)) return;
+    fetch('/api/allowlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, xuid, action: 'remove' })
+    })
+    .then(r => r.json())
+    .then(data => {
+        showToast(data.result || 'Removed from allowlist', 'info');
+        loadAllowlist();
+        loadPlayers();
+    })
+    .catch(err => showToast(`Failed to remove: ${err}`, 'error'));
+}
+
+/* Player Session History Modal */
+function openPlayerHistory(player) {
+    openModal('playerHistoryModal');
+    const titleEl = document.getElementById('historyModalPlayerName');
+    const timeEl = document.getElementById('historyModalTotalTime');
+    const tbody = document.getElementById('historyTableBody');
+
+    if (titleEl) titleEl.textContent = `Session History: ${player}`;
+    if (timeEl) timeEl.textContent = 'Loading records...';
+    if (tbody) tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; padding:16px;"><span class="status-dot-pulse"></span> Loading sessions...</td></tr>`;
+
+    fetch(`/api/player_sessions?player=${encodeURIComponent(player)}`)
+        .then(r => r.json())
+        .then(data => {
+            const sessions = data.sessions || [];
+            const totalSecs = data.total || 0;
+            const hours = Math.floor(totalSecs / 3600);
+            const mins = Math.floor((totalSecs % 3600) / 60);
+
+            if (timeEl) timeEl.textContent = `Total Playtime: ${hours}h ${mins}m (${sessions.length} recorded session${sessions.length === 1 ? '' : 's'})`;
+
+            if (sessions.length === 0) {
+                if (tbody) tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:var(--zentra-muted); padding:16px;">No session logs recorded yet for this player.</td></tr>`;
+                return;
+            }
+
+            if (tbody) {
+                tbody.innerHTML = sessions.map(s => `
+                    <tr>
+                        <td style="font-family:var(--font-mono); font-size:12px;">${escapeHtml(s.start || '--')}</td>
+                        <td style="font-family:var(--font-mono); font-size:12px;">${escapeHtml(s.end || '--')}</td>
+                        <td style="font-weight:600;">${escapeHtml(s.world || 'Default')}</td>
+                    </tr>
+                `).reverse().join('');
+            }
+        })
+        .catch(err => {
+            if (tbody) tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:var(--zentra-red);">Failed to load history.</td></tr>`;
+        });
 }
 
 /* =========================================================================

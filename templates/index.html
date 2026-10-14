@@ -7,7 +7,9 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/style.css?v=20261014_03">
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+    <link rel="shortcut icon" href="/favicon.ico">
+    <link rel="stylesheet" href="/static/css/style.css?v=20261014_04">
 </head>
 <body>
     <!-- Organic Wandering Halftone Canvas (Zentra Physics) -->
@@ -229,7 +231,32 @@
 
             <!-- 4. PLAYERS VIEW -->
             <section id="viewPlayers" class="tab-content" style="display:none;">
-                <div class="soft-card">
+                <!-- Gameplay Cheats Controller -->
+                <div class="soft-card" style="margin-bottom: 20px;">
+                    <div class="card-header-bar" style="flex-wrap:wrap; gap:12px;">
+                        <div class="card-title-group">
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <h3>Gameplay Cheats &amp; Environment</h3>
+                                <span class="metric-pill" id="cheatsStatusBadge">Checking...</span>
+                            </div>
+                            <p>Dispatch in-game operator commands directly to the active world</p>
+                        </div>
+                    </div>
+                    <div class="actions-pill-grid" style="margin-bottom: 14px;">
+                        <button class="zentra-btn secondary" onclick="sendPlayerCommand('time set day')">☀️ Time: Day</button>
+                        <button class="zentra-btn secondary" onclick="sendPlayerCommand('time set night')">🌙 Time: Night</button>
+                        <button class="zentra-btn secondary" onclick="sendPlayerCommand('weather clear')">⛅ Weather: Clear</button>
+                        <button class="zentra-btn secondary" onclick="sendPlayerCommand('gamemode creative @a')">🎮 Creative All</button>
+                        <button class="zentra-btn secondary" onclick="sendPlayerCommand('gamemode survival @a')">⚔️ Survival All</button>
+                    </div>
+                    <div style="display:flex; gap:8px;">
+                        <input type="text" id="customCheatCmd" class="zentra-input" placeholder="Custom cheat command (e.g. give @a diamond 64)" onkeydown="if(event.key==='Enter') executeCustomCheat()">
+                        <button class="zentra-btn emerald" onclick="executeCustomCheat()" style="white-space:nowrap;">Run Command</button>
+                    </div>
+                </div>
+
+                <!-- Player Directory & Permissions -->
+                <div class="soft-card" style="margin-bottom: 20px;">
                     <div class="card-header-bar">
                         <div class="card-title-group">
                             <h3>Player Directory &amp; Permissions</h3>
@@ -253,6 +280,48 @@
                             </thead>
                             <tbody id="playersTableBody">
                                 <tr><td colspan="7" style="text-align:center;">Loading players...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Allowlist Management Card -->
+                <div class="soft-card">
+                    <div class="card-header-bar" style="flex-wrap:wrap; gap:12px;">
+                        <div class="card-title-group">
+                            <h3>Allowlist (Whitelist) Management</h3>
+                            <p>Manage who can connect when allowlist is enforced in server.properties</p>
+                        </div>
+                        <button class="zentra-btn secondary" onclick="loadAllowlist()">↻ Reload Allowlist</button>
+                    </div>
+
+                    <form onsubmit="submitAddToAllowlist(event)" style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom: 16px;">
+                        <div class="zentra-input-group" style="flex: 1; min-width: 180px;">
+                            <label>Gamertag / Player Name</label>
+                            <input type="text" id="allowlistNewName" class="zentra-input" placeholder="e.g. Steve" required>
+                        </div>
+                        <div class="zentra-input-group" style="flex: 1; min-width: 180px;">
+                            <label>XUID (Optional)</label>
+                            <input type="text" id="allowlistNewXuid" class="zentra-input" placeholder="e.g. 253327482910">
+                        </div>
+                        <label style="display:flex; align-items:center; gap:6px; font-size:12px; margin-bottom:10px; cursor:pointer;">
+                            <input type="checkbox" id="allowlistIgnoreLimit"> Ignore Player Limit
+                        </label>
+                        <button type="submit" class="zentra-btn emerald" style="margin-bottom:4px;">+ Add to Allowlist</button>
+                    </form>
+
+                    <div class="zentra-table-wrap">
+                        <table class="zentra-table">
+                            <thead>
+                                <tr>
+                                    <th>Player Name</th>
+                                    <th>XUID</th>
+                                    <th>Ignores Limit</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="allowlistTableBody">
+                                <tr><td colspan="4" style="text-align:center; color:var(--zentra-muted);">Loading allowlist...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -443,9 +512,32 @@
         </div>
     </div>
 
+    <!-- Player Session History Modal -->
+    <div class="zentra-modal-backdrop" id="playerHistoryModal">
+        <div class="zentra-modal" style="max-width: 620px;">
+            <div class="card-header-bar">
+                <div class="card-title-group">
+                    <h3 id="historyModalPlayerName">Player Session History</h3>
+                    <p id="historyModalTotalTime">Loading records...</p>
+                </div>
+                <button class="zentra-btn secondary" onclick="closeModal('playerHistoryModal')" style="padding:4px 10px;">✕</button>
+            </div>
+            <div class="zentra-table-wrap" style="max-height: 380px; overflow-y: auto;">
+                <table class="zentra-table">
+                    <thead>
+                        <tr><th>Start Timestamp</th><th>End Timestamp</th><th>World</th></tr>
+                    </thead>
+                    <tbody id="historyTableBody">
+                        <tr><td colspan="3" style="text-align:center;">Loading session entries...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
     <!-- Toast Container -->
     <div id="toastContainer"></div>
 
-    <script src="/static/js/app.js?v=20261014_03"></script>
+    <script src="/static/js/app.js?v=20261014_04"></script>
 </body>
 </html>

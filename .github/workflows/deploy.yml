@@ -50,6 +50,8 @@ jobs:
 
       - name: Build Release Binary
         if: steps.filter.outputs.rust == 'true' || github.event_name == 'workflow_dispatch'
+        env:
+          RUSTFLAGS: "-C link-arg=-fuse-ld=mold"
         run: cargo build --release
 
       - name: Setup SSH

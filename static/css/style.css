@@ -66,28 +66,28 @@ body {
   padding: 80px 20px 80px;
 }
 
-/* Top Navigation Bar - FIXED directly at the top of the page */
+/* Top Navigation Bar - FLOATING pill anchored at document top (scrolls away) */
 .zentra-navbar {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  width: 100%;
-  z-index: 1000;
-  background: rgba(253, 253, 252, 0.92);
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(100% - 40px);
+  max-width: 1200px;
+  z-index: 100;
+  background: rgba(253, 253, 252, 0.94);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
-  border-bottom: 1px solid var(--zentra-border);
-  padding: 10px 24px;
-  box-shadow: 0 4px 20px rgba(17, 17, 17, 0.05);
+  border: 1px solid var(--zentra-border);
+  border-radius: var(--radius-pill);
+  padding: 8px 16px;
+  box-shadow: 0 14px 36px -12px rgba(17, 17, 17, 0.12), 0 2px 6px rgba(17, 17, 17, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.95);
   box-sizing: border-box;
   transition: all 0.25s ease;
 }
 
 .zentra-navbar-inner {
   width: 100%;
-  max-width: 1200px;
-  margin: 0 auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -928,12 +928,19 @@ body {
 }
 
 @media (max-width: 640px) {
+  .zentra-navbar {
+    width: calc(100% - 20px);
+    top: 10px;
+    border-radius: 20px;
+    padding: 8px 12px;
+  }
   .actions-pill-grid {
     grid-template-columns: 1fr;
   }
   .zentra-navbar-inner {
     flex-direction: column;
     align-items: stretch;
+    gap: 10px;
   }
   .tab-switcher-pill {
     overflow-x: auto;

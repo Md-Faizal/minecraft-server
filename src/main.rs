@@ -1,5 +1,6 @@
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use axum::extract::DefaultBodyLimit;
 use axum::routing::{get, post};
@@ -79,7 +80,8 @@ async fn main() {
         .route("/api/player_action", post(handlers::api_player_action))
         .route("/api/player/action", post(handlers::api_player_action))
         .route("/api/player_sessions", get(handlers::api_player_sessions))
-        .route("/api/allowlist", get(handlers::api_allowlist_get))
+        .route("/favicon.ico", get(handlers::favicon))
+        .route("/api/allowlist", get(handlers::api_allowlist_get).post(handlers::api_allowlist_post))
         .route("/api/cheats_status", get(handlers::api_cheats_status))
         .route("/api/cheats", get(handlers::api_cheats_status))
         .route("/api/player_command", post(handlers::api_player_command))
@@ -103,7 +105,17 @@ async fn main() {
         .layer(DefaultBodyLimit::max(500 * 1024 * 1024)) // 500 MB max for world uploads
         .layer(cors)
         .layer(TraceLayer::new_for_http())
-        .with_state(manager);
+        .with_state(Arc::clone(&manager));
+
+    // Automatically ensure the Bedrock Dedicated Server starts when manager daemon boots
+    let auto_start_mgr = Arc::clone(&manager);
+    tokio::spawn(async move {
+        tokio::time::sleep(tokio::time::Duration::from_millis(600)).await;
+        if !auto_start_mgr.is_server_running().await {
+            info!("🎮 Auto-starting Bedrock Dedicated Server daemon on manager boot...");
+            auto_start_mgr.start_server().await;
+        }
+    });
 
     let port: u16 = std::env::var("PORT")
         .unwrap_or_else(|_| "5000".to_string())
