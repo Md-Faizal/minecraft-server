@@ -183,16 +183,18 @@ function initZentraHalftoneBackground() {
 }
 
 /* =========================================================================
-   2. SLIDING PILL TAB NAVIGATION & DRAG CONTROLLER (Zentra Implementation)
+   2. SLIDING PILL TAB NAVIGATION & DUAL DRAG/CLICK CONTROLLER (Zentra Physics)
    ========================================================================= */
 let isDraggingTabs = false;
-let dragStartX = null;
+let tabDragStartX = 0;
+let tabDragStartY = 0;
 let hasDraggedTabs = false;
 
 function updateTabSlider(activeBtn) {
     const slider = document.getElementById('tabSliderPill');
     if (!slider || !activeBtn) return;
     const parent = activeBtn.parentElement;
+    if (!parent) return;
     const parentRect = parent.getBoundingClientRect();
     const btnRect = activeBtn.getBoundingClientRect();
 
@@ -204,30 +206,49 @@ function initTabDragSelector() {
     const switcher = document.getElementById('tabSwitcher');
     if (!switcher) return;
 
-    switcher.addEventListener('pointerdown', (e) => {
-        isDraggingTabs = true;
-        dragStartX = e.clientX;
-        hasDraggedTabs = false;
-        try { switcher.setPointerCapture(e.pointerId); } catch (_) {}
+    let isPointerDown = false;
+    let pointerId = null;
+
+    // Direct click handler on all tab buttons
+    switcher.querySelectorAll('.nav-tab-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            if (hasDraggedTabs) return; // Ignore if it was a drag gesture
+            const tab = btn.getAttribute('data-tab');
+            if (tab) switchZentraTab(tab);
+        });
     });
 
-    const onPointerMove = (e) => {
-        if (!isDraggingTabs || dragStartX === null) return;
-        const deltaX = Math.abs(e.clientX - dragStartX);
-        if (deltaX > 4) {
-            if (!hasDraggedTabs) {
-                hasDraggedTabs = true;
-                switcher.classList.add('dragging');
-            }
+    switcher.addEventListener('pointerdown', (e) => {
+        // Only react to primary button (left click / touch)
+        if (e.button !== 0 && e.pointerType === 'mouse') return;
+        isPointerDown = true;
+        pointerId = e.pointerId;
+        tabDragStartX = e.clientX;
+        tabDragStartY = e.clientY;
+        hasDraggedTabs = false;
+    });
+
+    window.addEventListener('pointermove', (e) => {
+        if (!isPointerDown) return;
+        const dx = e.clientX - tabDragStartX;
+        const dy = e.clientY - tabDragStartY;
+
+        // If pointer moved horizontally beyond threshold, activate drag mode
+        if (!hasDraggedTabs && Math.abs(dx) > 6 && Math.abs(dx) > Math.abs(dy)) {
+            hasDraggedTabs = true;
+            isDraggingTabs = true;
+            switcher.classList.add('dragging');
+            try { switcher.setPointerCapture(pointerId); } catch (_) {}
         }
+
         if (!hasDraggedTabs) return;
 
         const slider = document.getElementById('tabSliderPill');
         const parentRect = switcher.getBoundingClientRect();
         const currentActiveBtn = switcher.querySelector(`.nav-tab-btn[data-tab="${currentTab}"]`);
-        const pillWidth = currentActiveBtn ? currentActiveBtn.getBoundingClientRect().width : 70;
+        const pillWidth = currentActiveBtn ? currentActiveBtn.getBoundingClientRect().width : 76;
 
-        // Fluid drag position directly under cursor
+        // Position slider smoothly under cursor
         const relX = e.clientX - parentRect.left;
         const minLeft = 4;
         const maxLeft = parentRect.width - pillWidth - 4;
@@ -238,7 +259,7 @@ function initTabDragSelector() {
             slider.style.width = `${pillWidth}px`;
         }
 
-        // Find closest tab button based on mouse X relative to each button center
+        // Live visual highlight of the closest tab button while dragging
         const buttons = Array.from(switcher.querySelectorAll('.nav-tab-btn'));
         let closestBtn = null;
         let minDistance = Infinity;
@@ -254,60 +275,69 @@ function initTabDragSelector() {
         });
 
         if (closestBtn) {
-            const tabName = closestBtn.getAttribute('data-tab');
-            if (tabName && tabName !== currentTab) {
-                currentTab = tabName;
-                const allTabs = ['home', 'console', 'worlds', 'players', 'addons', 'properties', 'update', 'settings'];
-                allTabs.forEach(t => {
-                    const cap = t.charAt(0).toUpperCase() + t.slice(1);
-                    const view = document.getElementById(`view${cap}`);
-                    const b = switcher.querySelector(`.nav-tab-btn[data-tab="${t}"]`);
-                    if (view) {
-                        if (t === tabName) {
-                            view.classList.add('active');
-                            view.style.display = 'block';
-                        } else {
-                            view.classList.remove('active');
-                            view.style.display = 'none';
-                        }
-                    }
-                    if (b) {
-                        if (t === tabName) {
-                            b.classList.add('active');
-                        } else {
-                            b.classList.remove('active');
-                        }
-                    }
-                });
-                window.location.hash = tabName;
+            buttons.forEach(b => {
+                b.classList.toggle('active', b === closestBtn);
+            });
+        }
+    });
+
+    const handlePointerUp = (e) => {
+        if (!isPointerDown) return;
+        isPointerDown = false;
+        isDraggingTabs = false;
+        switcher.classList.remove('dragging');
+        try { if (pointerId !== null) switcher.releasePointerCapture(pointerId); } catch (_) {}
+
+        if (hasDraggedTabs) {
+            // Find which button the user dropped the slider on
+            const buttons = Array.from(switcher.querySelectorAll('.nav-tab-btn'));
+            let closestBtn = null;
+            let minDistance = Infinity;
+
+            buttons.forEach(btn => {
+                const rect = btn.getBoundingClientRect();
+                const centerX = rect.left + rect.width / 2;
+                const dist = Math.abs(e.clientX - centerX);
+                if (dist < minDistance) {
+                    minDistance = dist;
+                    closestBtn = btn;
+                }
+            });
+
+            if (closestBtn) {
+                const targetTab = closestBtn.getAttribute('data-tab');
+                if (targetTab) switchZentraTab(targetTab);
+            }
+
+            // Reset dragged state after click event cycle concludes
+            setTimeout(() => {
+                hasDraggedTabs = false;
+            }, 60);
+        } else {
+            // It was a click: if target was a tab button, ensure it switches
+            const targetBtn = e.target.closest('.nav-tab-btn');
+            if (targetBtn) {
+                const tab = targetBtn.getAttribute('data-tab');
+                if (tab) switchZentraTab(tab);
             }
         }
     };
 
-    const handlePointerUp = (e) => {
-        if (!isDraggingTabs) return;
-        isDraggingTabs = false;
-        dragStartX = null;
-        switcher.classList.remove('dragging');
-        try { if (e && e.pointerId) switcher.releasePointerCapture(e.pointerId); } catch (_) {}
+    window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('pointercancel', handlePointerUp);
 
+    // Keep slider in sync on window resize
+    window.addEventListener('resize', () => {
         const activeBtn = switcher.querySelector(`.nav-tab-btn[data-tab="${currentTab}"]`);
         if (activeBtn) updateTabSlider(activeBtn);
-
-        setTimeout(() => {
-            hasDraggedTabs = false;
-        }, 100);
-    };
-
-    switcher.addEventListener('pointermove', onPointerMove);
-    window.addEventListener('pointermove', onPointerMove);
-    switcher.addEventListener('pointerup', handlePointerUp);
-    switcher.addEventListener('pointercancel', handlePointerUp);
-    window.addEventListener('pointerup', handlePointerUp);
+    });
 }
 
-function switchZentraTab(tabName, isClick = true) {
-    if (isClick && hasDraggedTabs) return;
+function switchZentraTab(tabName) {
+    if (!tabName) return;
+    // Map URL aliases
+    if (tabName === 'terminal') tabName = 'console';
+
     currentTab = tabName;
     const allTabs = ['home', 'console', 'worlds', 'players', 'addons', 'properties', 'update', 'settings'];
 
@@ -316,7 +346,13 @@ function switchZentraTab(tabName, isClick = true) {
         const view = document.getElementById(`view${cap}`);
         const btn = document.querySelector(`.nav-tab-btn[data-tab="${t}"]`);
         if (view) {
-            view.style.display = (t === tabName) ? 'block' : 'none';
+            if (t === tabName) {
+                view.style.display = 'block';
+                view.classList.add('active');
+            } else {
+                view.style.display = 'none';
+                view.classList.remove('active');
+            }
         }
         if (btn) {
             if (t === tabName) {
@@ -328,17 +364,33 @@ function switchZentraTab(tabName, isClick = true) {
         }
     });
 
-    if (tabName === 'worlds') loadWorlds();
-    if (tabName === 'players') loadPlayers();
-    if (tabName === 'addons') loadAddons();
-    if (tabName === 'properties') loadProperties();
-    if (tabName === 'update') checkBdsUpdates();
-    if (tabName === 'console') {
+    // Update URL hash without forcing window scroll jump
+    const desiredHash = `#${tabName}`;
+    if (window.location.hash !== desiredHash) {
+        history.replaceState(null, null, desiredHash);
+    }
+
+    // Always trigger data load for the activated tab
+    if (tabName === 'home') {
+        loadStatus();
+    } else if (tabName === 'console') {
         fetchLogs();
         setTimeout(() => {
             const screen = document.getElementById('terminalScreen');
             if (screen && autoScroll) screen.scrollTop = screen.scrollHeight;
-        }, 50);
+        }, 60);
+    } else if (tabName === 'worlds') {
+        loadWorlds();
+    } else if (tabName === 'players') {
+        loadPlayers();
+    } else if (tabName === 'addons') {
+        loadAddons();
+    } else if (tabName === 'properties') {
+        loadProperties();
+    } else if (tabName === 'update') {
+        checkBdsUpdates();
+    } else if (tabName === 'settings') {
+        loadSettings();
     }
 }
 
@@ -666,8 +718,16 @@ function serverAction(action) {
    6. WORLDS MANAGEMENT
    ========================================================================= */
 function loadWorlds() {
+    const tbody = document.getElementById('worldsTableBody');
+    if (tbody) {
+        tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:var(--zentra-muted); padding:16px;"><span class="status-dot-pulse"></span> Loading worlds...</td></tr>`;
+    }
+
     fetch('/api/worlds')
-        .then(r => r.json())
+        .then(r => {
+            if (!r.ok) throw new Error(`HTTP ${r.status} ${r.statusText}`);
+            return r.json();
+        })
         .then(data => {
             const tbody = document.getElementById('worldsTableBody');
             if (!tbody) return;
@@ -676,7 +736,7 @@ function loadWorlds() {
             const activeWorld = data.active_world;
 
             if (worlds.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:var(--zentra-muted);">No worlds found on server.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:var(--zentra-muted); padding:16px;">No worlds found on server.</td></tr>`;
                 return;
             }
 
@@ -684,21 +744,39 @@ function loadWorlds() {
                 const isActive = (w === activeWorld);
                 return `
                     <tr>
-                        <td style="font-weight:700;">${w}</td>
+                        <td style="font-weight:700;">${escapeHtml(w)}</td>
                         <td>
                             ${isActive ? '<span class="metric-pill">Active World</span>' : '<span class="metric-pill neutral">Inactive</span>'}
                         </td>
                         <td>
                             <div style="display:flex; gap:8px;">
-                                ${!isActive ? `<button class="zentra-btn emerald" style="padding:4px 10px; font-size:12px;" onclick="setActiveWorld('${w}')">Activate</button>` : ''}
-                                <button class="zentra-btn secondary" style="padding:4px 10px; font-size:12px;" onclick="backupWorld('${w}')">Backup</button>
-                                <button class="zentra-btn secondary" style="padding:4px 10px; font-size:12px;" onclick="loadBackups('${w}')">Archives</button>
-                                ${!isActive ? `<button class="zentra-btn danger" style="padding:4px 10px; font-size:12px;" onclick="deleteWorld('${w}')">Delete</button>` : ''}
+                                ${!isActive ? `<button class="zentra-btn emerald" style="padding:4px 10px; font-size:12px;" onclick="setActiveWorld('${escapeHtml(w)}')">Activate</button>` : ''}
+                                <button class="zentra-btn secondary" style="padding:4px 10px; font-size:12px;" onclick="backupWorld('${escapeHtml(w)}')">Backup</button>
+                                <button class="zentra-btn secondary" style="padding:4px 10px; font-size:12px;" onclick="loadBackups('${escapeHtml(w)}')">Archives</button>
+                                ${!isActive ? `<button class="zentra-btn danger" style="padding:4px 10px; font-size:12px;" onclick="deleteWorld('${escapeHtml(w)}')">Delete</button>` : ''}
                             </div>
                         </td>
                     </tr>
                 `;
             }).join('');
+
+            if (activeWorld) {
+                loadBackups(activeWorld);
+            }
+        })
+        .catch(err => {
+            console.error("Failed to load worlds:", err);
+            const tbody = document.getElementById('worldsTableBody');
+            if (tbody) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="3" style="text-align:center; color:var(--zentra-red); padding:16px;">
+                            <div>Failed to load worlds (${escapeHtml(err.message || String(err))})</div>
+                            <button class="zentra-btn secondary" style="margin-top:8px; padding:4px 12px; font-size:12px;" onclick="loadWorlds()">↻ Retry</button>
+                        </td>
+                    </tr>
+                `;
+            }
         });
 }
 
@@ -714,7 +792,8 @@ function setActiveWorld(world) {
     .then(data => {
         showToast(data.result || 'World activated', 'success');
         setTimeout(() => { loadWorlds(); loadStatus(); }, 2000);
-    });
+    })
+    .catch(err => showToast(`Error activating world: ${err}`, 'error'));
 }
 
 function submitCreateWorld() {
@@ -732,7 +811,8 @@ function submitCreateWorld() {
         showToast(data.result || 'Created', 'success');
         closeModal('createWorldModal');
         loadWorlds();
-    });
+    })
+    .catch(err => showToast(`Error creating world: ${err}`, 'error'));
 }
 
 function submitUploadWorld() {
@@ -767,33 +847,38 @@ function backupWorld(world) {
     .then(data => {
         showToast(data.result || 'Backup created', 'success');
         loadBackups(world);
-    });
+    })
+    .catch(err => showToast(`Backup failed: ${err}`, 'error'));
 }
 
 function loadBackups(world) {
+    const container = document.getElementById('backupsListContainer');
+    if (!container) return;
+
     fetch(`/api/list_backups?world=${encodeURIComponent(world)}`)
         .then(r => r.json())
         .then(data => {
-            const container = document.getElementById('backupsListContainer');
-            if (!container) return;
             const backups = data.backups || [];
             if (backups.length === 0) {
-                container.innerHTML = `<p style="color:var(--zentra-muted); font-size:13px;">No backups found for world '${world}'.</p>`;
+                container.innerHTML = `<p style="color:var(--zentra-muted); font-size:13px;">No backups found for world '${escapeHtml(world)}'.</p>`;
                 return;
             }
             container.innerHTML = `
-                <h4 style="font-size:14px; font-weight:700; margin-bottom:10px;">Backups for world: ${world}</h4>
+                <h4 style="font-size:14px; font-weight:700; margin-bottom:10px;">Backups for world: ${escapeHtml(world)}</h4>
                 <div class="zentra-table-wrap">
                     <table class="zentra-table">
                         <thead>
                             <tr><th>Filename</th><th>Size</th><th>Created Date</th></tr>
                         </thead>
                         <tbody>
-                            ${backups.map(b => `<tr><td style="font-family:var(--font-mono); font-size:12px;">${b.filename}</td><td>${b.size}</td><td>${b.date}</td></tr>`).join('')}
+                            ${backups.map(b => `<tr><td style="font-family:var(--font-mono); font-size:12px;">${escapeHtml(b.filename)}</td><td>${escapeHtml(b.size)}</td><td>${escapeHtml(b.date)}</td></tr>`).join('')}
                         </tbody>
                     </table>
                 </div>
             `;
+        })
+        .catch(err => {
+            container.innerHTML = `<p style="color:var(--zentra-red); font-size:12px;">Failed to load backups for '${escapeHtml(world)}'.</p>`;
         });
 }
 
@@ -808,21 +893,30 @@ function deleteWorld(world) {
     .then(data => {
         showToast(data.result || 'Deleted', 'info');
         loadWorlds();
-    });
+    })
+    .catch(err => showToast(`Delete failed: ${err}`, 'error'));
 }
 
 /* =========================================================================
    7. PLAYERS MANAGEMENT
    ========================================================================= */
 function loadPlayers() {
+    const tbody = document.getElementById('playersTableBody');
+    if (tbody) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--zentra-muted); padding:16px;"><span class="status-dot-pulse"></span> Loading players...</td></tr>`;
+    }
+
     fetch('/api/players')
-        .then(r => r.json())
+        .then(r => {
+            if (!r.ok) throw new Error(`HTTP ${r.status} ${r.statusText}`);
+            return r.json();
+        })
         .then(data => {
             const tbody = document.getElementById('playersTableBody');
             if (!tbody) return;
             const players = data.players || [];
             if (players.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--zentra-muted);">No player records found.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--zentra-muted); padding:16px;">No player records found.</td></tr>`;
                 return;
             }
 
@@ -830,25 +924,39 @@ function loadPlayers() {
                 const isOnline = p.status === 'Online';
                 return `
                     <tr>
-                        <td style="font-weight:700;">${p.name}</td>
-                        <td style="font-family:var(--font-mono); font-size:11px; color:var(--zentra-muted);">${p.xuid || '--'}</td>
+                        <td style="font-weight:700;">${escapeHtml(p.name)}</td>
+                        <td style="font-family:var(--font-mono); font-size:11px; color:var(--zentra-muted);">${escapeHtml(p.xuid || '--')}</td>
                         <td>${isOnline ? '<span class="metric-pill">Online</span>' : '<span class="metric-pill neutral">Offline</span>'}</td>
-                        <td><span style="font-weight:600; text-transform:capitalize;">${p.level}</span></td>
-                        <td>${p.session_time || '--'}</td>
+                        <td><span style="font-weight:600; text-transform:capitalize;">${escapeHtml(p.level)}</span></td>
+                        <td>${escapeHtml(p.session_time || '--')}</td>
                         <td>${p.in_allowlist ? '<span style="color:#059669; font-weight:600;">Allowed</span>' : '<span style="color:#dc2626; font-weight:600;">Banned</span>'}</td>
                         <td>
                             <div style="display:flex; gap:6px;">
                                 ${p.in_allowlist 
-                                    ? `<button class="zentra-btn danger" style="padding:4px 8px; font-size:11px;" onclick="playerAction('${p.name}', 'ban')">Ban</button>`
-                                    : `<button class="zentra-btn emerald" style="padding:4px 8px; font-size:11px;" onclick="playerAction('${p.name}', 'unban')">Unban</button>`
+                                    ? `<button class="zentra-btn danger" style="padding:4px 8px; font-size:11px;" onclick="playerAction('${escapeHtml(p.name)}', 'ban')">Ban</button>`
+                                    : `<button class="zentra-btn emerald" style="padding:4px 8px; font-size:11px;" onclick="playerAction('${escapeHtml(p.name)}', 'unban')">Unban</button>`
                                 }
-                                <button class="zentra-btn secondary" style="padding:4px 8px; font-size:11px;" onclick="playerAction('${p.name}', 'promote')">Promote</button>
-                                <button class="zentra-btn secondary" style="padding:4px 8px; font-size:11px;" onclick="playerAction('${p.name}', 'demote')">Demote</button>
+                                <button class="zentra-btn secondary" style="padding:4px 8px; font-size:11px;" onclick="playerAction('${escapeHtml(p.name)}', 'promote')">Promote</button>
+                                <button class="zentra-btn secondary" style="padding:4px 8px; font-size:11px;" onclick="playerAction('${escapeHtml(p.name)}', 'demote')">Demote</button>
                             </div>
                         </td>
                     </tr>
                 `;
             }).join('');
+        })
+        .catch(err => {
+            console.error("Failed to load players:", err);
+            const tbody = document.getElementById('playersTableBody');
+            if (tbody) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7" style="text-align:center; color:var(--zentra-red); padding:16px;">
+                            <div>Failed to load players (${escapeHtml(err.message || String(err))})</div>
+                            <button class="zentra-btn secondary" style="margin-top:8px; padding:4px 12px; font-size:12px;" onclick="loadPlayers()">↻ Retry</button>
+                        </td>
+                    </tr>
+                `;
+            }
         });
 }
 
@@ -862,15 +970,24 @@ function playerAction(player, action) {
     .then(data => {
         showToast(data.result || 'Updated', 'success');
         loadPlayers();
-    });
+    })
+    .catch(err => showToast(`Player action failed: ${err}`, 'error'));
 }
 
 /* =========================================================================
    8. ADDONS MANAGEMENT
    ========================================================================= */
 function loadAddons() {
+    const bCont = document.getElementById('behaviorPacksContainer');
+    const rCont = document.getElementById('resourcePacksContainer');
+    if (bCont) bCont.innerHTML = `<p style="color:var(--zentra-muted); font-size:12px;"><span class="status-dot-pulse"></span> Loading behavior packs...</p>`;
+    if (rCont) rCont.innerHTML = `<p style="color:var(--zentra-muted); font-size:12px;"><span class="status-dot-pulse"></span> Loading resource packs...</p>`;
+
     fetch('/api/addons')
-        .then(r => r.json())
+        .then(r => {
+            if (!r.ok) throw new Error(`HTTP ${r.status} ${r.statusText}`);
+            return r.json();
+        })
         .then(data => {
             const bCont = document.getElementById('behaviorPacksContainer');
             const rCont = document.getElementById('resourcePacksContainer');
@@ -883,23 +1000,36 @@ function loadAddons() {
 
             bCont.innerHTML = bPacks.map(p => `
                 <label class="stat-box" style="display:flex; align-items:center; gap:10px; cursor:pointer;">
-                    <input type="checkbox" name="b_pack" value="${p.folder}" ${appliedB.includes(p.uuid) ? 'checked' : ''}>
+                    <input type="checkbox" name="b_pack" value="${escapeHtml(p.folder)}" ${appliedB.includes(p.uuid) ? 'checked' : ''}>
                     <div>
-                        <div style="font-weight:700; font-size:13px;">${p.name}</div>
-                        <div style="font-size:11px; color:var(--zentra-muted);">${p.folder}</div>
+                        <div style="font-weight:700; font-size:13px;">${escapeHtml(p.name)}</div>
+                        <div style="font-size:11px; color:var(--zentra-muted);">${escapeHtml(p.folder)}</div>
                     </div>
                 </label>
             `).join('') || '<p style="color:var(--zentra-muted); font-size:12px;">No behavior packs installed</p>';
 
             rCont.innerHTML = rPacks.map(p => `
                 <label class="stat-box" style="display:flex; align-items:center; gap:10px; cursor:pointer;">
-                    <input type="checkbox" name="r_pack" value="${p.folder}" ${appliedR.includes(p.uuid) ? 'checked' : ''}>
+                    <input type="checkbox" name="r_pack" value="${escapeHtml(p.folder)}" ${appliedR.includes(p.uuid) ? 'checked' : ''}>
                     <div>
-                        <div style="font-weight:700; font-size:13px;">${p.name}</div>
-                        <div style="font-size:11px; color:var(--zentra-muted);">${p.folder}</div>
+                        <div style="font-weight:700; font-size:13px;">${escapeHtml(p.name)}</div>
+                        <div style="font-size:11px; color:var(--zentra-muted);">${escapeHtml(p.folder)}</div>
                     </div>
                 </label>
             `).join('') || '<p style="color:var(--zentra-muted); font-size:12px;">No resource packs installed</p>';
+        })
+        .catch(err => {
+            console.error("Failed to load addons:", err);
+            const bCont = document.getElementById('behaviorPacksContainer');
+            const rCont = document.getElementById('resourcePacksContainer');
+            const errHtml = `
+                <div style="color:var(--zentra-red); font-size:12px; padding:10px;">
+                    <div>Failed to load addons (${escapeHtml(err.message || String(err))})</div>
+                    <button class="zentra-btn secondary" style="margin-top:6px; padding:3px 10px; font-size:11px;" onclick="loadAddons()">↻ Retry</button>
+                </div>
+            `;
+            if (bCont) bCont.innerHTML = errHtml;
+            if (rCont) rCont.innerHTML = errHtml;
         });
 }
 
@@ -918,7 +1048,8 @@ function applyAddonsToActiveWorld() {
     .then(r => r.json())
     .then(data => {
         showToast(data.result || 'Addons applied', 'success');
-    });
+    })
+    .catch(err => showToast(`Failed to apply addons: ${err}`, 'error'));
 }
 
 function submitUploadAddon() {
@@ -938,47 +1069,111 @@ function submitUploadAddon() {
         showToast(data.result || 'Addon installed', 'success');
         closeModal('uploadAddonModal');
         loadAddons();
-    });
+    })
+    .catch(err => showToast(`Upload failed: ${err}`, 'error'));
 }
 
 /* =========================================================================
-   9. SERVER PROPERTIES EDITOR
+   9. SERVER PROPERTIES EDITOR (Robust Schema Form & Realtime Filter)
    ========================================================================= */
+let _allPropertiesCache = [];
+
 function loadProperties() {
+    const form = document.getElementById('propertiesForm');
+    if (!form) return;
+
+    form.innerHTML = `
+        <div style="grid-column: 1 / -1; display:flex; align-items:center; gap:12px; padding:24px; color:var(--zentra-muted);">
+            <div class="status-dot-pulse"></div>
+            <span>Fetching server.properties from dedicated server...</span>
+        </div>
+    `;
+
     fetch('/api/properties')
-        .then(r => r.json())
+        .then(r => {
+            if (!r.ok) throw new Error(`HTTP ${r.status} ${r.statusText}`);
+            return r.json();
+        })
         .then(data => {
-            const form = document.getElementById('propertiesForm');
-            if (!form) return;
             const props = data.properties || [];
-
-            form.innerHTML = props.map(p => {
-                let inputHtml = '';
-                if (p.type === 'choice' && p.choices) {
-                    inputHtml = `
-                        <select name="${p.key}" class="zentra-input">
-                            ${p.choices.map(c => `<option value="${c}" ${c === String(p.value) ? 'selected' : ''}>${c}</option>`).join('')}
-                        </select>
-                    `;
-                } else if (p.type === 'bool') {
-                    inputHtml = `
-                        <select name="${p.key}" class="zentra-input">
-                            <option value="true" ${String(p.value).toLowerCase() === 'true' ? 'selected' : ''}>true</option>
-                            <option value="false" ${String(p.value).toLowerCase() === 'false' ? 'selected' : ''}>false</option>
-                        </select>
-                    `;
-                } else {
-                    inputHtml = `<input type="text" name="${p.key}" value="${escapeHtml(String(p.value ?? p.default))}" class="zentra-input">`;
-                }
-
-                return `
-                    <div class="zentra-input-group">
-                        <label>${p.label} <span style="font-family:var(--font-mono); font-size:10px; color:var(--zentra-muted);">(${p.key})</span></label>
-                        ${inputHtml}
-                    </div>
-                `;
-            }).join('');
+            _allPropertiesCache = props;
+            renderProperties(props);
+        })
+        .catch(err => {
+            console.error("Failed to load properties:", err);
+            form.innerHTML = `
+                <div style="grid-column: 1 / -1; padding: 20px; background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 12px; color: var(--zentra-red);">
+                    <div style="font-weight: 700; margin-bottom: 6px;">Failed to load server.properties</div>
+                    <div style="font-size: 13px; margin-bottom: 12px;">${escapeHtml(err.message || String(err))}</div>
+                    <button type="button" class="zentra-btn secondary" onclick="loadProperties()">↻ Retry Loading</button>
+                </div>
+            `;
+            showToast(`Could not load properties: ${err.message || err}`, 'error');
         });
+}
+
+function renderProperties(props) {
+    const form = document.getElementById('propertiesForm');
+    if (!form) return;
+
+    if (!props || props.length === 0) {
+        form.innerHTML = `<div style="grid-column: 1 / -1; color: var(--zentra-muted); padding: 16px;">No matching properties found.</div>`;
+        return;
+    }
+
+    form.innerHTML = props.map(p => {
+        let inputHtml = '';
+        const curVal = (p.value !== undefined && p.value !== null) ? p.value : p.default;
+
+        if (p.type === 'choice' && p.choices) {
+            inputHtml = `
+                <select name="${p.key}" class="zentra-input">
+                    ${p.choices.map(c => `<option value="${escapeHtml(c)}" ${String(c) === String(curVal) ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('')}
+                </select>
+            `;
+        } else if (p.type === 'bool') {
+            const isTrue = String(curVal).toLowerCase() === 'true';
+            inputHtml = `
+                <select name="${p.key}" class="zentra-input">
+                    <option value="true" ${isTrue ? 'selected' : ''}>true (enabled)</option>
+                    <option value="false" ${!isTrue ? 'selected' : ''}>false (disabled)</option>
+                </select>
+            `;
+        } else if (p.type === 'int') {
+            inputHtml = `<input type="number" step="1" name="${p.key}" value="${escapeHtml(String(curVal ?? ''))}" class="zentra-input">`;
+        } else if (p.type === 'float') {
+            inputHtml = `<input type="number" step="any" name="${p.key}" value="${escapeHtml(String(curVal ?? ''))}" class="zentra-input">`;
+        } else {
+            inputHtml = `<input type="text" name="${p.key}" value="${escapeHtml(String(curVal ?? ''))}" class="zentra-input">`;
+        }
+
+        return `
+            <div class="zentra-input-group" data-prop-key="${escapeHtml(p.key)}" data-prop-label="${escapeHtml(p.label)}">
+                <label style="display:flex; justify-content:space-between; align-items:baseline;">
+                    <span>${escapeHtml(p.label)}</span>
+                    <span style="font-family:var(--font-mono); font-size:10px; color:var(--zentra-muted);">${escapeHtml(p.key)}</span>
+                </label>
+                ${inputHtml}
+            </div>
+        `;
+    }).join('');
+}
+
+function filterProperties(query) {
+    const q = (query || '').trim().toLowerCase();
+    if (!q) {
+        renderProperties(_allPropertiesCache);
+        return;
+    }
+
+    const filtered = _allPropertiesCache.filter(p => {
+        const k = (p.key || '').toLowerCase();
+        const l = (p.label || '').toLowerCase();
+        const v = String(p.value ?? p.default ?? '').toLowerCase();
+        return k.includes(q) || l.includes(q) || v.includes(q);
+    });
+
+    renderProperties(filtered);
 }
 
 function saveProperties() {
@@ -988,14 +1183,22 @@ function saveProperties() {
     const obj = {};
     formData.forEach((val, key) => { obj[key] = val; });
 
+    showToast("Saving properties and updating world config...", "info");
     fetch('/api/properties', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(obj)
     })
-    .then(r => r.json())
+    .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+    })
     .then(data => {
-        showToast(data.result || 'Properties saved successfully', 'success');
+        showToast(data.result || 'Properties saved successfully!', 'success');
+        setTimeout(loadProperties, 600);
+    })
+    .catch(err => {
+        showToast(`Failed to save properties: ${err.message || err}`, 'error');
     });
 }
 
@@ -1003,19 +1206,30 @@ function saveProperties() {
    10. BDS VERSION UPDATER
    ========================================================================= */
 function checkBdsUpdates() {
+    const curEl = document.getElementById('updateCurrentVer');
+    const latEl = document.getElementById('updateLatestVer');
+    if (curEl) curEl.textContent = 'Checking...';
+    if (latEl) latEl.textContent = 'Checking...';
+
     fetch('/api/status')
         .then(r => r.json())
         .then(data => {
-            document.getElementById('updateCurrentVer').textContent = data.version || 'Unknown';
+            if (curEl) curEl.textContent = data.version || 'Unknown';
+        })
+        .catch(() => {
+            if (curEl) curEl.textContent = 'Unavailable';
         });
 
     fetch('/api/latest_version_url')
-        .then(r => r.json())
+        .then(r => {
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            return r.json();
+        })
         .then(data => {
-            document.getElementById('updateLatestVer').textContent = data.version || 'Latest';
+            if (latEl) latEl.textContent = data.version || 'Latest';
         })
         .catch(() => {
-            document.getElementById('updateLatestVer').textContent = 'Unable to fetch';
+            if (latEl) latEl.textContent = 'Unable to fetch';
         });
 }
 
@@ -1028,7 +1242,8 @@ function triggerServerUpdate() {
             showToast(data.result || 'Update started', 'info');
             document.getElementById('updateProgressCard').style.display = 'block';
             pollUpdateStatus();
-        });
+        })
+        .catch(err => showToast(`Update failed to start: ${err}`, 'error'));
 }
 
 function pollUpdateStatus() {
@@ -1044,13 +1259,21 @@ function pollUpdateStatus() {
                     clearInterval(timer);
                     showToast(state.message || state.status, state.status === 'success' ? 'success' : 'error');
                 }
-            });
+            })
+            .catch(() => {});
     }, 1000);
 }
 
 /* =========================================================================
    11. SETTINGS & MODALS HELPERS
    ========================================================================= */
+function loadSettings() {
+    const intervalSelect = document.getElementById('settingPollInterval');
+    const scrollSelect = document.getElementById('settingAutoScroll');
+    if (intervalSelect) intervalSelect.value = String(pollInterval);
+    if (scrollSelect) scrollSelect.value = String(autoScroll);
+}
+
 function saveSettings() {
     const interval = parseInt(document.getElementById('settingPollInterval').value, 10);
     const scroll = document.getElementById('settingAutoScroll').value === 'true';
@@ -1078,19 +1301,46 @@ function escapeHtml(str) {
 }
 
 /* =========================================================================
-   12. INITIALIZATION
+   12. INITIALIZATION (Hash Routing & Font Alignment)
    ========================================================================= */
 document.addEventListener('DOMContentLoaded', () => {
     initZentraHalftoneBackground();
     initTerminalKeyboard();
     initTabDragSelector();
 
-    // Set initial tab slider position
-    const activeBtn = document.querySelector('.nav-tab-btn.active');
-    if (activeBtn) updateTabSlider(activeBtn);
+    // Determine initial tab from window.location.hash
+    let initialTab = 'home';
+    if (window.location.hash) {
+        const hash = window.location.hash.replace(/^#/, '').trim().toLowerCase();
+        if (hash === 'terminal') initialTab = 'console';
+        else if (['home', 'console', 'worlds', 'players', 'addons', 'properties', 'update', 'settings'].includes(hash)) {
+            initialTab = hash;
+        }
+    }
+
+    switchZentraTab(initialTab);
+
+    // Update tab slider once fonts are loaded for pixel-perfect pill width
+    if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(() => {
+            const activeBtn = document.querySelector(`.nav-tab-btn[data-tab="${currentTab}"]`);
+            if (activeBtn) updateTabSlider(activeBtn);
+        });
+    }
+
+    // Listen for browser back/forward buttons (hashchange)
+    window.addEventListener('hashchange', () => {
+        let h = window.location.hash.replace(/^#/, '').trim().toLowerCase();
+        if (h === 'terminal') h = 'console';
+        if (h && h !== currentTab && ['home', 'console', 'worlds', 'players', 'addons', 'properties', 'update', 'settings'].includes(h)) {
+            switchZentraTab(h);
+        }
+    });
 
     loadStatus();
-    fetchLogs();
+    if (currentTab === 'console') {
+        fetchLogs();
+    }
 
     // Polling loop for status & logs
     setInterval(() => {

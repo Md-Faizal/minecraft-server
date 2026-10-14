@@ -7,40 +7,42 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/style.css?v=20261014_02">
+    <link rel="stylesheet" href="/static/css/style.css?v=20261014_03">
 </head>
 <body>
     <!-- Organic Wandering Halftone Canvas (Zentra Physics) -->
     <canvas id="zentraCanvas"></canvas>
 
-    <!-- Zentra Floating Top Navbar (Fixed at viewport top) -->
+    <!-- Zentra Fixed Top Navbar -->
     <header class="zentra-navbar">
-        <div class="brand-section">
-            <div class="brand-logo-badge">⛏</div>
-            <div class="brand-meta">
-                <h2>Bedrock Manager</h2>
-                <p id="navSubtext">Headless BDS Controller</p>
+        <div class="zentra-navbar-inner">
+            <div class="brand-section">
+                <div class="brand-logo-badge">⛏</div>
+                <div class="brand-meta">
+                    <h2>Bedrock Manager</h2>
+                    <p id="navSubtext">Headless BDS Controller</p>
+                </div>
             </div>
-        </div>
 
-        <!-- Sliding Pill Navigation Switcher -->
-        <div class="tab-switcher-pill" id="tabSwitcher">
-            <div class="tab-slider-pill" id="tabSliderPill"></div>
-            <button class="nav-tab-btn active" data-tab="home" onclick="switchZentraTab('home')">Home</button>
-            <button class="nav-tab-btn" data-tab="console" onclick="switchZentraTab('console')">Terminal</button>
-            <button class="nav-tab-btn" data-tab="worlds" onclick="switchZentraTab('worlds')">Worlds</button>
-            <button class="nav-tab-btn" data-tab="players" onclick="switchZentraTab('players')">Players</button>
-            <button class="nav-tab-btn" data-tab="addons" onclick="switchZentraTab('addons')">Addons</button>
-            <button class="nav-tab-btn" data-tab="properties" onclick="switchZentraTab('properties')">Properties</button>
-            <button class="nav-tab-btn" data-tab="update" onclick="switchZentraTab('update')">Update</button>
-            <button class="nav-tab-btn" data-tab="settings" onclick="switchZentraTab('settings')">Settings</button>
-        </div>
+            <!-- Sliding Pill Navigation Switcher -->
+            <div class="tab-switcher-pill" id="tabSwitcher">
+                <div class="tab-slider-pill" id="tabSliderPill"></div>
+                <button class="nav-tab-btn active" data-tab="home" onclick="switchZentraTab('home')">Home</button>
+                <button class="nav-tab-btn" data-tab="console" onclick="switchZentraTab('console')">Terminal</button>
+                <button class="nav-tab-btn" data-tab="worlds" onclick="switchZentraTab('worlds')">Worlds</button>
+                <button class="nav-tab-btn" data-tab="players" onclick="switchZentraTab('players')">Players</button>
+                <button class="nav-tab-btn" data-tab="addons" onclick="switchZentraTab('addons')">Addons</button>
+                <button class="nav-tab-btn" data-tab="properties" onclick="switchZentraTab('properties')">Properties</button>
+                <button class="nav-tab-btn" data-tab="update" onclick="switchZentraTab('update')">Update</button>
+                <button class="nav-tab-btn" data-tab="settings" onclick="switchZentraTab('settings')">Settings</button>
+            </div>
 
-        <!-- Header Server Status Pill Badge -->
-        <div class="nav-actions">
-            <div class="status-pill-badge" id="navStatusBadge">
-                <span class="status-dot-pulse"></span>
-                <span id="navStatusText">Connecting...</span>
+            <!-- Header Server Status Pill Badge -->
+            <div class="nav-actions">
+                <div class="status-pill-badge" id="navStatusBadge">
+                    <span class="status-dot-pulse"></span>
+                    <span id="navStatusText">Connecting...</span>
+                </div>
             </div>
         </div>
     </header>
@@ -288,16 +290,20 @@
             <!-- 6. PROPERTIES VIEW -->
             <section id="viewProperties" class="tab-content" style="display:none;">
                 <div class="soft-card">
-                    <div class="card-header-bar">
+                    <div class="card-header-bar" style="flex-wrap:wrap; gap:12px;">
                         <div class="card-title-group">
                             <h3>Server Properties Editor</h3>
-                            <p>Configures server.properties (automatically saves per-world config)</p>
+                            <p>Configures server.properties (automatically saves to active world configuration)</p>
                         </div>
-                        <button class="zentra-btn emerald" onclick="saveProperties()">💾 Save Properties</button>
+                        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                            <input type="text" id="propSearchInput" class="zentra-input" placeholder="🔍 Search properties..." oninput="filterProperties(this.value)" style="width: 200px; padding: 7px 12px; font-size: 12px;">
+                            <button class="zentra-btn secondary" type="button" onclick="loadProperties()" title="Reload from server">↻ Reload</button>
+                            <button class="zentra-btn emerald" type="button" onclick="saveProperties()">💾 Save Properties</button>
+                        </div>
                     </div>
 
                     <form id="propertiesForm" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
-                        <p>Loading properties schema...</p>
+                        <p style="color:var(--zentra-muted);">Loading properties schema...</p>
                     </form>
                 </div>
             </section>
@@ -440,6 +446,6 @@
     <!-- Toast Container -->
     <div id="toastContainer"></div>
 
-    <script src="/static/js/app.js?v=20261014_02"></script>
+    <script src="/static/js/app.js?v=20261014_03"></script>
 </body>
 </html>
