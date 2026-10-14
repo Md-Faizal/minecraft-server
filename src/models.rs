@@ -167,3 +167,30 @@ pub struct AddonsResponse {
     pub applied_behavior: Vec<AppliedPack>,
     pub applied_resource: Vec<AppliedPack>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AnnouncementSettings {
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    #[serde(default = "default_announcement_interval")]
+    pub interval_seconds: u64,
+    #[serde(default = "default_true")]
+    pub only_when_online: bool,
+    #[serde(default = "default_announcement_prefix")]
+    pub prefix: String,
+    #[serde(default = "default_announcement_mode")]
+    pub mode: String,
+    #[serde(default = "default_messages")]
+    pub messages: Vec<String>,
+}
+
+fn default_announcement_interval() -> u64 { 300 }
+fn default_announcement_prefix() -> String { "§l§e[Server]§r §b".to_string() }
+fn default_announcement_mode() -> String { "sequential".to_string() }
+fn default_messages() -> Vec<String> {
+    vec![
+        "Welcome to the server! Explore, build, and have fun!".to_string(),
+        "Remember to respect other players and keep your builds safe.".to_string(),
+        "Check your world stats and controls on the Bedrock Manager dashboard!".to_string(),
+    ]
+}

@@ -102,6 +102,11 @@ async fn main() {
             "/api/settings",
             get(handlers::api_get_settings).post(handlers::api_set_settings),
         )
+        .route(
+            "/api/announcements",
+            get(handlers::api_get_announcements).post(handlers::api_set_announcements),
+        )
+        .route("/api/announcements/broadcast_now", post(handlers::api_broadcast_now))
         .nest_service("/static", ServeDir::new(static_dir))
         .layer(DefaultBodyLimit::max(500 * 1024 * 1024)) // 500 MB max for world uploads
         .layer(cors)
@@ -115,6 +120,53 @@ async fn main() {
         if !auto_start_mgr.is_server_running().await {
             info!("🎮 Auto-starting Bedrock Dedicated Server daemon on manager boot...");
             auto_start_mgr.start_server().await;
+        }
+    });
+
+    // Smart Automated In-Game Announcements daemon
+    let ann_mgr = Arc::clone(&manager);
+    tokio::spawn(async move {
+        let mut msg_idx = 0usize;
+        loop {
+            let settings = ann_mgr.get_announcements();
+            let interval = if settings.enabled && !settings.messages.is_empty() {
+                settings.interval_seconds.max(10)
+            } else {
+                30
+            };
+            tokio::time::sleep(tokio::time::Duration::from_secs(interval)).await;
+
+            let current_settings = ann_mgr.get_announcements();
+            if !current_settings.enabled || current_settings.messages.is_empty() {
+                continue;
+            }
+
+            if !ann_mgr.is_server_running().await {
+                continue;
+            }
+
+            if current_settings.only_when_online {
+                let online = ann_mgr.online_players.read().await;
+                if online.is_empty() {
+                    continue;
+                }
+            }
+
+            let message = if current_settings.mode == "random" {
+                let now_ms = chrono::Utc::now().timestamp_millis() as usize;
+                let idx = now_ms % current_settings.messages.len();
+                current_settings.messages.get(idx).cloned()
+            } else {
+                let msg = current_settings.messages.get(msg_idx % current_settings.messages.len()).cloned();
+                msg_idx = (msg_idx + 1) % current_settings.messages.len();
+                msg
+            };
+
+            if let Some(msg) = message {
+                let formatted = format!("say {}{}", current_settings.prefix, msg);
+                info!("📢 Broadcasting automated announcement: {}", formatted);
+                ann_mgr.send_server_command(&formatted).await;
+            }
         }
     });
 

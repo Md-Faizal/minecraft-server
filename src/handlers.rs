@@ -1417,3 +1417,46 @@ pub async fn api_upload_addon(
 
     Err((StatusCode::BAD_REQUEST, Json(json!({"result": "No file uploaded."}))))
 }
+
+pub async fn api_get_announcements(State(mgr): State<Arc<ServerManager>>) -> Json<AnnouncementSettings> {
+    Json(mgr.get_announcements())
+}
+
+pub async fn api_set_announcements(
+    State(mgr): State<Arc<ServerManager>>,
+    Json(settings): Json<AnnouncementSettings>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    if let Err(e) = mgr.save_announcements(&settings) {
+        return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"result": format!("Failed to save announcements: {}", e)}))));
+    }
+    Ok(Json(json!({"result": "Announcements updated successfully."})))
+}
+
+#[derive(Deserialize)]
+pub struct BroadcastPayload {
+    pub message: Option<String>,
+}
+
+pub async fn api_broadcast_now(
+    State(mgr): State<Arc<ServerManager>>,
+    payload: Option<Json<BroadcastPayload>>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    let settings = mgr.get_announcements();
+    let text = payload
+        .and_then(|p| p.0.message)
+        .filter(|m| !m.trim().is_empty())
+        .unwrap_or_else(|| {
+            settings
+                .messages
+                .first()
+                .cloned()
+                .unwrap_or_else(|| "Server announcement test.".to_string())
+        });
+
+    let formatted = format!("say {}{}", settings.prefix, text);
+    mgr.send_server_command(&formatted).await;
+    Ok(Json(json!({
+        "result": "Broadcast sent to all players.",
+        "message": text
+    })))
+}

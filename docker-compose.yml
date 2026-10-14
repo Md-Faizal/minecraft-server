@@ -1,0 +1,21 @@
+services:
+  minecraft:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: minecraft-server-manager:latest
+    container_name: minecraft-bedrock-manager
+    restart: unless-stopped
+    # host networking ensures 0-overhead UDP performance & zero NAT packet queue jitter for NetherNet/Bedrock
+    network_mode: host
+    volumes:
+      # Persistent worlds, server.properties, backups, and Bedrock binaries
+      - /home/ubuntu/minecraft-server:/data
+      - ./data:/data/manager_data
+    environment:
+      - PORT=5000
+      - HOST=0.0.0.0
+    deploy:
+      resources:
+        reservations:
+          memory: 350M

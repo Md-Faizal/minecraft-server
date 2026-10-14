@@ -373,6 +373,7 @@ function switchZentraTab(tabName) {
     // Always trigger data load for the activated tab
     if (tabName === 'home') {
         loadStatus();
+        loadAnnouncements();
     } else if (tabName === 'console') {
         fetchLogs();
         setTimeout(() => {
@@ -1540,6 +1541,87 @@ function saveSettings() {
     showToast("Settings saved locally", "success");
 }
 
+/* =========================================================================
+   11. SMART AUTOMATED ANNOUNCEMENTS
+   ========================================================================= */
+function loadAnnouncements() {
+    fetch('/api/announcements')
+        .then(r => r.json())
+        .then(data => {
+            const enabledEl = document.getElementById('annEnabled');
+            const intervalEl = document.getElementById('annInterval');
+            const modeEl = document.getElementById('annMode');
+            const onlyOnlineEl = document.getElementById('annOnlyOnline');
+            const prefixEl = document.getElementById('annPrefix');
+            const messagesEl = document.getElementById('annMessages');
+
+            if (enabledEl) enabledEl.value = String(data.enabled);
+            if (intervalEl) intervalEl.value = data.interval_seconds || 300;
+            if (modeEl) modeEl.value = data.mode || 'sequential';
+            if (onlyOnlineEl) onlyOnlineEl.value = String(data.only_when_online);
+            if (prefixEl) prefixEl.value = data.prefix || '§l§e[Server]§r §b';
+            if (messagesEl && Array.isArray(data.messages)) {
+                messagesEl.value = data.messages.join('\n');
+            }
+        })
+        .catch(err => console.error("Failed to load announcements:", err));
+}
+
+function saveAnnouncements() {
+    const enabledEl = document.getElementById('annEnabled');
+    const intervalEl = document.getElementById('annInterval');
+    const modeEl = document.getElementById('annMode');
+    const onlyOnlineEl = document.getElementById('annOnlyOnline');
+    const prefixEl = document.getElementById('annPrefix');
+    const messagesEl = document.getElementById('annMessages');
+
+    const enabled = enabledEl ? enabledEl.value === 'true' : true;
+    const interval_seconds = intervalEl ? parseInt(intervalEl.value, 10) || 300 : 300;
+    const mode = modeEl ? modeEl.value : 'sequential';
+    const only_when_online = onlyOnlineEl ? onlyOnlineEl.value === 'true' : true;
+    const prefix = prefixEl ? prefixEl.value : '§l§e[Server]§r §b';
+    const rawMessages = messagesEl ? messagesEl.value : '';
+    const messages = rawMessages.split('\n').map(m => m.trim()).filter(m => m.length > 0);
+
+    const payload = {
+        enabled,
+        interval_seconds,
+        mode,
+        only_when_online,
+        prefix,
+        messages
+    };
+
+    fetch('/api/announcements', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    })
+    .then(r => r.json())
+    .then(res => {
+        showToast(res.result || "Announcements saved successfully!", "success");
+    })
+    .catch(err => showToast(`Failed to save announcements: ${err}`, "error"));
+}
+
+function broadcastNow() {
+    const messagesEl = document.getElementById('annMessages');
+    const rawMessages = messagesEl ? messagesEl.value : '';
+    const lines = rawMessages.split('\n').map(m => m.trim()).filter(m => m.length > 0);
+    const message = lines.length > 0 ? lines[0] : "Test server broadcast.";
+
+    fetch('/api/announcements/broadcast_now', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message })
+    })
+    .then(r => r.json())
+    .then(res => {
+        showToast(res.result || "Broadcast sent to all players!", "success");
+    })
+    .catch(err => showToast(`Broadcast failed: ${err}`, "error"));
+}
+
 function openModal(id) {
     const el = document.getElementById(id);
     if (el) el.classList.add('open');
@@ -1596,6 +1678,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     loadStatus();
+    loadAnnouncements();
     if (currentTab === 'console') {
         fetchLogs();
     }

@@ -646,4 +646,34 @@ impl ServerManager {
             format!("{} seconds", sec)
         }
     }
+
+    pub fn get_announcements(&self) -> AnnouncementSettings {
+        let path = self.data_dir.join("announcements.json");
+        if path.exists() {
+            if let Ok(c) = fs::read_to_string(&path) {
+                if let Ok(settings) = serde_json::from_str::<AnnouncementSettings>(&c) {
+                    return settings;
+                }
+            }
+        }
+        let default_settings = AnnouncementSettings {
+            enabled: true,
+            interval_seconds: 300,
+            only_when_online: true,
+            prefix: "§l§e[Server]§r §b".to_string(),
+            mode: "sequential".to_string(),
+            messages: vec![
+                "Welcome to the server! Explore, build, and have fun!".to_string(),
+                "Remember to respect other players and keep your builds safe.".to_string(),
+                "Check your world stats and controls on the Bedrock Manager dashboard!".to_string(),
+            ],
+        };
+        let _ = fs::write(&path, serde_json::to_string_pretty(&default_settings).unwrap_or_default());
+        default_settings
+    }
+
+    pub fn save_announcements(&self, settings: &AnnouncementSettings) -> Result<(), std::io::Error> {
+        let path = self.data_dir.join("announcements.json");
+        fs::write(&path, serde_json::to_string_pretty(settings).unwrap_or_default())
+    }
 }

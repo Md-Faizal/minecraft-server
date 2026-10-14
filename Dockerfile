@@ -1,0 +1,38 @@
+# Multi-stage production container for Bedrock Minecraft Server & Rust Manager
+FROM rust:1.82-bookworm AS builder
+WORKDIR /app
+COPY Cargo.toml Cargo.lock ./
+COPY src/ ./src/
+RUN cargo build --release
+
+FROM ubuntu:24.04 AS runner
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    curl \
+    libssl3 \
+    libcurl4 \
+    unzip \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy application assets and compiled manager
+COPY --from=builder /app/target/release/minecraft-server-manager /app/minecraft-server-manager
+COPY static/ /app/static/
+COPY templates/ /app/templates/
+
+# Data directory where worlds, server.properties, and BDS binaries reside
+WORKDIR /data
+
+ENV PORT=5000
+ENV HOST=0.0.0.0
+EXPOSE 5000/tcp
+EXPOSE 19132/udp
+EXPOSE 19133/udp
+EXPOSE 19132-19142/udp
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD curl -fsS http://127.0.0.1:5000/api/status || exit 1
+
+ENTRYPOINT ["/app/minecraft-server-manager"]
