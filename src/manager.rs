@@ -425,6 +425,7 @@ impl ServerManager {
             PropertySchemaItem { key: "server-port".into(), label: "Server Port".into(), field_type: "int".into(), choices: None, default: json!(19132), value: None },
             PropertySchemaItem { key: "server-portv6".into(), label: "Server Port (v6)".into(), field_type: "int".into(), choices: None, default: json!(19133), value: None },
             PropertySchemaItem { key: "transport".into(), label: "Transport".into(), field_type: "choice".into(), choices: Some(vec!["nethernet".into(), "raknet".into()]), default: json!("nethernet"), value: None },
+            PropertySchemaItem { key: "server-udp-ports".into(), label: "Server UDP Ports (NetherNet)".into(), field_type: "str".into(), choices: None, default: json!("68.233.115.138:19132:19132"), value: None },
             PropertySchemaItem { key: "enable-lan-visibility".into(), label: "Enable LAN Visibility".into(), field_type: "bool".into(), choices: None, default: json!(true), value: None },
             PropertySchemaItem { key: "level-name".into(), label: "Level Name".into(), field_type: "str".into(), choices: None, default: json!("Bedrock level"), value: None },
             PropertySchemaItem { key: "level-seed".into(), label: "Level Seed".into(), field_type: "str".into(), choices: None, default: json!(""), value: None },

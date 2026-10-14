@@ -183,8 +183,12 @@ function initZentraHalftoneBackground() {
 }
 
 /* =========================================================================
-   2. SLIDING PILL TAB NAVIGATION
+   2. SLIDING PILL TAB NAVIGATION & DRAG CONTROLLER (Zentra Implementation)
    ========================================================================= */
+let isDraggingTabs = false;
+let dragStartX = null;
+let hasDraggedTabs = false;
+
 function updateTabSlider(activeBtn) {
     const slider = document.getElementById('tabSliderPill');
     if (!slider || !activeBtn) return;
@@ -196,7 +200,76 @@ function updateTabSlider(activeBtn) {
     slider.style.width = `${btnRect.width}px`;
 }
 
-function switchZentraTab(tabName) {
+function initTabDragSelector() {
+    const switcher = document.getElementById('tabSwitcher');
+    if (!switcher) return;
+
+    switcher.addEventListener('pointerdown', (e) => {
+        isDraggingTabs = true;
+        dragStartX = e.clientX;
+        hasDraggedTabs = false;
+    });
+
+    window.addEventListener('pointermove', (e) => {
+        if (!isDraggingTabs || dragStartX === null) return;
+        const deltaX = Math.abs(e.clientX - dragStartX);
+        if (deltaX > 6) {
+            if (!hasDraggedTabs) {
+                hasDraggedTabs = true;
+                switcher.classList.add('dragging');
+            }
+        }
+        if (!hasDraggedTabs) return;
+
+        // Find closest tab button based on mouse X relative to each button center
+        const buttons = Array.from(switcher.querySelectorAll('.nav-tab-btn'));
+        let closestBtn = null;
+        let minDistance = Infinity;
+
+        buttons.forEach(btn => {
+            const rect = btn.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const dist = Math.abs(e.clientX - centerX);
+            if (dist < minDistance) {
+                minDistance = dist;
+                closestBtn = btn;
+            }
+        });
+
+        if (closestBtn) {
+            const tabName = closestBtn.getAttribute('data-tab');
+            if (tabName && tabName !== currentTab) {
+                switchZentraTab(tabName, false);
+            }
+
+            const slider = document.getElementById('tabSliderPill');
+            const parentRect = switcher.getBoundingClientRect();
+            const btnRect = closestBtn.getBoundingClientRect();
+            if (slider) {
+                slider.style.left = `${btnRect.left - parentRect.left}px`;
+                slider.style.width = `${btnRect.width}px`;
+            }
+        }
+    });
+
+    const handlePointerUp = () => {
+        if (!isDraggingTabs) return;
+        isDraggingTabs = false;
+        dragStartX = null;
+        switcher.classList.remove('dragging');
+        setTimeout(() => {
+            hasDraggedTabs = false;
+            const activeBtn = switcher.querySelector(`.nav-tab-btn[data-tab="${currentTab}"]`);
+            if (activeBtn) updateTabSlider(activeBtn);
+        }, 120);
+    };
+
+    window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('pointercancel', handlePointerUp);
+}
+
+function switchZentraTab(tabName, isClick = true) {
+    if (isClick && hasDraggedTabs) return;
     currentTab = tabName;
     const allTabs = ['home', 'console', 'worlds', 'players', 'addons', 'properties', 'update', 'settings'];
 
@@ -972,6 +1045,7 @@ function escapeHtml(str) {
 document.addEventListener('DOMContentLoaded', () => {
     initZentraHalftoneBackground();
     initTerminalKeyboard();
+    initTabDragSelector();
 
     // Set initial tab slider position
     const activeBtn = document.querySelector('.nav-tab-btn.active');
