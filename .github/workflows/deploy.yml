@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  detect-changes:
+  detect_changes:
     name: Detect Changes
     runs-on: ubuntu-latest
     outputs:
@@ -35,10 +35,10 @@ jobs:
               - 'static/**'
               - 'templates/**'
 
-  build-backend:
+  build_backend:
     name: Build Rust Backend
-    needs: detect-changes
-    if: needs.detect-changes.outputs.rust == 'true' || github.event_name == 'workflow_dispatch'
+    needs: detect_changes
+    if: needs.detect_changes.outputs.rust == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -72,8 +72,8 @@ jobs:
 
   deploy:
     name: Streamline Deploy & Verify
-    needs: [detect-changes, build-backend]
-    if: always() && !cancelled() && !contains(needs.*.result, 'failure') && (needs.detect-changes.outputs.rust == 'true' || needs.detect-changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch')
+    needs: [detect_changes, build_backend]
+    if: always() && !cancelled() && needs.detect_changes.result == 'success' && needs.build_backend.result != 'failure' && (needs.detect_changes.outputs.rust == 'true' || needs.detect_changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     timeout-minutes: 5
 
@@ -82,7 +82,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Download Built Binary
-        if: needs.detect-changes.outputs.rust == 'true' || github.event_name == 'workflow_dispatch'
+        if: needs.detect_changes.outputs.rust == 'true' || github.event_name == 'workflow_dispatch'
         uses: actions/download-artifact@v4
         with:
           name: minecraft-server-manager
@@ -117,7 +117,7 @@ jobs:
             ControlPersist 180s
             Compression yes
             LogLevel ERROR
-          EOF
+EOF
           chmod 600 ~/.ssh/config
 
       - name: Deploy Assets & Binaries via Streaming Pipe
@@ -125,7 +125,7 @@ jobs:
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_USER: ${{ secrets.SSH_USER || 'ubuntu' }}
           SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
-          RUST_CHANGED: ${{ needs.detect-changes.outputs.rust }}
+          RUST_CHANGED: ${{ needs.detect_changes.outputs.rust }}
         run: |
           TARGET_DIR="/home/ubuntu/stack/games/minecraft"
 
@@ -145,7 +145,7 @@ jobs:
               chmod +x "$TARGET_DIR/minecraft-server-manager.new"
               mv "$TARGET_DIR/minecraft-server-manager.new" "$TARGET_DIR/minecraft-server-manager"
               sudo systemctl restart mc-manager
-  EOF
+EOF
           fi
 
       - name: Health Verification
@@ -163,4 +163,4 @@ jobs:
               exit 1
             }
             echo "✅ Minecraft Server Manager is healthy and active!"
-  EOF
+EOF
