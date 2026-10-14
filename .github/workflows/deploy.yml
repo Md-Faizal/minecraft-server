@@ -24,7 +24,7 @@ jobs:
         uses: dorny/paths-filter@v3
         id: filter
         with:
-          filters:
+          filters: |
             rust:
               - 'src/**'
               - 'Cargo.toml'
