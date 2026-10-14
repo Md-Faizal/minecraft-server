@@ -155,8 +155,9 @@ body {
 }
 
 .tab-switcher-pill.dragging .tab-slider-pill {
-  transition: left 0.05s ease, width 0.05s ease, transform 0.15s ease;
-  transform: scale(1.04);
+  transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  transform: scaleY(1.08) scaleX(1.02);
+  box-shadow: 0 10px 24px rgba(17, 17, 17, 0.35);
 }
 
 .nav-tab-btn {

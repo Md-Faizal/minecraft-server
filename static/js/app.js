@@ -208,18 +208,35 @@ function initTabDragSelector() {
         isDraggingTabs = true;
         dragStartX = e.clientX;
         hasDraggedTabs = false;
+        try { switcher.setPointerCapture(e.pointerId); } catch (_) {}
     });
 
-    window.addEventListener('pointermove', (e) => {
+    const onPointerMove = (e) => {
         if (!isDraggingTabs || dragStartX === null) return;
         const deltaX = Math.abs(e.clientX - dragStartX);
-        if (deltaX > 6) {
+        if (deltaX > 4) {
             if (!hasDraggedTabs) {
                 hasDraggedTabs = true;
                 switcher.classList.add('dragging');
             }
         }
         if (!hasDraggedTabs) return;
+
+        const slider = document.getElementById('tabSliderPill');
+        const parentRect = switcher.getBoundingClientRect();
+        const currentActiveBtn = switcher.querySelector(`.nav-tab-btn[data-tab="${currentTab}"]`);
+        const pillWidth = currentActiveBtn ? currentActiveBtn.getBoundingClientRect().width : 70;
+
+        // Fluid drag position directly under cursor
+        const relX = e.clientX - parentRect.left;
+        const minLeft = 4;
+        const maxLeft = parentRect.width - pillWidth - 4;
+        const targetLeft = Math.max(minLeft, Math.min(maxLeft, relX - pillWidth / 2));
+
+        if (slider) {
+            slider.style.left = `${targetLeft}px`;
+            slider.style.width = `${pillWidth}px`;
+        }
 
         // Find closest tab button based on mouse X relative to each button center
         const buttons = Array.from(switcher.querySelectorAll('.nav-tab-btn'));
@@ -239,33 +256,54 @@ function initTabDragSelector() {
         if (closestBtn) {
             const tabName = closestBtn.getAttribute('data-tab');
             if (tabName && tabName !== currentTab) {
-                switchZentraTab(tabName, false);
-            }
-
-            const slider = document.getElementById('tabSliderPill');
-            const parentRect = switcher.getBoundingClientRect();
-            const btnRect = closestBtn.getBoundingClientRect();
-            if (slider) {
-                slider.style.left = `${btnRect.left - parentRect.left}px`;
-                slider.style.width = `${btnRect.width}px`;
+                currentTab = tabName;
+                const allTabs = ['home', 'console', 'worlds', 'players', 'addons', 'properties', 'update', 'settings'];
+                allTabs.forEach(t => {
+                    const cap = t.charAt(0).toUpperCase() + t.slice(1);
+                    const view = document.getElementById(`view${cap}`);
+                    const b = switcher.querySelector(`.nav-tab-btn[data-tab="${t}"]`);
+                    if (view) {
+                        if (t === tabName) {
+                            view.classList.add('active');
+                            view.style.display = 'block';
+                        } else {
+                            view.classList.remove('active');
+                            view.style.display = 'none';
+                        }
+                    }
+                    if (b) {
+                        if (t === tabName) {
+                            b.classList.add('active');
+                        } else {
+                            b.classList.remove('active');
+                        }
+                    }
+                });
+                window.location.hash = tabName;
             }
         }
-    });
+    };
 
-    const handlePointerUp = () => {
+    const handlePointerUp = (e) => {
         if (!isDraggingTabs) return;
         isDraggingTabs = false;
         dragStartX = null;
         switcher.classList.remove('dragging');
+        try { if (e && e.pointerId) switcher.releasePointerCapture(e.pointerId); } catch (_) {}
+
+        const activeBtn = switcher.querySelector(`.nav-tab-btn[data-tab="${currentTab}"]`);
+        if (activeBtn) updateTabSlider(activeBtn);
+
         setTimeout(() => {
             hasDraggedTabs = false;
-            const activeBtn = switcher.querySelector(`.nav-tab-btn[data-tab="${currentTab}"]`);
-            if (activeBtn) updateTabSlider(activeBtn);
-        }, 120);
+        }, 100);
     };
 
+    switcher.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointermove', onPointerMove);
+    switcher.addEventListener('pointerup', handlePointerUp);
+    switcher.addEventListener('pointercancel', handlePointerUp);
     window.addEventListener('pointerup', handlePointerUp);
-    window.addEventListener('pointercancel', handlePointerUp);
 }
 
 function switchZentraTab(tabName, isClick = true) {

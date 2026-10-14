@@ -7,45 +7,45 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/style.css?v=20261014_02">
 </head>
 <body>
     <!-- Organic Wandering Halftone Canvas (Zentra Physics) -->
     <canvas id="zentraCanvas"></canvas>
 
+    <!-- Zentra Floating Top Navbar (Fixed at viewport top) -->
+    <header class="zentra-navbar">
+        <div class="brand-section">
+            <div class="brand-logo-badge">⛏</div>
+            <div class="brand-meta">
+                <h2>Bedrock Manager</h2>
+                <p id="navSubtext">Headless BDS Controller</p>
+            </div>
+        </div>
+
+        <!-- Sliding Pill Navigation Switcher -->
+        <div class="tab-switcher-pill" id="tabSwitcher">
+            <div class="tab-slider-pill" id="tabSliderPill"></div>
+            <button class="nav-tab-btn active" data-tab="home" onclick="switchZentraTab('home')">Home</button>
+            <button class="nav-tab-btn" data-tab="console" onclick="switchZentraTab('console')">Terminal</button>
+            <button class="nav-tab-btn" data-tab="worlds" onclick="switchZentraTab('worlds')">Worlds</button>
+            <button class="nav-tab-btn" data-tab="players" onclick="switchZentraTab('players')">Players</button>
+            <button class="nav-tab-btn" data-tab="addons" onclick="switchZentraTab('addons')">Addons</button>
+            <button class="nav-tab-btn" data-tab="properties" onclick="switchZentraTab('properties')">Properties</button>
+            <button class="nav-tab-btn" data-tab="update" onclick="switchZentraTab('update')">Update</button>
+            <button class="nav-tab-btn" data-tab="settings" onclick="switchZentraTab('settings')">Settings</button>
+        </div>
+
+        <!-- Header Server Status Pill Badge -->
+        <div class="nav-actions">
+            <div class="status-pill-badge" id="navStatusBadge">
+                <span class="status-dot-pulse"></span>
+                <span id="navStatusText">Connecting...</span>
+            </div>
+        </div>
+    </header>
+
     <div class="app-wrapper">
-        <!-- Zentra Floating Top Navbar -->
-        <header class="zentra-navbar">
-            <div class="brand-section">
-                <div class="brand-logo-badge">⛏</div>
-                <div class="brand-meta">
-                    <h2>Bedrock Manager</h2>
-                    <p id="navSubtext">Headless BDS Controller</p>
-                </div>
-            </div>
-
-            <!-- Sliding Pill Navigation Switcher -->
-            <div class="tab-switcher-pill" id="tabSwitcher">
-                <div class="tab-slider-pill" id="tabSliderPill"></div>
-                <button class="nav-tab-btn active" data-tab="home" onclick="switchZentraTab('home')">Home</button>
-                <button class="nav-tab-btn" data-tab="console" onclick="switchZentraTab('console')">Terminal</button>
-                <button class="nav-tab-btn" data-tab="worlds" onclick="switchZentraTab('worlds')">Worlds</button>
-                <button class="nav-tab-btn" data-tab="players" onclick="switchZentraTab('players')">Players</button>
-                <button class="nav-tab-btn" data-tab="addons" onclick="switchZentraTab('addons')">Addons</button>
-                <button class="nav-tab-btn" data-tab="properties" onclick="switchZentraTab('properties')">Properties</button>
-                <button class="nav-tab-btn" data-tab="update" onclick="switchZentraTab('update')">Update</button>
-                <button class="nav-tab-btn" data-tab="settings" onclick="switchZentraTab('settings')">Settings</button>
-            </div>
-
-            <!-- Header Server Status Pill Badge -->
-            <div class="nav-actions">
-                <div class="status-pill-badge" id="navStatusBadge">
-                    <span class="status-dot-pulse"></span>
-                    <span id="navStatusText">Connecting...</span>
-                </div>
-            </div>
-        </header>
-
         <!-- MAIN SPA CONTENT VIEWS -->
         <main id="spaContent">
             <!-- 1. HOME VIEW -->
@@ -440,6 +440,6 @@
     <!-- Toast Container -->
     <div id="toastContainer"></div>
 
-    <script src="/static/js/app.js"></script>
+    <script src="/static/js/app.js?v=20261014_02"></script>
 </body>
 </html>
