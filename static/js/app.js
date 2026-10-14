@@ -885,10 +885,13 @@ function setActiveWorld(world) {
         return r.json();
     })
     .then(data => {
-        showToast(data.result || `World '${world}' activated!`, 'success');
-        // Reload worlds list after a short delay to let any restart begin
-        setTimeout(loadWorlds, 800);
-        setTimeout(loadStatus, 2500);
+        // Strip Minecraft colour codes (§x) before showing in the UI toast
+        const msg = (data.result || `World '${world}' switch initiated!`).replace(/§[0-9a-zA-Z]/g, '');
+        showToast(msg, 'success');
+        // The switch takes ~10s countdown + ~10s BDS restart.
+        // Refresh worlds table after restart completes (~12s), status after fully up (~20s).
+        setTimeout(loadWorlds, 12000);
+        setTimeout(loadStatus, 20000);
     })
     .catch(err => {
         showToast(`Failed to activate world: ${err}`, 'error');

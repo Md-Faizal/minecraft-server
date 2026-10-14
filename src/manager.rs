@@ -85,12 +85,16 @@ impl ServerManager {
                         map.insert(k, v.trim().to_string());
                     }
                 }
-                // --- Chunk loading performance: applied once-for-all on every boot ---
-                map.insert("client-side-chunk-generation-enabled".to_string(), "false".to_string());
-                // Force exact view-distance — 6 is the BDS sweet spot for low-lag chunk delivery
-                map.insert("view-distance".to_string(), "6".to_string());
-                // tick-distance must be <= view-distance; 2 stops server from simulating far chunks
-                map.insert("tick-distance".to_string(), "2".to_string());
+                // --- Chunk performance: balanced for both stationary players AND elytra flight ---
+                // client-side-chunk-generation MUST be true: without it the client shows void
+                // (black/empty chunks) until the server sends every chunk — fatal for elytra.
+                map.insert("client-side-chunk-generation-enabled".to_string(), "true".to_string());
+                // view-distance=10: elytra+fireworks travel fast; 6 was too short and caused
+                // players to outrun the loaded chunk bubble. 10 is the practical minimum.
+                map.insert("view-distance".to_string(), "10".to_string());
+                // tick-distance=4: standard BDS default; keeps mobs/pistons working in a
+                // reasonable radius without simulating the entire view bubble.
+                map.insert("tick-distance".to_string(), "4".to_string());
                 // max-threads=0 lets BDS use all available cores for chunk I/O
                 map.insert("max-threads".to_string(), "0".to_string());
                 // Async chunk writes — never block the main tick on disk flush
@@ -98,7 +102,8 @@ impl ServerManager {
                 // snappy is far cheaper than zlib for chunk packet compression
                 map.insert("compression-algorithm".to_string(), "snappy".to_string());
                 map.insert("compression-threshold".to_string(), "512".to_string());
-                // Stop BDS from eagerly pre-generating chunks in all directions
+                // server-build-radius-ratio=Disabled stops BDS pre-generating chunks
+                // in ALL directions equally — chunks are prioritised toward the player instead.
                 map.insert("server-build-radius-ratio".to_string(), "Disabled".to_string());
                 if !map.contains_key("transport") {
                     map.insert("transport".to_string(), "nethernet".to_string());
@@ -742,12 +747,16 @@ impl ServerManager {
             map.insert("level-seed".to_string(), profile.seed.clone());
         }
 
-        // --- Chunk loading performance: permanent, applied on every world sync ---
-        map.insert("client-side-chunk-generation-enabled".to_string(), "false".to_string());
-        // Force exact view-distance — 6 is the BDS sweet spot for low-lag chunk delivery
-        map.insert("view-distance".to_string(), "6".to_string());
-        // tick-distance must be <= view-distance; 2 stops server from simulating far chunks
-        map.insert("tick-distance".to_string(), "2".to_string());
+        // --- Chunk performance: balanced for both stationary players AND elytra flight ---
+        // client-side-chunk-generation MUST be true: without it the client shows void
+        // (black/empty chunks) until the server sends every chunk — fatal for elytra.
+        map.insert("client-side-chunk-generation-enabled".to_string(), "true".to_string());
+        // view-distance=10: elytra+fireworks travel fast; 6 was too short and caused
+        // players to outrun the loaded chunk bubble. 10 is the practical minimum.
+        map.insert("view-distance".to_string(), "10".to_string());
+        // tick-distance=4: standard BDS default; keeps mobs/pistons working in a
+        // reasonable radius without simulating the entire view bubble.
+        map.insert("tick-distance".to_string(), "4".to_string());
         // max-threads=0 lets BDS use all available cores for chunk I/O
         map.insert("max-threads".to_string(), "0".to_string());
         // Async chunk writes — never block the main tick on disk flush
@@ -755,7 +764,8 @@ impl ServerManager {
         // snappy is far cheaper than zlib for chunk packet compression
         map.insert("compression-algorithm".to_string(), "snappy".to_string());
         map.insert("compression-threshold".to_string(), "512".to_string());
-        // Stop BDS from eagerly pre-generating chunks in all directions
+        // server-build-radius-ratio=Disabled stops BDS pre-generating chunks
+        // in ALL directions equally — chunks are prioritised toward the player instead.
         map.insert("server-build-radius-ratio".to_string(), "Disabled".to_string());
         if !map.contains_key("transport") {
             map.insert("transport".to_string(), "nethernet".to_string());

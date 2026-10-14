@@ -217,15 +217,54 @@ pub async fn api_set_active_world(
     if mgr.is_server_running().await {
         let m = Arc::clone(&mgr);
         let gmode = profile.gamemode.clone();
+        let world_name = target.clone();
         tokio::spawn(async move {
-            m.restart_server().await;
+            // --- 10-second countdown with in-game announcements ---
+            m.send_server_command(&format!(
+                "say §c§l[Server] §eWorld switching to §b§l'{}'§e in §c10 seconds§e! Find a safe spot!",
+                world_name
+            )).await;
+            m.send_server_command(&format!(
+                "title @a title §c§lWORLD SWITCH"
+            )).await;
+            m.send_server_command(&format!(
+                "title @a subtitle §eSwitching to §b{}§e in 10s!", world_name
+            )).await;
+
+            tokio::time::sleep(Duration::from_secs(5)).await;
+            m.send_server_command(&format!(
+                "say §6§l[Server] §eWorld switch to §b'{}'§e in §c5 seconds§e..."
+                , world_name
+            )).await;
+            m.send_server_command("title @a subtitle §c5 seconds remaining!").await;
+
+            tokio::time::sleep(Duration::from_secs(3)).await;
+            m.send_server_command("say §c§l[Server] §e2...").await;
+            m.send_server_command("title @a title §c§l2").await;
+
+            tokio::time::sleep(Duration::from_secs(1)).await;
+            m.send_server_command("say §c§l[Server] §e1...").await;
+            m.send_server_command("title @a title §c§l1").await;
+
+            tokio::time::sleep(Duration::from_secs(1)).await;
+
+            // Save world data before switching
+            m.send_server_command("say §c§l[Server] §6Saving world and switching now...").await;
+            m.send_server_command("save-all").await;
             tokio::time::sleep(Duration::from_millis(1500)).await;
+
+            // Restart into the new world
+            m.restart_server().await;
+            tokio::time::sleep(Duration::from_millis(2000)).await;
             m.send_server_command(&format!("defaultgamemode {}", gmode)).await;
             m.send_server_command(&format!("gamemode {} @a", gmode)).await;
         });
-    }
 
-    Ok(Json(json!({"result": format!("Active world changed to '{}' (Mode: {}, Difficulty: {}).", target, profile.gamemode, profile.difficulty)})))
+        Ok(Json(json!({"result": format!("§b'{}' §eworld switch countdown started — players will be notified in-game!", target)})))
+    } else {
+        // Server not running: properties already synced, just confirm
+        Ok(Json(json!({"result": format!("Active world set to '{}' (Mode: {}, Difficulty: {}). Changes will apply on next server start.", target, profile.gamemode, profile.difficulty)})))
+    }
 }
 
 #[derive(Deserialize)]
