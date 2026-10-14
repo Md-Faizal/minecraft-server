@@ -1410,7 +1410,13 @@ function checkBdsUpdates() {
 function triggerServerUpdate() {
     if (!confirm("This will download and update the Bedrock Dedicated Server binary. Your worlds and properties will be preserved. Proceed?")) return;
 
-    fetch('/api/update_server', { method: 'POST' })
+    fetch('/api/update_server', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({})
+    })
         .then(r => r.json())
         .then(data => {
             showToast(data.result || 'Update started', 'info');

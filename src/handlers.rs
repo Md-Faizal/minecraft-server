@@ -1007,9 +1007,11 @@ pub struct UpdateServerPayload {
 
 pub async fn api_update_server(
     State(mgr): State<Arc<ServerManager>>,
-    Json(payload): Json<UpdateServerPayload>,
+    payload: Option<Json<UpdateServerPayload>>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
-    let mut url = payload.download_url.unwrap_or_default();
+    let mut url = payload
+        .and_then(|p| p.0.download_url)
+        .unwrap_or_default();
     if url.is_empty() {
         let Json(latest) = api_latest_version_url().await;
         url = latest.get("url").and_then(|u| u.as_str()).unwrap_or("").to_string();
