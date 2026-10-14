@@ -83,16 +83,7 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
 
           # Configure SSH client with connection multiplexing and compression
-          cat << 'EOF' > ~/.ssh/config
-          Host *
-            StrictHostKeyChecking no
-            UserKnownHostsFile=/dev/null
-            ControlMaster auto
-            ControlPath ~/.ssh/cm-%r@%h:%p
-            ControlPersist 120s
-            Compression yes
-            LogLevel ERROR
-          EOF
+          printf "Host *\n  StrictHostKeyChecking no\n  UserKnownHostsFile /dev/null\n  ControlMaster auto\n  ControlPath ~/.ssh/cm-%%r@%%h:%%p\n  ControlPersist 120s\n  Compression yes\n  LogLevel ERROR\n" > ~/.ssh/config
           chmod 600 ~/.ssh/config
 
       - name: Deploy Rust Binary
@@ -108,13 +99,7 @@ jobs:
           scp -P "$SSH_PORT" -i ~/.ssh/id_rsa target/release/minecraft-server-manager "$SSH_USER@$SSH_HOST:$TARGET_DIR/minecraft-server-manager.new"
 
           echo "🚀 Activating new binary..."
-          ssh -p "$SSH_PORT" -i ~/.ssh/id_rsa "$SSH_USER@$SSH_HOST" "bash -s" << 'EOF'
-            set -e
-            TARGET_DIR="/home/ubuntu/stack/games/minecraft"
-            chmod +x "$TARGET_DIR/minecraft-server-manager.new"
-            mv "$TARGET_DIR/minecraft-server-manager.new" "$TARGET_DIR/minecraft-server-manager"
-            sudo systemctl restart mc-manager
-          EOF
+          ssh -p "$SSH_PORT" -i ~/.ssh/id_rsa "$SSH_USER@$SSH_HOST" "chmod +x $TARGET_DIR/minecraft-server-manager.new && mv $TARGET_DIR/minecraft-server-manager.new $TARGET_DIR/minecraft-server-manager && sudo systemctl restart mc-manager"
 
       - name: Deploy Frontend Assets & Verify Service
         if: steps.filter.outputs.rust == 'true' || steps.filter.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch'
@@ -129,12 +114,4 @@ jobs:
           tar -czf - static templates | ssh -p "$SSH_PORT" -i ~/.ssh/id_rsa "$SSH_USER@$SSH_HOST" "tar -xzf - -C $TARGET_DIR"
 
           echo "🔍 Verifying service health..."
-          ssh -p "$SSH_PORT" -i ~/.ssh/id_rsa "$SSH_USER@$SSH_HOST" "bash -s" << 'EOF'
-            sleep 2
-            curl -fsS http://127.0.0.1:5000/api/status || {
-              echo "Health check failed! Checking logs:"
-              journalctl -u mc-manager.service --no-pager -n 20
-              exit 1
-            }
-            echo "✅ Deployment verified healthy!"
-          EOF
+          ssh -p "$SSH_PORT" -i ~/.ssh/id_rsa "$SSH_USER@$SSH_HOST" "sleep 2 && curl -fsS http://127.0.0.1:5000/api/status && echo '✅ Deployment verified healthy!'"
