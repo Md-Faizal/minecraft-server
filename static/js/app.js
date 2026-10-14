@@ -865,7 +865,38 @@ function copyToClipboard(text, customMsg) {
 }
 
 function setActiveWorld(world) {
-    openLifecycleModal('switch_world', world);
+    if (!confirm(`Activate world '${world}'?\n\nThis will update server.properties to use this world. If the server is running, it will be restarted automatically.`)) return;
+
+    const btn = event && event.target;
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Activating...';
+    }
+
+    showToast(`Activating world '${world}'...`, 'info');
+
+    fetch('/api/set_active_world', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ world })
+    })
+    .then(r => {
+        if (!r.ok) return r.json().then(e => Promise.reject(e.result || `HTTP ${r.status}`));
+        return r.json();
+    })
+    .then(data => {
+        showToast(data.result || `World '${world}' activated!`, 'success');
+        // Reload worlds list after a short delay to let any restart begin
+        setTimeout(loadWorlds, 800);
+        setTimeout(loadStatus, 2500);
+    })
+    .catch(err => {
+        showToast(`Failed to activate world: ${err}`, 'error');
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = 'Activate';
+        }
+    });
 }
 
 function submitCreateWorld() {
