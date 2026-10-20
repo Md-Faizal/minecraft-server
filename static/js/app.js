@@ -339,7 +339,7 @@ function switchZentraTab(tabName) {
     if (tabName === 'terminal') tabName = 'console';
 
     currentTab = tabName;
-    const allTabs = ['home', 'map', 'console', 'worlds', 'players', 'addons', 'properties', 'update', 'settings'];
+    const allTabs = ['home', 'map', 'console', 'java', 'worlds', 'players', 'addons', 'properties', 'update', 'settings'];
 
     allTabs.forEach(t => {
         const cap = t.charAt(0).toUpperCase() + t.slice(1);
@@ -383,6 +383,9 @@ function switchZentraTab(tabName) {
             const screen = document.getElementById('terminalScreen');
             if (screen && autoScroll) screen.scrollTop = screen.scrollHeight;
         }, 60);
+    } else if (tabName === 'java') {
+        loadJavaServer();
+        loadJavaOutput();
     } else if (tabName === 'worlds') {
         loadWorlds();
     } else if (tabName === 'players') {
@@ -756,6 +759,105 @@ function serverAction(action) {
             setTimeout(fetchLogs, 2000);
         })
         .catch(err => showToast(`Action failed: ${err}`, 'error'));
+}
+
+function loadJavaServer() {
+    fetch('/api/java/status')
+        .then(r => {
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            return r.json();
+        })
+        .then(data => {
+            const status = document.getElementById('javaServerStatus');
+            const directory = document.getElementById('javaServerDirectory');
+            const paper = document.getElementById('javaPaperStatus');
+            const eula = document.getElementById('javaEulaStatus');
+            const address = document.getElementById('javaServerAddress');
+            if (status) {
+                status.textContent = data.running ? '● Running' : '○ Stopped';
+                status.className = data.running ? 'metric-pill' : 'metric-pill neutral';
+            }
+            if (directory) directory.textContent = data.directory || 'Unavailable';
+            if (paper) paper.textContent = data.paper_installed ? 'Installed' : 'Not installed (save as paper.jar)';
+            if (eula) eula.textContent = data.eula_accepted ? 'Accepted' : 'Not accepted';
+            if (address) address.textContent = data.address || 'TCP 25565';
+            return fetch('/api/status')
+                .then(r => {
+                    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                    return r.json();
+                })
+                .then(bedrock => {
+                    const bedrockStatus = document.getElementById('javaBedrockStatus');
+                    if (bedrockStatus) bedrockStatus.textContent = bedrock.server_running ? 'Running' : 'Stopped';
+                });
+        })
+        .catch(err => {
+            const status = document.getElementById('javaServerStatus');
+            if (status) status.textContent = `Unavailable: ${err.message}`;
+        });
+}
+
+function loadJavaOutput() {
+    fetch('/api/java/output')
+        .then(r => {
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            return r.text();
+        })
+        .then(text => {
+            const output = document.getElementById('javaConsoleOutput');
+            if (output) {
+                output.textContent = text || 'No Paper output yet.';
+                output.scrollTop = output.scrollHeight;
+            }
+        })
+        .catch(err => showToast(`Could not load Paper console: ${err.message}`, 'error'));
+}
+
+function javaServerAction(action) {
+    fetch(`/api/java/${action}`, { method: 'POST' })
+        .then(async r => {
+            const data = await r.json();
+            if (!r.ok) throw new Error(data.result || `HTTP ${r.status}`);
+            return data;
+        })
+        .then(data => {
+            showToast(data.result || 'Paper request completed.', 'success');
+            setTimeout(() => {
+                loadJavaServer();
+                loadJavaOutput();
+            }, 700);
+        })
+        .catch(err => showToast(`Paper ${action} failed: ${err.message}`, 'error'));
+}
+
+function startJavaServer() {
+    javaServerAction('start');
+}
+
+function stopJavaServer() {
+    javaServerAction('stop');
+}
+
+function sendJavaCommand(event) {
+    event.preventDefault();
+    const input = document.getElementById('javaCommandInput');
+    const command = input ? input.value.trim() : '';
+    if (!command) return;
+    fetch('/api/java/command', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ command })
+    })
+        .then(async r => {
+            const data = await r.json();
+            if (!r.ok) throw new Error(data.result || `HTTP ${r.status}`);
+            return data;
+        })
+        .then(() => {
+            input.value = '';
+            loadJavaOutput();
+        })
+        .catch(err => showToast(`Paper command failed: ${err.message}`, 'error'));
 }
 
 /* =========================================================================
@@ -2610,7 +2712,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (window.location.hash) {
         const hash = window.location.hash.replace(/^#/, '').trim().toLowerCase();
         if (hash === 'terminal') initialTab = 'console';
-        else if (['home', 'map', 'console', 'worlds', 'players', 'addons', 'properties', 'update', 'settings'].includes(hash)) {
+        else if (['home', 'map', 'console', 'java', 'worlds', 'players', 'addons', 'properties', 'update', 'settings'].includes(hash)) {
             initialTab = hash;
         }
     }
@@ -2629,7 +2731,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('hashchange', () => {
         let h = window.location.hash.replace(/^#/, '').trim().toLowerCase();
         if (h === 'terminal') h = 'console';
-        if (h && h !== currentTab && ['home', 'map', 'console', 'worlds', 'players', 'addons', 'properties', 'update', 'settings'].includes(h)) {
+        if (h && h !== currentTab && ['home', 'map', 'console', 'java', 'worlds', 'players', 'addons', 'properties', 'update', 'settings'].includes(h)) {
             switchZentraTab(h);
         }
     });
@@ -2642,6 +2744,9 @@ document.addEventListener('DOMContentLoaded', () => {
         fetchLogs();
     } else if (currentTab === 'map') {
         loadGodsEyeData();
+    } else if (currentTab === 'java') {
+        loadJavaServer();
+        loadJavaOutput();
     }
 
     initGameMasterArsenal();
@@ -2655,6 +2760,9 @@ document.addEventListener('DOMContentLoaded', () => {
             fetchLogs();
         } else if (currentTab === 'map') {
             loadGodsEyeData();
+        } else if (currentTab === 'java') {
+            loadJavaServer();
+            loadJavaOutput();
         }
     }, pollInterval);
 });

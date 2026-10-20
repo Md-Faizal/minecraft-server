@@ -124,6 +124,70 @@ pub async fn api_server_output(State(mgr): State<Arc<ServerManager>>) -> impl In
     ([(header::CONTENT_TYPE, "text/plain; charset=utf-8")], text)
 }
 
+pub async fn api_java_status(State(mgr): State<Arc<ServerManager>>) -> Json<Value> {
+    let running = mgr.java_server.is_running().await;
+    let eula_path = mgr.java_server.server_dir.join("eula.txt");
+    let eula_accepted = fs::read_to_string(eula_path)
+        .map(|content| {
+            content.lines().any(|line| {
+                line.split_once('=')
+                    .map(|(key, value)| {
+                        key.trim().eq_ignore_ascii_case("eula")
+                            && value.trim().eq_ignore_ascii_case("true")
+                    })
+                    .unwrap_or(false)
+            })
+        })
+        .unwrap_or(false);
+    Json(json!({
+        "running": running,
+        "paper_installed": mgr.java_server.paper_jar.is_file(),
+        "eula_accepted": eula_accepted,
+        "directory": mgr.java_server.server_dir.display().to_string(),
+        "address": "TCP 25565",
+    }))
+}
+
+pub async fn api_java_start(
+    State(mgr): State<Arc<ServerManager>>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    mgr.java_server.start().await.map_err(|error| {
+        let status = if error.contains("already running") {
+            StatusCode::CONFLICT
+        } else {
+            StatusCode::SERVICE_UNAVAILABLE
+        };
+        (status, Json(json!({"result": error})))
+    })?;
+    Ok(Json(json!({"result": "Paper is starting."})))
+}
+
+pub async fn api_java_stop(
+    State(mgr): State<Arc<ServerManager>>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    mgr.java_server.stop().await.map_err(|error| {
+        (StatusCode::CONFLICT, Json(json!({"result": error})))
+    })?;
+    Ok(Json(json!({"result": "Paper stopped."})))
+}
+
+pub async fn api_java_command(
+    State(mgr): State<Arc<ServerManager>>,
+    Json(payload): Json<CommandPayload>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    let command = payload.command.unwrap_or_default();
+    mgr.java_server.send_command(&command).await.map_err(|error| {
+        (StatusCode::SERVICE_UNAVAILABLE, Json(json!({"result": error})))
+    })?;
+    Ok(Json(json!({"result": "sent"})))
+}
+
+pub async fn api_java_output(State(mgr): State<Arc<ServerManager>>) -> impl IntoResponse {
+    let logs = mgr.java_server.console_buffer.read().await;
+    let text = logs.iter().cloned().collect::<Vec<_>>().join("\n");
+    ([(header::CONTENT_TYPE, "text/plain; charset=utf-8")], text)
+}
+
 #[derive(Deserialize)]
 pub struct CommandPayload {
     pub command: Option<String>,
@@ -1608,4 +1672,3 @@ pub async fn api_gamemaster_action(
         Err(err) => Err((StatusCode::BAD_REQUEST, Json(json!({"result": err})))),
     }
 }
-

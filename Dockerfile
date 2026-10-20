@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     libssl3 \
     libcurl4 \
+    openjdk-21-jre-headless \
     unzip \
     && rm -rf /var/lib/apt/lists/*
 
@@ -31,6 +32,7 @@ EXPOSE 5000/tcp
 EXPOSE 19132/udp
 EXPOSE 19133/udp
 EXPOSE 19132-19142/udp
+EXPOSE 25565/tcp
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD curl -fsS http://127.0.0.1:5000/api/status || exit 1

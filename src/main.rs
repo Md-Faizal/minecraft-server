@@ -12,6 +12,7 @@ use tracing::info;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod handlers;
+mod java_server;
 mod manager;
 mod models;
 
@@ -67,6 +68,11 @@ async fn main() {
         .route("/api/restart", post(handlers::api_restart))
         .route("/api/server_output", get(handlers::api_server_output))
         .route("/api/command", post(handlers::api_command))
+        .route("/api/java/status", get(handlers::api_java_status))
+        .route("/api/java/start", post(handlers::api_java_start))
+        .route("/api/java/stop", post(handlers::api_java_stop))
+        .route("/api/java/command", post(handlers::api_java_command))
+        .route("/api/java/output", get(handlers::api_java_output))
         .route("/api/worlds", get(handlers::api_worlds))
         .route("/api/set_active_world", post(handlers::api_set_active_world))
         .route("/api/worlds/active", post(handlers::api_set_active_world))
@@ -123,15 +129,35 @@ async fn main() {
         .layer(TraceLayer::new_for_http())
         .with_state(Arc::clone(&manager));
 
-    // Automatically ensure the Bedrock Dedicated Server starts when manager daemon boots
-    let auto_start_mgr = Arc::clone(&manager);
-    tokio::spawn(async move {
-        tokio::time::sleep(tokio::time::Duration::from_millis(600)).await;
-        if !auto_start_mgr.is_server_running().await {
-            info!("🎮 Auto-starting Bedrock Dedicated Server daemon on manager boot...");
-            auto_start_mgr.start_server().await;
-        }
-    });
+    // Keep existing Bedrock auto-start behavior unless the host chooses Java-only mode.
+    let auto_start_bedrock = std::env::var("MC_AUTO_START_BEDROCK")
+        .map(|value| !matches!(value.trim().to_ascii_lowercase().as_str(), "false" | "0" | "no"))
+        .unwrap_or(true);
+    if auto_start_bedrock {
+        let auto_start_mgr = Arc::clone(&manager);
+        tokio::spawn(async move {
+            tokio::time::sleep(tokio::time::Duration::from_millis(600)).await;
+            if !auto_start_mgr.is_server_running().await {
+                info!("🎮 Auto-starting Bedrock Dedicated Server daemon on manager boot...");
+                auto_start_mgr.start_server().await;
+            }
+        });
+    }
+
+    let auto_start_java = std::env::var("MC_AUTO_START_JAVA")
+        .map(|value| matches!(value.trim().to_ascii_lowercase().as_str(), "true" | "1" | "yes"))
+        .unwrap_or(false);
+    if auto_start_java {
+        let auto_start_mgr = Arc::clone(&manager);
+        tokio::spawn(async move {
+            tokio::time::sleep(tokio::time::Duration::from_millis(900)).await;
+            if !auto_start_mgr.java_server.is_running().await {
+                if let Err(error) = auto_start_mgr.java_server.start().await {
+                    tracing::error!("Could not auto-start Paper Java server: {error}");
+                }
+            }
+        });
+    }
 
     // Smart Automated In-Game Announcements daemon
     let ann_mgr = Arc::clone(&manager);

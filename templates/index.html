@@ -9,7 +9,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
     <link rel="shortcut icon" href="/favicon.ico">
-    <link rel="stylesheet" href="/static/css/style.css?v=20261014_04">
+    <link rel="stylesheet" href="/static/css/style.css?v=20261021_01">
 </head>
 <body>
     <!-- Organic Wandering Halftone Canvas (Zentra Physics) -->
@@ -21,8 +21,8 @@
             <div class="brand-section">
                 <div class="brand-logo-badge">⛏</div>
                 <div class="brand-meta">
-                    <h2>Bedrock Manager</h2>
-                    <p id="navSubtext">Headless BDS Controller</p>
+                    <h2>Minecraft Manager</h2>
+                    <p id="navSubtext">Bedrock &amp; Java Controller</p>
                 </div>
             </div>
 
@@ -32,6 +32,7 @@
                 <button class="nav-tab-btn active" data-tab="home" onclick="switchZentraTab('home')">Home</button>
                 <button class="nav-tab-btn" data-tab="map" onclick="switchZentraTab('map')">🗺️ God's Eye</button>
                 <button class="nav-tab-btn" data-tab="console" onclick="switchZentraTab('console')">Terminal</button>
+                <button class="nav-tab-btn" data-tab="java" onclick="switchZentraTab('java')">Java Server</button>
                 <button class="nav-tab-btn" data-tab="worlds" onclick="switchZentraTab('worlds')">Worlds</button>
                 <button class="nav-tab-btn" data-tab="players" onclick="switchZentraTab('players')">Players</button>
                 <button class="nav-tab-btn" data-tab="addons" onclick="switchZentraTab('addons')">Addons</button>
@@ -514,6 +515,54 @@
                         <input type="text" id="terminalCmdInput" class="term-input" placeholder="Type server command (e.g. gamemode creative @a, kick, tp)... [Up/Down for history]" autocomplete="off" spellcheck="false">
                         <button class="term-send-btn" onclick="sendConsoleCommand('terminalCmdInput')">Send ↵</button>
                     </div>
+                </div>
+            </section>
+
+            <section id="viewJava" class="tab-content" style="display:none;">
+                <div class="soft-card">
+                    <div class="card-header-bar" style="flex-wrap:wrap; gap:12px;">
+                        <div class="card-title-group">
+                            <h3>Paper Java Server</h3>
+                            <p>Separate Java world and process; Bedrock controls and files remain unchanged.</p>
+                        </div>
+                        <span class="metric-pill" id="javaServerStatus">Checking...</span>
+                    </div>
+
+                    <div style="display:flex; flex-wrap:wrap; gap:10px; margin:16px 0;">
+                        <button class="zentra-btn emerald" type="button" onclick="startJavaServer()">Start Paper</button>
+                        <button class="zentra-btn danger" type="button" onclick="stopJavaServer()">Stop Paper</button>
+                        <button class="zentra-btn secondary" type="button" onclick="loadJavaServer()">Refresh status</button>
+                    </div>
+
+                    <div class="stat-box" style="margin-bottom:16px;">
+                        <div><strong>Java server folder</strong><p id="javaServerDirectory" style="margin:4px 0 0;">Loading...</p></div>
+                        <div style="margin-top:8px;"><strong>Paper jar:</strong> <span id="javaPaperStatus">Checking...</span></div>
+                        <div style="margin-top:4px;"><strong>EULA:</strong> <span id="javaEulaStatus">Checking...</span></div>
+                        <div style="margin-top:4px;"><strong>Player connection:</strong> <span id="javaServerAddress">TCP 25565</span></div>
+                        <div style="margin-top:4px;"><strong>Bedrock:</strong> <span id="javaBedrockStatus">Checking...</span></div>
+                    </div>
+
+                    <div style="padding:14px 16px; border:1px solid rgba(56,189,248,0.25); border-radius:12px; background:rgba(56,189,248,0.06);">
+                        <strong>First-time setup</strong>
+                        <ol style="margin:8px 0 0 20px; color:var(--zentra-muted); line-height:1.7;">
+                            <li>Install a Java runtime compatible with your chosen Paper version (the Docker image includes Java 21).</li>
+                            <li>Download Paper from <a href="https://papermc.io/downloads/paper" target="_blank" rel="noopener noreferrer">the official Paper downloads page</a> and save it as <code>paper.jar</code> in the folder above.</li>
+                            <li>Review <a href="https://aka.ms/MinecraftEULA" target="_blank" rel="noopener noreferrer">the Minecraft EULA</a>. If you agree, create <code>eula.txt</code> in that folder with <code>eula=true</code>.</li>
+                            <li>Stop Bedrock first if you need to conserve the VM's memory. Both servers can run, but may overload a micro VM.</li>
+                        </ol>
+                    </div>
+                </div>
+
+                <div class="soft-card" style="margin-top:20px;">
+                    <div class="card-header-bar">
+                        <div class="card-title-group"><h3>Paper Console</h3><p>Output is kept separate from the Bedrock terminal.</p></div>
+                        <button class="zentra-btn secondary" type="button" onclick="loadJavaOutput()">Refresh logs</button>
+                    </div>
+                    <pre id="javaConsoleOutput" style="height:360px; overflow:auto; white-space:pre-wrap; background:#09090b; color:#d4d4d8; padding:14px; border-radius:10px; font:12px 'Fira Code',monospace;">Paper console output will appear here.</pre>
+                    <form onsubmit="sendJavaCommand(event)" style="display:flex; gap:8px; margin-top:10px;">
+                        <input id="javaCommandInput" class="zentra-input" type="text" placeholder="Enter a Paper console command" autocomplete="off">
+                        <button class="zentra-btn primary" type="submit">Send</button>
+                    </form>
                 </div>
             </section>
 
@@ -1343,6 +1392,6 @@
     <!-- Toast Container -->
     <div id="toastContainer"></div>
 
-    <script src="/static/js/app.js?v=20261014_04"></script>
+    <script src="/static/js/app.js?v=20261021_01"></script>
 </body>
 </html>

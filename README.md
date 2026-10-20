@@ -1,6 +1,6 @@
-# Minecraft Bedrock Dedicated Server Web Manager
+# Minecraft Bedrock & Java Server Web Manager
 
-A high-performance, asynchronous web management portal and headless controller for Minecraft Bedrock Dedicated Server (BDS), rewritten in **Rust** (Tokio + Axum).
+A high-performance, asynchronous web management portal and headless controller for Minecraft Bedrock Dedicated Server (BDS) and Paper for Java Edition, rewritten in **Rust** (Tokio + Axum).
 
 ---
 
@@ -27,6 +27,22 @@ In recent releases of the Minecraft Bedrock Dedicated Server, NetherNet (WebRTC-
 ---
 
 ## 🚀 Deployment Options
+
+## ☕ Paper Java Server
+
+The dashboard now has a separate **Java Server** tab for starting/stopping Paper, viewing its console, and sending commands. Paper data lives in a separate `java/` folder under the manager's data directory; it does not modify Bedrock worlds or settings.
+
+1. Install a Java runtime compatible with the Paper version you download. For the Docker image, Java 21 is included. For a systemd install on Ubuntu, for example:
+   ```bash
+   sudo apt-get update
+   sudo apt-get install -y openjdk-21-jre-headless
+   ```
+2. Download a Paper server jar from [Paper's official downloads page](https://papermc.io/downloads/paper) and save it as `paper.jar` in the `java/` directory shown in the dashboard.
+3. Read and accept the [Minecraft EULA](https://aka.ms/MinecraftEULA) yourself. Only if you agree, create `eula.txt` in that same directory containing `eula=true`.
+4. Start Paper from the **Java Server** tab. The manager uses a conservative 256 MB initial / 512 MB maximum Java heap for small VMs.
+5. Allow inbound **TCP 25565** in the cloud firewall and host firewall. Bedrock continues to use its existing UDP ports.
+
+Bedrock remains configured to auto-start by default for backwards compatibility; Java auto-start is off by default. For Java-only mode, set `MC_AUTO_START_BEDROCK=false` and `MC_AUTO_START_JAVA=true` in the manager's service environment (or in the Compose `.env` file), then restart the manager. If you keep Bedrock auto-start enabled, stop it from its existing controls before starting Paper to conserve memory. Both processes can be run, but a micro VM may run out of memory.
 
 ### Method 1: Automatic GitHub Actions CI/CD
 A GitHub Actions workflow is configured in `.github/workflows/deploy.yml`.

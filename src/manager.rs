@@ -16,6 +16,7 @@ use tokio::sync::{mpsc, Mutex, RwLock};
 use tracing::{error, info};
 
 use crate::models::*;
+use crate::java_server::JavaServerManager;
 
 pub struct ServerManager {
     pub base_dir: PathBuf,
@@ -26,6 +27,7 @@ pub struct ServerManager {
     pub resource_packs_dir: PathBuf,
     pub behavior_packs_dir: PathBuf,
     pub data_dir: PathBuf,
+    pub java_server: Arc<JavaServerManager>,
 
     child_process: Arc<Mutex<Option<Child>>>,
     stdin_tx: Arc<Mutex<Option<mpsc::UnboundedSender<String>>>>,
@@ -50,6 +52,7 @@ impl ServerManager {
         let resource_packs_dir = base_dir.join("resource_packs");
         let behavior_packs_dir = base_dir.join("behavior_packs");
         let data_dir = base_dir.join("data");
+        let java_server = JavaServerManager::new(base_dir.join("java"));
 
         let _ = fs::create_dir_all(&worlds_dir);
         let _ = fs::create_dir_all(&backup_dir);
@@ -161,6 +164,7 @@ impl ServerManager {
             resource_packs_dir,
             behavior_packs_dir,
             data_dir,
+            java_server,
             child_process: Arc::new(Mutex::new(None)),
             stdin_tx: Arc::new(Mutex::new(None)),
             console_buffer: Arc::new(RwLock::new(VecDeque::with_capacity(250))),
@@ -1237,5 +1241,4 @@ impl ServerManager {
         }
     }
 }
-
 
