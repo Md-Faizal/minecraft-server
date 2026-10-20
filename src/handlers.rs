@@ -13,6 +13,7 @@ use chrono::Local;
 use regex::Regex;
 use serde::Deserialize;
 use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
 use walkdir::WalkDir;
 
 use crate::manager::ServerManager;
@@ -139,9 +140,15 @@ pub async fn api_java_status(State(mgr): State<Arc<ServerManager>>) -> Json<Valu
             })
         })
         .unwrap_or(false);
+    let installed_version = fs::read_to_string(mgr.java_server.server_dir.join("paper-version.json"))
+        .ok()
+        .and_then(|content| serde_json::from_str::<Value>(&content).ok())
+        .and_then(|value| value.get("version").and_then(Value::as_str).map(str::to_string))
+        .unwrap_or_else(|| "Unknown".to_string());
     Json(json!({
         "running": running,
         "paper_installed": mgr.java_server.paper_jar.is_file(),
+        "installed_version": installed_version,
         "eula_accepted": eula_accepted,
         "directory": mgr.java_server.server_dir.display().to_string(),
         "address": "TCP 25565",
@@ -171,6 +178,15 @@ pub async fn api_java_stop(
     Ok(Json(json!({"result": "Paper stopped."})))
 }
 
+pub async fn api_java_restart(
+    State(mgr): State<Arc<ServerManager>>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    mgr.java_server.restart().await.map_err(|error| {
+        (StatusCode::SERVICE_UNAVAILABLE, Json(json!({"result": error})))
+    })?;
+    Ok(Json(json!({"result": "Paper restarted."})))
+}
+
 pub async fn api_java_command(
     State(mgr): State<Arc<ServerManager>>,
     Json(payload): Json<CommandPayload>,
@@ -186,6 +202,521 @@ pub async fn api_java_output(State(mgr): State<Arc<ServerManager>>) -> impl Into
     let logs = mgr.java_server.console_buffer.read().await;
     let text = logs.iter().cloned().collect::<Vec<_>>().join("\n");
     ([(header::CONTENT_TYPE, "text/plain; charset=utf-8")], text)
+}
+
+#[derive(Debug)]
+struct PaperBuild {
+    version: String,
+    build: u64,
+    url: String,
+    sha256: String,
+    size: u64,
+    required_java: u32,
+}
+
+async fn java_runtime_major() -> Result<u32, String> {
+    let output = tokio::process::Command::new("java")
+        .arg("-version")
+        .output()
+        .await
+        .map_err(|error| format!("Java runtime is not installed or unavailable on PATH: {error}"))?;
+    if !output.status.success() {
+        return Err("The installed Java runtime could not report its version.".to_string());
+    }
+    let version_text = format!(
+        "{} {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    for token in version_text.split_whitespace() {
+        let token = token.trim_matches('"').trim_matches(',');
+        let mut parts = token.split('.');
+        if let Some(major) = parts.next().and_then(|part| part.parse::<u32>().ok()) {
+            if major == 1 {
+                if let Some(legacy_major) = parts.next().and_then(|part| part.parse::<u32>().ok()) {
+                    return Ok(legacy_major);
+                }
+            }
+            if major >= 8 {
+                return Ok(major);
+            }
+        }
+    }
+    Err(format!("Could not determine Java version from: {}", version_text.trim()))
+}
+
+fn required_java_for_paper(version: &str) -> u32 {
+    let mut components = version.split('.').filter_map(|part| part.parse::<u32>().ok());
+    let first = components.next().unwrap_or_default();
+    let second = components.next().unwrap_or_default();
+    let major = if first == 1 && second > 1 {
+        second
+    } else {
+        first
+    };
+    if major >= 26 {
+        25
+    } else if major >= 20 {
+        21
+    } else if major >= 17 {
+        17
+    } else if major == 16 {
+        16
+    } else if major >= 12 {
+        11
+    } else {
+        8
+    }
+}
+
+async fn latest_stable_paper_build(runtime_major: u32) -> Result<PaperBuild, String> {
+    if runtime_major < 8 {
+        return Err(format!(
+            "Java {runtime_major} is too old for Paper. Install Java 8 or newer."
+        ));
+    }
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(15))
+        .user_agent("Minecraft-Server-Manager/1.0")
+        .build()
+        .map_err(|error| format!("Could not create Paper API client: {error}"))?;
+    let project = client
+        .get("https://fill.papermc.io/v3/projects/paper")
+        .send()
+        .await
+        .map_err(|error| format!("Could not reach Paper downloads: {error}"))?
+        .error_for_status()
+        .map_err(|error| format!("Paper project lookup failed: {error}"))?
+        .json::<Value>()
+        .await
+        .map_err(|error| format!("Paper project response was invalid: {error}"))?;
+
+    let mut versions = project
+        .get("versions")
+        .and_then(Value::as_object)
+        .into_iter()
+        .flat_map(|groups| groups.values())
+        .flat_map(Value::as_array)
+        .flatten()
+        .filter_map(Value::as_str)
+        .filter(|version| {
+            !version.contains('-')
+                && version
+                    .chars()
+                    .all(|character| character.is_ascii_digit() || character == '.')
+        })
+        .map(str::to_string)
+        .collect::<Vec<_>>();
+    versions.sort_by(|left, right| compare_numeric_versions(right, left));
+    versions.dedup();
+
+    for version in versions.into_iter().take(20) {
+        let required_java = required_java_for_paper(&version);
+        if required_java > runtime_major {
+            continue;
+        }
+        let url = format!(
+            "https://fill.papermc.io/v3/projects/paper/versions/{version}/builds"
+        );
+        let response = match client.get(url).send().await {
+            Ok(response) if response.status().is_success() => response,
+            Ok(_) | Err(_) => continue,
+        };
+        let builds = match response.json::<Value>().await {
+            Ok(Value::Array(builds)) => builds,
+            _ => continue,
+        };
+        for build in builds {
+            if build.get("channel").and_then(Value::as_str) != Some("STABLE") {
+                continue;
+            }
+            let Some(download) = build.get("downloads").and_then(|value| value.get("server:default")) else {
+                continue;
+            };
+            let (Some(url), Some(sha256), Some(size), Some(build_id)) = (
+                download.get("url").and_then(Value::as_str),
+                download.get("checksums").and_then(|value| value.get("sha256")).and_then(Value::as_str),
+                download.get("size").and_then(Value::as_u64),
+                build.get("id").and_then(Value::as_u64),
+            ) else {
+                continue;
+            };
+            if !url.starts_with("https://fill-data.papermc.io/")
+                || sha256.len() != 64
+                || !sha256.chars().all(|character| character.is_ascii_hexdigit())
+                || size == 0
+                || size > 300 * 1024 * 1024
+            {
+                continue;
+            }
+            return Ok(PaperBuild {
+                version,
+                build: build_id,
+                url: url.to_string(),
+                sha256: sha256.to_ascii_lowercase(),
+                size,
+                required_java,
+            });
+        }
+    }
+
+    Err("Paper has no stable downloadable build available.".to_string())
+}
+
+fn compare_numeric_versions(left: &str, right: &str) -> std::cmp::Ordering {
+    let left = left.split('.').filter_map(|part| part.parse::<u32>().ok());
+    let right = right.split('.').filter_map(|part| part.parse::<u32>().ok());
+    left.cmp(right)
+}
+
+pub async fn api_java_latest() -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    let runtime = java_runtime_major().await.map_err(|error| {
+        (StatusCode::SERVICE_UNAVAILABLE, Json(json!({"result": error})))
+    })?;
+    let latest = latest_stable_paper_build(runtime).await.map_err(|error| {
+        (StatusCode::BAD_GATEWAY, Json(json!({"result": error})))
+    })?;
+    Ok(Json(json!({
+        "version": latest.version,
+        "build": latest.build,
+        "size": latest.size,
+        "required_java": latest.required_java,
+        "java_runtime": runtime,
+    })))
+}
+
+pub async fn api_java_install(
+    State(mgr): State<Arc<ServerManager>>,
+    Json(payload): Json<PaperInstallPayload>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    if !payload.eula_accepted {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(json!({"result": "Please confirm that you have read and agree to the Minecraft EULA before installing."})),
+        ));
+    }
+
+    let runtime = java_runtime_major().await.map_err(|error| {
+        (StatusCode::SERVICE_UNAVAILABLE, Json(json!({"result": error})))
+    })?;
+
+    {
+        let mut state = mgr.java_server.update_state.write().await;
+        if matches!(
+            state.status.as_str(),
+            "preparing" | "downloading" | "stopping" | "installing" | "restarting"
+        ) {
+            return Err((
+                StatusCode::CONFLICT,
+                Json(json!({"result": "A Paper install or update is already in progress."})),
+            ));
+        }
+        state.status = "preparing".to_string();
+        state.progress = 2;
+        state.message = "Checking the latest stable Paper build...".to_string();
+        state.error.clear();
+    }
+
+    let latest = match latest_stable_paper_build(runtime).await {
+        Ok(build) => build,
+        Err(error) => {
+            set_paper_update_state(&mgr, "failed", 0, "", &error).await;
+            return Err((StatusCode::BAD_GATEWAY, Json(json!({"result": error}))));
+        }
+    };
+
+    let task_mgr = Arc::clone(&mgr);
+    tokio::spawn(async move {
+        let result = download_and_install_paper(&task_mgr, latest).await;
+        if let Err(error) = result {
+            set_paper_update_state(&task_mgr, "failed", 0, "", &error).await;
+        }
+    });
+    Ok(Json(json!({"result": "Paper install/update started."})))
+}
+
+#[derive(Deserialize)]
+pub struct PaperInstallPayload {
+    #[serde(default)]
+    pub eula_accepted: bool,
+}
+
+async fn download_and_install_paper(
+    mgr: &Arc<ServerManager>,
+    build: PaperBuild,
+) -> Result<(), String> {
+    set_paper_update_state(
+        mgr,
+        "downloading",
+        10,
+        &format!("Downloading Paper {} build {}...", build.version, build.build),
+        "",
+    )
+    .await;
+
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(300))
+        .user_agent("Minecraft-Server-Manager/1.0")
+        .redirect(reqwest::redirect::Policy::custom(|attempt| {
+            if attempt.previous().len() >= 5 {
+                return attempt.error("Too many redirects");
+            }
+            if attempt
+                .url()
+                .host_str()
+                .map(|host| host.eq_ignore_ascii_case("fill-data.papermc.io"))
+                .unwrap_or(false)
+                && attempt.url().scheme() == "https"
+            {
+                attempt.follow()
+            } else {
+                attempt.stop()
+            }
+        }))
+        .build()
+        .map_err(|error| format!("Could not create Paper download client: {error}"))?;
+    let response = client
+        .get(&build.url)
+        .send()
+        .await
+        .map_err(|error| format!("Paper jar download failed: {error}"))?
+        .error_for_status()
+        .map_err(|error| format!("Paper jar download failed: {error}"))?;
+    if response.content_length().map(|size| size > 300 * 1024 * 1024).unwrap_or(false) {
+        return Err("Paper download exceeded the 300 MB safety limit.".to_string());
+    }
+    let bytes = response
+        .bytes()
+        .await
+        .map_err(|error| format!("Could not read Paper jar download: {error}"))?;
+    if bytes.len() as u64 != build.size {
+        return Err(format!(
+            "Paper download size did not match the release metadata (expected {} bytes, got {}).",
+            build.size,
+            bytes.len()
+        ));
+    }
+    let digest = Sha256::digest(&bytes);
+    let checksum = digest.iter().map(|byte| format!("{byte:02x}")).collect::<String>();
+    if checksum != build.sha256 {
+        return Err("Paper download checksum verification failed; the installed jar was not changed.".to_string());
+    }
+
+    let java_dir = &mgr.java_server.server_dir;
+    fs::create_dir_all(java_dir)
+        .map_err(|error| format!("Could not create Java server directory: {error}"))?;
+    let temp_jar = java_dir.join(format!("paper.jar.download-{}", std::process::id()));
+    fs::write(&temp_jar, &bytes)
+        .map_err(|error| format!("Could not stage the Paper download: {error}"))?;
+
+    let was_running = mgr.java_server.is_running().await;
+    if was_running {
+        set_paper_update_state(
+            mgr,
+            "stopping",
+            75,
+            "Stopping Paper cleanly before replacing its server jar...",
+            "",
+        )
+        .await;
+        if let Err(error) = mgr.java_server.stop().await {
+            let _ = fs::remove_file(&temp_jar);
+            return Err(error);
+        }
+    }
+
+    let backup_dir = java_dir.join("backups");
+    fs::create_dir_all(&backup_dir)
+        .map_err(|error| format!("Could not create Paper backup directory: {error}"))?;
+    let jar_path = mgr.java_server.paper_jar.clone();
+    let backup_path = if jar_path.exists() {
+        let backup = backup_dir.join(format!(
+            "paper-{}.jar",
+            chrono::Utc::now().format("%Y%m%d-%H%M%S")
+        ));
+        fs::rename(&jar_path, &backup)
+            .map_err(|error| format!("Could not back up the current Paper jar: {error}"))?;
+        Some(backup)
+    } else {
+        None
+    };
+
+    set_paper_update_state(mgr, "installing", 88, "Installing verified Paper jar...", "").await;
+    if let Err(error) = fs::rename(&temp_jar, &jar_path) {
+        if let Some(backup) = &backup_path {
+            let _ = fs::rename(backup, &jar_path);
+        }
+        let _ = fs::remove_file(&temp_jar);
+        return Err(format!("Could not activate the Paper jar: {error}"));
+    }
+
+    let metadata = json!({
+        "version": build.version,
+        "build": build.build,
+        "sha256": build.sha256,
+    });
+    fs::write(java_dir.join("paper-version.json"), metadata.to_string())
+        .map_err(|error| format!("Paper installed, but version metadata could not be saved: {error}"))?;
+    fs::write(java_dir.join("eula.txt"), "eula=true\n")
+        .map_err(|error| format!("Paper installed, but the agreed EULA setting could not be saved: {error}"))?;
+
+    if was_running {
+        set_paper_update_state(mgr, "restarting", 95, "Starting the updated Paper server...", "").await;
+        mgr.java_server
+            .start()
+            .await
+            .map_err(|error| format!("Paper updated, but the server did not restart: {error}"))?;
+    }
+    set_paper_update_state(
+        mgr,
+        "success",
+        100,
+        &format!("Paper {} build {} installed successfully.", build.version, build.build),
+        "",
+    )
+    .await;
+    Ok(())
+}
+
+async fn set_paper_update_state(
+    mgr: &ServerManager,
+    status: &str,
+    progress: u32,
+    message: &str,
+    error: &str,
+) {
+    let mut state = mgr.java_server.update_state.write().await;
+    state.status = status.to_string();
+    state.progress = progress;
+    state.message = message.to_string();
+    state.error = error.to_string();
+}
+
+pub async fn api_java_update_status(State(mgr): State<Arc<ServerManager>>) -> Json<UpdateState> {
+    Json(mgr.java_server.update_state.read().await.clone())
+}
+
+pub async fn api_java_properties_get(State(mgr): State<Arc<ServerManager>>) -> Json<Value> {
+    let file = mgr.java_server.server_dir.join("server.properties");
+    let mut current = HashMap::new();
+    if let Ok(content) = fs::read_to_string(file) {
+        for line in content.lines() {
+            if let Some((key, value)) = line.split_once('=') {
+                current.insert(key.trim().to_string(), value.trim().to_string());
+            }
+        }
+    }
+
+    let schema = [
+        ("motd", "Message of the day", "text", json!("A Minecraft Server")),
+        ("server-port", "Server port", "int", json!(25565)),
+        ("max-players", "Maximum players", "int", json!(20)),
+        ("view-distance", "View distance", "int", json!(8)),
+        ("simulation-distance", "Simulation distance", "int", json!(6)),
+        ("gamemode", "Default game mode", "choice", json!("survival")),
+        ("difficulty", "Difficulty", "choice", json!("easy")),
+        ("online-mode", "Online mode", "bool", json!(true)),
+        ("white-list", "Whitelist", "bool", json!(false)),
+        ("pvp", "Player versus player", "bool", json!(true)),
+        ("enable-command-block", "Command blocks", "bool", json!(false)),
+    ];
+    let properties = schema
+        .iter()
+        .map(|(key, label, field_type, default)| {
+            let mut item = PropertySchemaItem {
+                key: (*key).to_string(),
+                label: (*label).to_string(),
+                field_type: (*field_type).to_string(),
+                choices: if *field_type == "choice" {
+                    Some(if *key == "gamemode" {
+                        vec!["survival", "creative", "adventure", "spectator"]
+                    } else {
+                        vec!["peaceful", "easy", "normal", "hard"]
+                    }
+                    .into_iter()
+                    .map(str::to_string)
+                    .collect())
+                } else {
+                    None
+                },
+                default: default.clone(),
+                value: None,
+            };
+            if let Some(value) = current.get(*key) {
+                item.value = Some(match field_type {
+                    &"bool" => json!(value.eq_ignore_ascii_case("true")),
+                    &"int" => value.parse::<i64>().map(Value::from).unwrap_or_else(|_| json!(value)),
+                    _ => json!(value),
+                });
+            } else {
+                item.value = Some(default.clone());
+            }
+            item
+        })
+        .collect::<Vec<_>>();
+    Json(json!({"properties": properties}))
+}
+
+pub async fn api_java_properties_post(
+    State(mgr): State<Arc<ServerManager>>,
+    Json(payload): Json<HashMap<String, Value>>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    let allowed = [
+        "motd",
+        "server-port",
+        "max-players",
+        "view-distance",
+        "simulation-distance",
+        "gamemode",
+        "difficulty",
+        "online-mode",
+        "white-list",
+        "pvp",
+        "enable-command-block",
+    ];
+    let file = mgr.java_server.server_dir.join("server.properties");
+    let mut current = HashMap::new();
+    if let Ok(content) = fs::read_to_string(&file) {
+        for line in content.lines() {
+            if let Some((key, value)) = line.split_once('=') {
+                current.insert(key.trim().to_string(), value.trim().to_string());
+            }
+        }
+    }
+    for key in allowed {
+        if let Some(value) = payload.get(key) {
+            let value = match value {
+                Value::String(value) => value.clone(),
+                Value::Bool(value) => value.to_string(),
+                Value::Number(value) => value.to_string(),
+                _ => {
+                    return Err((
+                        StatusCode::BAD_REQUEST,
+                        Json(json!({"result": format!("Invalid value for {key}.")})),
+                    ))
+                }
+            };
+            if value.chars().any(char::is_control) || value.len() > 512 {
+                return Err((
+                    StatusCode::BAD_REQUEST,
+                    Json(json!({"result": format!("Invalid value for {key}.")})),
+                ));
+            }
+            current.insert(key.to_string(), value);
+        }
+    }
+    let mut output = current
+        .into_iter()
+        .map(|(key, value)| format!("{key}={value}\n"))
+        .collect::<Vec<_>>();
+    output.sort();
+    fs::write(file, output.concat()).map_err(|error| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"result": format!("Could not save Java server.properties: {error}")})),
+        )
+    })?;
+    Ok(Json(json!({"result": "Java properties saved. Restart Paper to apply changes."})))
 }
 
 #[derive(Deserialize)]
@@ -1670,5 +2201,24 @@ pub async fn api_gamemaster_action(
     match mgr.execute_gamemaster_action(req).await {
         Ok(msg) => Ok(Json(json!({"result": msg}))),
         Err(err) => Err((StatusCode::BAD_REQUEST, Json(json!({"result": err})))),
+    }
+}
+
+#[cfg(test)]
+mod paper_version_tests {
+    use super::{compare_numeric_versions, required_java_for_paper};
+
+    #[test]
+    fn paper_java_requirement_parses_minecraft_versions() {
+        assert_eq!(required_java_for_paper("1.21.11"), 21);
+        assert_eq!(required_java_for_paper("1.19.4"), 17);
+        assert_eq!(required_java_for_paper("1.16.5"), 16);
+        assert_eq!(required_java_for_paper("26.1"), 25);
+    }
+
+    #[test]
+    fn paper_versions_sort_numerically() {
+        assert!(compare_numeric_versions("1.21.11", "1.21.9").is_gt());
+        assert!(compare_numeric_versions("1.21.9", "1.20.6").is_gt());
     }
 }

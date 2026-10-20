@@ -1,10 +1,15 @@
 /**
- * Minecraft Bedrock Server Management Dashboard
- * Zentra Design System & Buffed Remote Terminal Controller
+ * Minecraft Bedrock and Java Server Management Dashboard
  */
 
 // Global State
 let currentTab = 'home';
+let serverEdition = ['bedrock', 'java'].includes(localStorage.getItem('server_edition'))
+    ? localStorage.getItem('server_edition')
+    : 'bedrock';
+let lastBedrockStatus = null;
+let lastJavaStatus = null;
+let lastPaperUpdateStatus = 'idle';
 let autoScroll = true;
 let consoleFilter = 'all';
 let searchQuery = '';
@@ -34,6 +39,18 @@ const BDS_COMMANDS = [
     { cmd: "tp", desc: "Teleport player" },
     { cmd: "say", desc: "Broadcast public message" },
     { cmd: "stop", desc: "Gracefully shutdown BDS daemon" }
+];
+const JAVA_COMMANDS = [
+    { cmd: 'list', desc: 'List online players' },
+    { cmd: 'save-all', desc: 'Save world data' },
+    { cmd: 'say', desc: 'Broadcast a message' },
+    { cmd: 'whitelist on', desc: 'Enable the whitelist' },
+    { cmd: 'whitelist off', desc: 'Disable the whitelist' },
+    { cmd: 'op', desc: 'Grant operator access' },
+    { cmd: 'deop', desc: 'Remove operator access' },
+    { cmd: 'time set day', desc: 'Set the world time to day' },
+    { cmd: 'weather clear', desc: 'Clear the weather' },
+    { cmd: 'stop', desc: 'Gracefully stop Paper' }
 ];
 
 /* =========================================================================
@@ -333,10 +350,70 @@ function initTabDragSelector() {
     });
 }
 
+const PAGE_CONTEXT = {
+    home: ['Overview', 'Status, process controls, and edition-specific shortcuts.'],
+    map: ['World map', 'Explore the Bedrock world and manage live player locations.'],
+    console: ['Server console', 'One console for the selected server edition.'],
+    java: ['Paper setup', 'Install, update, and inspect the Paper Java server.'],
+    worlds: ['Worlds', 'Manage Bedrock worlds and backups.'],
+    players: ['Players', 'Bedrock player sessions, permissions, and allowlist.'],
+    addons: ['Addons', 'Install and apply Bedrock behavior and resource packs.'],
+    properties: ['Properties', 'Shared settings editor adapted to the selected server.'],
+    update: ['Install & update', 'Update the selected server without replacing its worlds.'],
+    settings: ['Settings', 'Dashboard preferences and server startup context.']
+};
+
+function syncServerEditionUI() {
+    document.body.dataset.serverEdition = serverEdition;
+    document.querySelectorAll('[data-server-context]').forEach(button => {
+        button.classList.toggle('active', button.dataset.serverContext === serverEdition);
+    });
+    document.querySelectorAll('[data-edition]').forEach(element => {
+        element.hidden = element.dataset.edition !== serverEdition;
+    });
+    const navSubtext = document.getElementById('navSubtext');
+    const eyebrow = document.getElementById('pageContextEyebrow');
+    const address = document.getElementById('contextServerAddress');
+    if (navSubtext) navSubtext.textContent = serverEdition === 'java' ? 'Paper Java server' : 'Bedrock Dedicated Server';
+    if (eyebrow) eyebrow.textContent = serverEdition === 'java' ? 'JAVA · PAPER' : 'BEDROCK EDITION';
+    if (address) address.textContent = serverEdition === 'java' ? 'TCP 25565' : 'UDP 19132';
+
+    const context = PAGE_CONTEXT[currentTab] || PAGE_CONTEXT.home;
+    const title = document.getElementById('pageContextTitle');
+    const description = document.getElementById('pageContextDescription');
+    if (title) title.textContent = context[0];
+    if (description) description.textContent = serverEdition === 'java'
+        ? context[1].replace('Bedrock ', '').replace('Bedrock', 'Paper')
+        : context[1];
+
+    if (currentTab === 'properties') {
+        const pageTitle = document.getElementById('propertiesPageTitle');
+        const pageDescription = document.getElementById('propertiesPageDescription');
+        if (pageTitle) pageTitle.textContent = serverEdition === 'java' ? 'Java server.properties' : 'Bedrock server.properties';
+        if (pageDescription) pageDescription.textContent = serverEdition === 'java'
+            ? 'Common Paper settings. Restart Paper after saving to apply changes.'
+            : 'Bedrock settings. World-linked settings are saved to the active world configuration.';
+    }
+
+    const tabButton = document.querySelector(`.nav-tab-btn[data-tab="${currentTab}"]`);
+    if (tabButton && tabButton.hidden) switchZentraTab('home');
+}
+
+function switchServerContext(edition) {
+    if (!['bedrock', 'java'].includes(edition) || edition === serverEdition) return;
+    serverEdition = edition;
+    localStorage.setItem('server_edition', edition);
+    syncServerEditionUI();
+    switchZentraTab('home');
+    loadStatus();
+}
+
 function switchZentraTab(tabName) {
     if (!tabName) return;
     // Map URL aliases
     if (tabName === 'terminal') tabName = 'console';
+    const button = document.querySelector(`.nav-tab-btn[data-tab="${tabName}"]`);
+    if (button && button.dataset.edition && button.dataset.edition !== serverEdition) return;
 
     currentTab = tabName;
     const allTabs = ['home', 'map', 'console', 'java', 'worlds', 'players', 'addons', 'properties', 'update', 'settings'];
@@ -363,6 +440,7 @@ function switchZentraTab(tabName) {
             }
         }
     });
+    syncServerEditionUI();
 
     // Update URL hash without forcing window scroll jump
     const desiredHash = `#${tabName}`;
@@ -373,7 +451,7 @@ function switchZentraTab(tabName) {
     // Always trigger data load for the activated tab
     if (tabName === 'home') {
         loadStatus();
-        loadAnnouncements();
+        if (serverEdition === 'bedrock') loadAnnouncements();
     } else if (tabName === 'map') {
         initGodsEyeMap();
         loadGodsEyeData();
@@ -385,7 +463,8 @@ function switchZentraTab(tabName) {
         }, 60);
     } else if (tabName === 'java') {
         loadJavaServer();
-        loadJavaOutput();
+        loadLatestPaper();
+        pollPaperUpdateStatus();
     } else if (tabName === 'worlds') {
         loadWorlds();
     } else if (tabName === 'players') {
@@ -395,7 +474,12 @@ function switchZentraTab(tabName) {
     } else if (tabName === 'properties') {
         loadProperties();
     } else if (tabName === 'update') {
-        checkBdsUpdates();
+        if (serverEdition === 'bedrock') checkBdsUpdates();
+        else {
+            loadJavaServer();
+            loadLatestPaper();
+            pollPaperUpdateStatus();
+        }
     } else if (tabName === 'settings') {
         loadSettings();
     }
@@ -425,13 +509,28 @@ function showToast(message, type = 'info') {
    4. BUFFED REMOTE TERMINAL CONSOLE ENGINE
    ========================================================================= */
 function fetchLogs() {
-    fetch('/api/server_output')
-        .then(r => r.text())
+    const outputEndpoint = serverEdition === 'java' ? '/api/java/output' : '/api/server_output';
+    const serverLabel = document.getElementById('terminalServerLabel');
+    const prompt = document.getElementById('terminalPrompt');
+    const input = document.getElementById('terminalCmdInput');
+    const badge = document.getElementById('termConnBadge');
+    if (serverLabel) serverLabel.textContent = serverEdition === 'java' ? 'paper.jar · stdin/stdout' : 'bedrock_server · stdin/stdout';
+    if (prompt) prompt.textContent = serverEdition === 'java' ? 'paper>' : 'bds>';
+    if (input) input.placeholder = serverEdition === 'java'
+        ? 'Paper command (e.g. list, whitelist on, say hello)...'
+        : 'Bedrock command (e.g. list, gamemode creative, say hello)...';
+    if (badge) badge.textContent = serverEdition === 'java' ? 'JAVA · TCP 25565' : 'BEDROCK · UDP 19132';
+    fetch(outputEndpoint)
+        .then(r => {
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            return r.text();
+        })
         .then(text => {
             const lines = text.split('\n').filter(l => l.trim().length > 0);
             rawLogsCache = lines;
             renderTerminalLines(lines);
-            document.getElementById('termLineCount').textContent = `${lines.length} lines buffered`;
+            const lineCount = document.getElementById('termLineCount');
+            if (lineCount) lineCount.textContent = `${lines.length} lines buffered`;
         })
         .catch(err => console.error("Error fetching logs:", err));
 }
@@ -444,7 +543,7 @@ function renderTerminalLines(lines) {
         screen.innerHTML = `
             <div style="color:var(--zentra-muted); font-style:italic; padding:24px; text-align:center;">
                 <p style="margin-bottom:8px; font-weight:600;">Console buffer is currently empty.</p>
-                <p style="font-size:12px; color:#8b949e;">If the server was recently restarted or stopped, logs will stream here as the Bedrock Dedicated Server processes events.</p>
+                <p style="font-size:12px; color:#8b949e;">Start the selected server to stream live process output here.</p>
             </div>
         `;
         return;
@@ -496,7 +595,9 @@ function renderTerminalLines(lines) {
         }
 
         let isPlayerEvent = false;
-        if (content.includes('Player connected:') || content.includes('Player disconnected:')) {
+        if (content.includes('Player connected:')
+            || content.includes('Player disconnected:')
+            || (serverEdition === 'java' && (content.includes(' joined the game') || content.includes(' left the game')))) {
             level = 'PLAYER';
             isPlayerEvent = true;
         }
@@ -556,7 +657,7 @@ function downloadLogs() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `bedrock-server-${new Date().toISOString().slice(0, 10)}.log`;
+    a.download = `${serverEdition}-server-${new Date().toISOString().slice(0, 10)}.log`;
     a.click();
     URL.revokeObjectURL(url);
     showToast("Server log file downloaded", "success");
@@ -588,12 +689,17 @@ function sendConsoleCommand(inputId) {
     }
     historyIndex = -1;
 
-    fetch('/api/command', {
+    const endpoint = serverEdition === 'java' ? '/api/java/command' : '/api/command';
+    fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ command: cmd })
     })
-    .then(r => r.json())
+    .then(async r => {
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.result || `HTTP ${r.status}`);
+        return data;
+    })
     .then(data => {
         if (data.result === 'sent') {
             showToast(`Executed: ${cmd}`, 'success');
@@ -648,7 +754,8 @@ function initTerminalKeyboard() {
             return;
         }
 
-        const matches = BDS_COMMANDS.filter(c => c.cmd.toLowerCase().startsWith(val) || c.cmd.toLowerCase().includes(val));
+            const commandList = serverEdition === 'java' ? JAVA_COMMANDS : BDS_COMMANDS;
+            const matches = commandList.filter(c => c.cmd.toLowerCase().startsWith(val) || c.cmd.toLowerCase().includes(val));
         if (matches.length > 0) {
             box.innerHTML = matches.map(m => `
                 <div class="autocomplete-item" onclick="selectAutocomplete('${m.cmd}')">
@@ -682,83 +789,147 @@ function hideAutocomplete() {
    ========================================================================= */
 function loadStatus() {
     fetch('/api/status')
-        .then(r => r.json())
+        .then(r => {
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            return r.json();
+        })
         .then(data => {
-            const badge = document.getElementById('navStatusBadge');
-            const statusText = document.getElementById('navStatusText');
-            const statePill = document.getElementById('homeStatePill');
-            const homeActiveWorld = document.getElementById('homeActiveWorld');
-            const homeOnlineCount = document.getElementById('homeOnlineCount');
-            const homeVersion = document.getElementById('homeVersion');
-
-            const isRunning = data.server_running;
-            const activeWorld = data.active_world || 'None';
-            const onlineCount = (data.online_players || []).length;
-            const ver = data.version || 'Bedrock 1.26+';
-
-            if (homeActiveWorld) homeActiveWorld.textContent = activeWorld;
-            if (homeOnlineCount) homeOnlineCount.textContent = `${onlineCount} player${onlineCount === 1 ? '' : 's'}`;
-            if (homeVersion) homeVersion.textContent = ver;
-
-            if (isRunning) {
-                badge.className = 'status-pill-badge';
-                statusText.textContent = `Online (${activeWorld})`;
-                if (statePill) {
-                    statePill.className = 'metric-pill';
-                    statePill.textContent = '● Daemon Active';
-                }
-            } else {
-                badge.className = 'status-pill-badge stopped';
-                statusText.textContent = 'Server Stopped';
-                if (statePill) {
-                    statePill.className = 'metric-pill neutral';
-                    statePill.textContent = '○ Stopped';
-                }
-            }
-
-            const heroServerName = document.getElementById('heroServerName');
-            const heroOnlineBadge = document.getElementById('heroOnlineBadge');
-            const heroPlayerCountText = document.getElementById('heroPlayerCountText');
-            const heroMotdPreview = document.getElementById('heroMotdPreview');
-
-            if (heroPlayerCountText) heroPlayerCountText.textContent = `👥 ${onlineCount} / 10 Players`;
-
-            if (heroOnlineBadge) {
-                if (isRunning) {
-                    heroOnlineBadge.className = 'status-pill-badge';
-                    heroOnlineBadge.textContent = '● ONLINE';
-                    heroOnlineBadge.style.background = 'rgba(16,185,129,0.2)';
-                    heroOnlineBadge.style.color = '#10b981';
-                    heroOnlineBadge.style.borderColor = 'rgba(16,185,129,0.4)';
-                } else {
-                    heroOnlineBadge.className = 'status-pill-badge stopped';
-                    heroOnlineBadge.textContent = '○ OFFLINE';
-                    heroOnlineBadge.style.background = 'rgba(239,68,68,0.2)';
-                    heroOnlineBadge.style.color = '#ef4444';
-                    heroOnlineBadge.style.borderColor = 'rgba(239,68,68,0.4)';
-                }
-            }
-
-            if (window._currentServerName) {
-                if (heroServerName) heroServerName.textContent = window._currentServerName.replace(/§[0-9a-zA-Z]/g, '');
-                if (heroMotdPreview) heroMotdPreview.innerHTML = parseMinecraftColorCodes(window._currentServerName);
-            }
-
+            lastBedrockStatus = data;
+            renderSelectedServerStatus();
             pollLifecycleStatus();
+            loadJavaStatusOnly();
         })
         .catch(err => console.error("Status fetch error:", err));
 }
 
-function serverAction(action) {
-    showToast(`Sending ${action} request to BDS daemon...`, 'info');
-    fetch(`/api/${action}`, { method: 'POST' })
-        .then(r => r.json())
+function loadJavaStatusOnly() {
+    fetch('/api/java/status')
+        .then(r => {
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            return r.json();
+        })
         .then(data => {
-            showToast(`Server status: ${data.result || 'OK'}`, 'success');
-            setTimeout(loadStatus, 1500);
+            lastJavaStatus = data;
+            renderSelectedServerStatus();
+        })
+        .catch(err => {
+            console.error("Paper status fetch error:", err);
+            const status = document.getElementById('javaServerStatus');
+            if (status) status.textContent = 'Unavailable';
+        });
+}
+
+function renderSelectedServerStatus() {
+    const bedrock = lastBedrockStatus;
+    const java = lastJavaStatus;
+    const isJava = serverEdition === 'java';
+    const running = isJava ? Boolean(java && java.running) : Boolean(bedrock && bedrock.server_running);
+    const badge = document.getElementById('navStatusBadge');
+    const statusText = document.getElementById('navStatusText');
+    const statePill = document.getElementById('homeStatePill');
+    const javaHomeCard = document.getElementById('javaHomeCard');
+    const isInstalled = java && java.paper_installed;
+    const activeWorld = bedrock && bedrock.active_world ? bedrock.active_world : 'World';
+    const onlineCount = bedrock ? (bedrock.online_players || []).length : 0;
+
+    if (badge) badge.className = running ? 'status-pill-badge' : 'status-pill-badge stopped';
+    if (statusText) statusText.textContent = `${isJava ? 'Paper' : 'Bedrock'} ${running ? 'Running' : 'Stopped'}`;
+    if (statePill) {
+        statePill.className = running ? 'metric-pill' : 'metric-pill neutral';
+        statePill.textContent = running ? '● Running' : '○ Stopped';
+    }
+    document.querySelectorAll('[data-process-action]').forEach(button => {
+        const action = button.dataset.processAction;
+        button.style.display = action === 'start'
+            ? (running ? 'none' : 'inline-flex')
+            : (running ? 'inline-flex' : 'none');
+    });
+
+    if (javaHomeCard) javaHomeCard.style.display = isJava ? 'block' : 'none';
+    const javaStatus = document.getElementById('javaServerStatus');
+    const javaVersion = document.getElementById('javaPaperStatus');
+    const javaEula = document.getElementById('javaEulaStatus');
+    const javaDir = document.getElementById('javaServerDirectory');
+    const backupDir = document.getElementById('javaBackupDirectory');
+    const javaHomeState = document.getElementById('javaHomeState');
+    const javaHomeVersion = document.getElementById('javaHomeVersion');
+    const javaHomeAddress = document.getElementById('javaHomeAddress');
+    const javaAddress = document.getElementById('javaServerAddress');
+    const javaBedrockStatus = document.getElementById('javaBedrockStatus');
+    const eulaConfirm = document.getElementById('paperEulaConfirm');
+    if (javaStatus) {
+        javaStatus.textContent = java ? (java.running ? 'Paper running' : 'Paper stopped') : 'Checking Paper...';
+        javaStatus.className = java && java.running ? 'metric-pill' : 'metric-pill neutral';
+    }
+    if (javaVersion) javaVersion.textContent = isInstalled ? java.installed_version || 'Installed' : 'Not installed';
+    if (javaEula) javaEula.textContent = java && java.eula_accepted ? 'Accepted' : 'Not yet recorded';
+    if (javaDir) javaDir.textContent = java ? java.directory : 'Loading...';
+    if (backupDir) backupDir.textContent = java && java.directory ? `${java.directory}\\backups` : 'Loading...';
+    if (javaBedrockStatus) javaBedrockStatus.textContent = bedrock ? (bedrock.server_running ? 'Running' : 'Stopped') : 'Checking...';
+    if (javaHomeState) {
+        javaHomeState.textContent = java ? (java.running ? '● Running' : (isInstalled ? '○ Stopped' : 'Setup required')) : 'Checking...';
+        javaHomeState.className = java && java.running ? 'metric-pill' : 'metric-pill neutral';
+    }
+    if (javaHomeVersion) javaHomeVersion.textContent = isInstalled ? java.installed_version || 'Installed' : 'Not installed';
+    if (javaHomeAddress) javaHomeAddress.textContent = java ? java.address : 'TCP 25565';
+    if (javaAddress) javaAddress.textContent = java ? java.address : 'TCP 25565';
+    if (eulaConfirm && java && java.eula_accepted) eulaConfirm.checked = true;
+    const paperButton = document.getElementById('paperInstallButton');
+    if (paperButton && window.latestPaperVersion && java) {
+        paperButton.textContent = java.paper_installed
+            ? `Update Paper to ${window.latestPaperVersion}`
+            : `Install Paper ${window.latestPaperVersion}`;
+    }
+
+    const homeActiveWorld = document.getElementById('homeActiveWorld');
+    const homeOnlineCount = document.getElementById('homeOnlineCount');
+    const homeVersion = document.getElementById('homeVersion');
+    if (homeActiveWorld) homeActiveWorld.textContent = activeWorld;
+    if (homeOnlineCount) homeOnlineCount.textContent = `${onlineCount} player${onlineCount === 1 ? '' : 's'}`;
+    if (homeVersion) homeVersion.textContent = bedrock ? bedrock.version || 'Unknown' : 'Unknown';
+    const quickCommand = document.getElementById('homeCmdInput');
+    if (quickCommand) quickCommand.placeholder = isJava
+        ? 'e.g. say Hello from the dashboard! or list'
+        : 'e.g. say Hello from the dashboard! or list';
+    const heroPlayerCountText = document.getElementById('heroPlayerCountText');
+    const heroOnlineBadge = document.getElementById('heroOnlineBadge');
+    const heroServerName = document.getElementById('heroServerName');
+    const heroMotdPreview = document.getElementById('heroMotdPreview');
+    if (heroPlayerCountText) heroPlayerCountText.textContent = `👥 ${onlineCount} / 10 Players`;
+    if (heroOnlineBadge) {
+        heroOnlineBadge.className = running && !isJava ? 'status-pill-badge' : 'status-pill-badge stopped';
+        heroOnlineBadge.textContent = running && !isJava ? '● ONLINE' : '○ OFFLINE';
+    }
+    if (window._currentServerName) {
+        if (heroServerName) heroServerName.textContent = window._currentServerName.replace(/§[0-9a-zA-Z]/g, '');
+        if (heroMotdPreview) heroMotdPreview.innerHTML = parseMinecraftColorCodes(window._currentServerName);
+    }
+}
+
+function serverAction(action) {
+    if (serverEdition === 'bedrock' && action !== 'start') {
+        openLifecycleModal(action);
+        return;
+    }
+    showToast(`Sending ${action} request to ${serverEdition === 'java' ? 'Paper' : 'Bedrock'}...`, 'info');
+    const endpoint = serverEdition === 'java'
+        ? `/api/java/${action}`
+        : `/api/${action}`;
+    fetch(endpoint, { method: 'POST' })
+        .then(async r => {
+            const data = await r.json();
+            if (!r.ok) throw new Error(data.result || `HTTP ${r.status}`);
+            return data;
+        })
+        .then(data => {
+            showToast(data.result || `${action} request accepted.`, 'success');
+            setTimeout(() => {
+                loadStatus();
+                if (currentTab === 'console') fetchLogs();
+            }, 800);
             setTimeout(fetchLogs, 2000);
         })
-        .catch(err => showToast(`Action failed: ${err}`, 'error'));
+        .catch(err => showToast(`Action failed: ${err.message || err}`, 'error'));
 }
 
 function loadJavaServer() {
@@ -769,27 +940,8 @@ function loadJavaServer() {
         })
         .then(data => {
             const status = document.getElementById('javaServerStatus');
-            const directory = document.getElementById('javaServerDirectory');
-            const paper = document.getElementById('javaPaperStatus');
-            const eula = document.getElementById('javaEulaStatus');
-            const address = document.getElementById('javaServerAddress');
-            if (status) {
-                status.textContent = data.running ? '● Running' : '○ Stopped';
-                status.className = data.running ? 'metric-pill' : 'metric-pill neutral';
-            }
-            if (directory) directory.textContent = data.directory || 'Unavailable';
-            if (paper) paper.textContent = data.paper_installed ? 'Installed' : 'Not installed (save as paper.jar)';
-            if (eula) eula.textContent = data.eula_accepted ? 'Accepted' : 'Not accepted';
-            if (address) address.textContent = data.address || 'TCP 25565';
-            return fetch('/api/status')
-                .then(r => {
-                    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-                    return r.json();
-                })
-                .then(bedrock => {
-                    const bedrockStatus = document.getElementById('javaBedrockStatus');
-                    if (bedrockStatus) bedrockStatus.textContent = bedrock.server_running ? 'Running' : 'Stopped';
-                });
+            lastJavaStatus = data;
+            renderSelectedServerStatus();
         })
         .catch(err => {
             const status = document.getElementById('javaServerStatus');
@@ -797,67 +949,92 @@ function loadJavaServer() {
         });
 }
 
-function loadJavaOutput() {
-    fetch('/api/java/output')
-        .then(r => {
-            if (!r.ok) throw new Error(`HTTP ${r.status}`);
-            return r.text();
-        })
-        .then(text => {
-            const output = document.getElementById('javaConsoleOutput');
-            if (output) {
-                output.textContent = text || 'No Paper output yet.';
-                output.scrollTop = output.scrollHeight;
-            }
-        })
-        .catch(err => showToast(`Could not load Paper console: ${err.message}`, 'error'));
+function loadLatestPaper() {
+        const latest = document.getElementById('javaLatestVersion');
+        if (latest) latest.textContent = 'Checking...';
+        fetch('/api/java/latest')
+            .then(async r => {
+                const data = await r.json();
+                if (!r.ok) throw new Error(data.result || `HTTP ${r.status}`);
+                return data;
+            })
+            .then(data => {
+                if (latest) latest.textContent = `${data.version} · build ${data.build}`;
+                const summary = document.getElementById('javaUpdateSummary');
+                if (summary) summary.textContent = `Java ${data.java_runtime} installed · Paper ${data.version} requires Java ${data.required_java}`;
+                const button = document.getElementById('paperInstallButton');
+                if (button && lastJavaStatus) button.textContent = lastJavaStatus.paper_installed
+                    ? `Update Paper to ${data.version}`
+                    : `Install Paper ${data.version}`;
+                window.latestPaperVersion = data.version;
+                window.latestPaperJava = data.required_java;
+            })
+            .catch(error => {
+                if (latest) latest.textContent = 'Unavailable';
+                const summary = document.getElementById('javaUpdateSummary');
+                if (summary) summary.textContent = error.message;
+                showToast(`Could not check latest Paper build: ${error.message}`, 'error');
+            });
 }
 
-function javaServerAction(action) {
-    fetch(`/api/java/${action}`, { method: 'POST' })
-        .then(async r => {
-            const data = await r.json();
-            if (!r.ok) throw new Error(data.result || `HTTP ${r.status}`);
-            return data;
+function installOrUpdatePaper() {
+        const eula = document.getElementById('paperEulaConfirm');
+        if (!eula || !eula.checked) {
+            showToast('Read and accept the Minecraft EULA before installing Paper.', 'error');
+            return;
+        }
+        const button = document.getElementById('paperInstallButton');
+        if (button) button.disabled = true;
+        const progress = document.getElementById('paperUpdateProgress');
+        if (progress) progress.style.display = 'block';
+        fetch('/api/java/install', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ eula_accepted: true })
         })
-        .then(data => {
-            showToast(data.result || 'Paper request completed.', 'success');
-            setTimeout(() => {
-                loadJavaServer();
-                loadJavaOutput();
-            }, 700);
-        })
-        .catch(err => showToast(`Paper ${action} failed: ${err.message}`, 'error'));
+            .then(async r => {
+                const data = await r.json();
+                if (!r.ok) throw new Error(data.result || `HTTP ${r.status}`);
+                return data;
+            })
+            .then(data => {
+                showToast(data.result || 'Paper install/update started.', 'info');
+                pollPaperUpdateStatus();
+            })
+            .catch(error => {
+                if (button) button.disabled = false;
+                showToast(`Paper install/update failed: ${error.message}`, 'error');
+            });
 }
 
-function startJavaServer() {
-    javaServerAction('start');
-}
-
-function stopJavaServer() {
-    javaServerAction('stop');
-}
-
-function sendJavaCommand(event) {
-    event.preventDefault();
-    const input = document.getElementById('javaCommandInput');
-    const command = input ? input.value.trim() : '';
-    if (!command) return;
-    fetch('/api/java/command', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ command })
-    })
-        .then(async r => {
-            const data = await r.json();
-            if (!r.ok) throw new Error(data.result || `HTTP ${r.status}`);
-            return data;
-        })
-        .then(() => {
-            input.value = '';
-            loadJavaOutput();
-        })
-        .catch(err => showToast(`Paper command failed: ${err.message}`, 'error'));
+function pollPaperUpdateStatus() {
+        fetch('/api/java/update_status')
+            .then(r => {
+                if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                return r.json();
+            })
+            .then(state => {
+                const progress = document.getElementById('paperUpdateProgress');
+                const message = document.getElementById('paperUpdateMessage');
+                const percent = document.getElementById('paperUpdatePercent');
+                const bar = document.getElementById('paperUpdateBar');
+                const error = document.getElementById('paperUpdateError');
+                const button = document.getElementById('paperInstallButton');
+                if (progress && state.status !== 'idle') progress.style.display = 'block';
+                if (message) message.textContent = state.message || state.status;
+                if (percent) percent.textContent = `${state.progress}%`;
+                if (bar) bar.style.width = `${state.progress}%`;
+                if (error) error.textContent = state.error || '';
+                const active = ['preparing', 'downloading', 'stopping', 'installing', 'restarting'].includes(state.status);
+                if (button) button.disabled = active;
+                if (active) setTimeout(pollPaperUpdateStatus, 1200);
+                if (state.status === 'success' && lastPaperUpdateStatus !== 'success') {
+                    loadJavaServer();
+                    showToast(state.message, 'success');
+                }
+                lastPaperUpdateStatus = state.status;
+            })
+            .catch(error => console.error('Paper update status fetch failed:', error));
 }
 
 /* =========================================================================
@@ -1501,7 +1678,8 @@ function loadProperties() {
         </div>
     `;
 
-    fetch('/api/properties')
+    const endpoint = serverEdition === 'java' ? '/api/java/properties' : '/api/properties';
+    fetch(endpoint)
         .then(r => {
             if (!r.ok) throw new Error(`HTTP ${r.status} ${r.statusText}`);
             return r.json();
@@ -1511,7 +1689,7 @@ function loadProperties() {
             _allPropertiesCache = props;
             renderProperties(props);
             const serverNameProp = props.find(p => p.key === 'server-name');
-            if (serverNameProp && serverNameProp.value) {
+            if (serverEdition === 'bedrock' && serverNameProp && serverNameProp.value) {
                 window._currentServerName = serverNameProp.value;
                 const heroServerName = document.getElementById('heroServerName');
                 const heroMotdPreview = document.getElementById('heroMotdPreview');
@@ -1603,8 +1781,9 @@ function saveProperties() {
     const obj = {};
     formData.forEach((val, key) => { obj[key] = val; });
 
-    showToast("Saving properties and updating world config...", "info");
-    fetch('/api/properties', {
+    showToast(serverEdition === 'java' ? "Saving Paper server properties..." : "Saving properties and updating world config...", "info");
+    const endpoint = serverEdition === 'java' ? '/api/java/properties' : '/api/properties';
+    fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(obj)
@@ -2706,6 +2885,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initZentraHalftoneBackground();
     initTerminalKeyboard();
     initTabDragSelector();
+    syncServerEditionUI();
 
     // Determine initial tab from window.location.hash
     let initialTab = 'home';
@@ -2737,7 +2917,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     loadStatus();
-    loadAnnouncements();
+    if (serverEdition === 'bedrock') loadAnnouncements();
     loadProperties();
     pollLifecycleStatus();
     if (currentTab === 'console') {
@@ -2746,7 +2926,8 @@ document.addEventListener('DOMContentLoaded', () => {
         loadGodsEyeData();
     } else if (currentTab === 'java') {
         loadJavaServer();
-        loadJavaOutput();
+        loadLatestPaper();
+        pollPaperUpdateStatus();
     }
 
     initGameMasterArsenal();
@@ -2762,7 +2943,6 @@ document.addEventListener('DOMContentLoaded', () => {
             loadGodsEyeData();
         } else if (currentTab === 'java') {
             loadJavaServer();
-            loadJavaOutput();
         }
     }, pollInterval);
 });

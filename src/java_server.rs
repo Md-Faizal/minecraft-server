@@ -10,12 +10,15 @@ use tokio::process::{Child, Command};
 use tokio::sync::{mpsc, Mutex, RwLock};
 use tracing::{error, info};
 
+use crate::models::UpdateState;
+
 pub struct JavaServerManager {
     pub server_dir: PathBuf,
     pub paper_jar: PathBuf,
     child_process: Mutex<Option<Child>>,
     stdin_tx: Mutex<Option<mpsc::UnboundedSender<String>>>,
     pub console_buffer: RwLock<VecDeque<String>>,
+    pub update_state: RwLock<UpdateState>,
     lifecycle_lock: Mutex<()>,
 }
 
@@ -33,6 +36,7 @@ impl JavaServerManager {
             child_process: Mutex::new(None),
             stdin_tx: Mutex::new(None),
             console_buffer: RwLock::new(VecDeque::with_capacity(250)),
+            update_state: RwLock::new(UpdateState::default()),
             lifecycle_lock: Mutex::new(()),
         })
     }
@@ -194,6 +198,15 @@ impl JavaServerManager {
         }
         *self.stdin_tx.lock().await = None;
         Ok(())
+    }
+
+    pub async fn restart(self: &Arc<Self>) -> Result<(), String> {
+        if !self.is_running().await {
+            return Err("Paper is not running.".to_string());
+        }
+        self.stop().await?;
+        tokio::time::sleep(Duration::from_secs(1)).await;
+        self.start().await.map(|_| ())
     }
 
     pub async fn send_command(&self, command: &str) -> Result<(), String> {

@@ -2,14 +2,14 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Minecraft Bedrock Dashboard &bull; Remote Controller</title>
+    <title>Minecraft Server Manager</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
     <link rel="shortcut icon" href="/favicon.ico">
-    <link rel="stylesheet" href="/static/css/style.css?v=20261021_01">
+    <link rel="stylesheet" href="/static/css/style.css?v=20261021_02">
 </head>
 <body>
     <!-- Organic Wandering Halftone Canvas (Zentra Physics) -->
@@ -22,20 +22,29 @@
                 <div class="brand-logo-badge">⛏</div>
                 <div class="brand-meta">
                     <h2>Minecraft Manager</h2>
-                    <p id="navSubtext">Bedrock &amp; Java Controller</p>
+                    <p id="navSubtext">Server control center</p>
                 </div>
+            </div>
+
+            <div class="server-context-switcher" role="group" aria-label="Choose server edition">
+                <button type="button" class="server-context-btn active" data-server-context="bedrock" onclick="switchServerContext('bedrock')">
+                    <span class="server-context-icon">◆</span> Bedrock
+                </button>
+                <button type="button" class="server-context-btn" data-server-context="java" onclick="switchServerContext('java')">
+                    <span class="server-context-icon">☕</span> Java
+                </button>
             </div>
 
             <!-- Sliding Pill Navigation Switcher -->
             <div class="tab-switcher-pill" id="tabSwitcher">
                 <div class="tab-slider-pill" id="tabSliderPill"></div>
                 <button class="nav-tab-btn active" data-tab="home" onclick="switchZentraTab('home')">Home</button>
-                <button class="nav-tab-btn" data-tab="map" onclick="switchZentraTab('map')">🗺️ God's Eye</button>
+                <button class="nav-tab-btn" data-tab="map" data-edition="bedrock" onclick="switchZentraTab('map')">Map</button>
                 <button class="nav-tab-btn" data-tab="console" onclick="switchZentraTab('console')">Terminal</button>
-                <button class="nav-tab-btn" data-tab="java" onclick="switchZentraTab('java')">Java Server</button>
-                <button class="nav-tab-btn" data-tab="worlds" onclick="switchZentraTab('worlds')">Worlds</button>
-                <button class="nav-tab-btn" data-tab="players" onclick="switchZentraTab('players')">Players</button>
-                <button class="nav-tab-btn" data-tab="addons" onclick="switchZentraTab('addons')">Addons</button>
+                <button class="nav-tab-btn" data-tab="java" data-edition="java" onclick="switchZentraTab('java')">Paper</button>
+                <button class="nav-tab-btn" data-tab="worlds" data-edition="bedrock" onclick="switchZentraTab('worlds')">Worlds</button>
+                <button class="nav-tab-btn" data-tab="players" data-edition="bedrock" onclick="switchZentraTab('players')">Players</button>
+                <button class="nav-tab-btn" data-tab="addons" data-edition="bedrock" onclick="switchZentraTab('addons')">Addons</button>
                 <button class="nav-tab-btn" data-tab="properties" onclick="switchZentraTab('properties')">Properties</button>
                 <button class="nav-tab-btn" data-tab="update" onclick="switchZentraTab('update')">Update</button>
                 <button class="nav-tab-btn" data-tab="settings" onclick="switchZentraTab('settings')">Settings</button>
@@ -53,7 +62,7 @@
 
     <div class="app-wrapper">
         <!-- Global Lifecycle Countdown Banner (Appears during restart / stop / world swap) -->
-        <div id="lifecycleCountdownBanner" style="display:none; margin-bottom: 20px; background: linear-gradient(135deg, rgba(239, 68, 68, 0.12), rgba(245, 158, 11, 0.15)); border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 14px; padding: 14px 20px; align-items: center; justify-content: space-between; box-shadow: 0 4px 24px rgba(239, 68, 68, 0.12); flex-wrap: wrap; gap: 12px;">
+        <div id="lifecycleCountdownBanner" data-edition="bedrock" style="display:none; margin-bottom: 20px; background: linear-gradient(135deg, rgba(239, 68, 68, 0.12), rgba(245, 158, 11, 0.15)); border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 14px; padding: 14px 20px; align-items: center; justify-content: space-between; box-shadow: 0 4px 24px rgba(239, 68, 68, 0.12); flex-wrap: wrap; gap: 12px;">
             <div style="display:flex; align-items:center; gap:14px;">
                 <span style="font-size: 26px;">⏳</span>
                 <div>
@@ -75,10 +84,38 @@
 
         <!-- MAIN SPA CONTENT VIEWS -->
         <main id="spaContent">
+            <div class="page-context-heading">
+                <div>
+                    <p id="pageContextEyebrow">BEDROCK SERVER</p>
+                    <h1 id="pageContextTitle">Overview</h1>
+                    <p id="pageContextDescription">Status, controls, and server tools in one place.</p>
+                </div>
+                <div class="context-address">
+                    <span class="context-address-label">CONNECT</span>
+                    <strong id="contextServerAddress">Loading...</strong>
+                </div>
+            </div>
+
             <!-- 1. HOME VIEW -->
             <section id="viewHome" class="tab-content">
+                <div class="soft-card java-overview-card" id="javaHomeCard" style="display:none;">
+                    <div class="card-header-bar">
+                        <div class="card-title-group">
+                            <h3>Paper Java Edition</h3>
+                            <p>Separate Java world and runtime. Bedrock files and worlds stay untouched.</p>
+                        </div>
+                        <span class="metric-pill neutral" id="javaHomeState">Checking...</span>
+                    </div>
+                    <div class="metrics-grid">
+                        <div class="stat-box"><div class="stat-label">Installed Paper</div><div class="stat-value" id="javaHomeVersion">--</div></div>
+                        <div class="stat-box"><div class="stat-label">Players</div><div class="stat-value" id="javaHomePlayers">Use console</div></div>
+                        <div class="stat-box"><div class="stat-label">Java address</div><div class="stat-value" id="javaHomeAddress">TCP 25565</div></div>
+                    </div>
+                    <button class="zentra-btn secondary" type="button" onclick="switchZentraTab('update')">Install or update Paper</button>
+                </div>
+
                 <!-- Server Hero Branding Card -->
-                <div class="server-hero-card">
+                <div class="server-hero-card" data-edition="bedrock">
                     <div style="height: 190px; background: url('/static/img/server_banner.jpg') center/cover no-repeat; position: relative;">
                         <div style="position: absolute; inset: 0; background: linear-gradient(180deg, rgba(15,23,42,0.2) 0%, rgba(15,23,42,0.85) 100%);"></div>
                         <div style="position: absolute; bottom: 16px; left: 24px; right: 24px; display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 16px;">
@@ -120,7 +157,7 @@
                 </div>
 
                 <!-- Metrics Bar -->
-                <div class="metrics-grid">
+                <div class="metrics-grid" data-edition="bedrock">
                     <div class="stat-box">
                         <div class="stat-label">Active World</div>
                         <div class="stat-value" id="homeActiveWorld">--</div>
@@ -149,14 +186,14 @@
                         <span class="metric-pill" id="homeStatePill">Checking state...</span>
                     </div>
 
-                    <div class="actions-pill-grid">
-                        <button class="zentra-btn emerald" onclick="serverAction('start')">
+                    <div class="actions-pill-grid server-process-actions">
+                        <button class="zentra-btn emerald" id="homeStartBtn" data-process-action="start" onclick="serverAction('start')">
                             <span>▶</span> Start Server
                         </button>
-                        <button class="zentra-btn danger" onclick="openLifecycleModal('stop')">
+                        <button class="zentra-btn danger" id="homeStopBtn" data-process-action="stop" style="display:none;" onclick="serverAction('stop')">
                             <span>⏹</span> Stop Server
                         </button>
-                        <button class="zentra-btn primary" onclick="openLifecycleModal('restart')">
+                        <button class="zentra-btn primary" id="homeRestartBtn" data-process-action="restart" style="display:none;" onclick="serverAction('restart')">
                             <span>🔄</span> Restart Server
                         </button>
                     </div>
@@ -173,7 +210,7 @@
                 </div>
 
                 <!-- Smart Automated Announcements Card -->
-                <div class="soft-card" style="margin-top: 20px;">
+                <div class="soft-card" data-edition="bedrock" style="margin-top: 20px;">
                     <div class="card-header-bar" style="flex-wrap:wrap; gap:12px;">
                         <div class="card-title-group">
                             <h3>📢 Smart Automated Announcements</h3>
@@ -225,7 +262,7 @@
                 </div>
 
                 <!-- Fast Gamerules Manager Card -->
-                <div class="soft-card" style="margin-top: 20px;">
+                <div class="soft-card" data-edition="bedrock" style="margin-top: 20px;">
                     <div class="card-header-bar" style="flex-wrap:wrap; gap:12px;">
                         <div class="card-title-group">
                             <h3>🎮 Quick World Gamerules</h3>
@@ -300,7 +337,7 @@
             </section>
 
             <!-- 1.5. GOD'S EYE TACTICAL REAL-TIME SATELLITE MAP -->
-            <section id="viewMap" class="tab-content" style="display:none;">
+            <section id="viewMap" class="tab-content" data-edition="bedrock" style="display:none;">
                 <div class="godseye-container">
                     <!-- Top Reconnaissance HUD Bar -->
                     <div class="godseye-hud-bar">
@@ -451,8 +488,8 @@
                             <span class="tdot green"></span>
                         </div>
                         <div class="terminal-title">
-                            <span>bedrock_server &bull; stdin/stdout</span>
-                            <span class="terminal-badge" id="termConnBadge">● LIVE AT PORT 19132</span>
+                            <span id="terminalServerLabel">bedrock_server &bull; stdin/stdout</span>
+                            <span class="terminal-badge" id="termConnBadge">● OFFLINE</span>
                             <span style="font-size: 11px; color:#6e7681;" id="termLineCount">0 lines</span>
                         </div>
                         <div class="terminal-controls">
@@ -504,15 +541,17 @@
                         <button class="quick-cmd-btn" onclick="quickSendCommand('time set day')">time set day</button>
                         <button class="quick-cmd-btn" onclick="quickSendCommand('time set night')">time set night</button>
                         <button class="quick-cmd-btn" onclick="quickSendCommand('weather clear')">weather clear</button>
-                        <button class="quick-cmd-btn" onclick="quickSendCommand('gamerule showcoordinates true')">coords on</button>
-                        <button class="quick-cmd-btn" onclick="quickSendCommand('toggledownfall')">toggle rain</button>
+                        <button class="quick-cmd-btn" data-edition="bedrock" onclick="quickSendCommand('gamerule showcoordinates true')">coords on</button>
+                        <button class="quick-cmd-btn" data-edition="bedrock" onclick="quickSendCommand('toggledownfall')">toggle rain</button>
+                        <button class="quick-cmd-btn" data-edition="java" onclick="quickSendCommand('whitelist list')">whitelist list</button>
+                        <button class="quick-cmd-btn" data-edition="java" onclick="quickSendCommand('gamerule keepInventory true')">keep inventory</button>
                     </div>
 
                     <!-- Interactive Command Input with Arrow History & Autocomplete -->
                     <div class="terminal-input-bar">
                         <div class="autocomplete-box" id="autocompleteBox"></div>
-                        <span class="term-prompt-sym">bds&gt;</span>
-                        <input type="text" id="terminalCmdInput" class="term-input" placeholder="Type server command (e.g. gamemode creative @a, kick, tp)... [Up/Down for history]" autocomplete="off" spellcheck="false">
+                        <span class="term-prompt-sym" id="terminalPrompt">server&gt;</span>
+                        <input type="text" id="terminalCmdInput" class="term-input" placeholder="Type a server command..." autocomplete="off" spellcheck="false">
                         <button class="term-send-btn" onclick="sendConsoleCommand('terminalCmdInput')">Send ↵</button>
                     </div>
                 </div>
@@ -522,52 +561,54 @@
                 <div class="soft-card">
                     <div class="card-header-bar" style="flex-wrap:wrap; gap:12px;">
                         <div class="card-title-group">
-                            <h3>Paper Java Server</h3>
-                            <p>Separate Java world and process; Bedrock controls and files remain unchanged.</p>
+                            <h3>Paper server setup</h3>
+                            <p>Install or update the newest stable Paper build compatible with the Java runtime on this manager.</p>
                         </div>
                         <span class="metric-pill" id="javaServerStatus">Checking...</span>
                     </div>
 
-                    <div style="display:flex; flex-wrap:wrap; gap:10px; margin:16px 0;">
-                        <button class="zentra-btn emerald" type="button" onclick="startJavaServer()">Start Paper</button>
-                        <button class="zentra-btn danger" type="button" onclick="stopJavaServer()">Stop Paper</button>
-                        <button class="zentra-btn secondary" type="button" onclick="loadJavaServer()">Refresh status</button>
+                    <div class="metrics-grid">
+                        <div class="stat-box"><div class="stat-label">Installed Paper</div><div class="stat-value" id="javaPaperStatus">Not installed</div></div>
+                        <div class="stat-box"><div class="stat-label">Latest compatible Paper</div><div class="stat-value" id="javaLatestVersion">Checking...</div></div>
+                        <div class="stat-box"><div class="stat-label">Server address</div><div class="stat-value">TCP 25565</div></div>
                     </div>
 
-                    <div class="stat-box" style="margin-bottom:16px;">
-                        <div><strong>Java server folder</strong><p id="javaServerDirectory" style="margin:4px 0 0;">Loading...</p></div>
-                        <div style="margin-top:8px;"><strong>Paper jar:</strong> <span id="javaPaperStatus">Checking...</span></div>
-                        <div style="margin-top:4px;"><strong>EULA:</strong> <span id="javaEulaStatus">Checking...</span></div>
-                        <div style="margin-top:4px;"><strong>Player connection:</strong> <span id="javaServerAddress">TCP 25565</span></div>
-                        <div style="margin-top:4px;"><strong>Bedrock:</strong> <span id="javaBedrockStatus">Checking...</span></div>
+                    <div class="setup-path-row">
+                        <div><span class="stat-label">Java server folder</span><code id="javaServerDirectory">Loading...</code></div>
+                        <div><span class="stat-label">Previous jar backups</span><code id="javaBackupDirectory">Loading...</code></div>
                     </div>
 
-                    <div style="padding:14px 16px; border:1px solid rgba(56,189,248,0.25); border-radius:12px; background:rgba(56,189,248,0.06);">
-                        <strong>First-time setup</strong>
-                        <ol style="margin:8px 0 0 20px; color:var(--zentra-muted); line-height:1.7;">
-                            <li>Install a Java runtime compatible with your chosen Paper version (the Docker image includes Java 21).</li>
-                            <li>Download Paper from <a href="https://papermc.io/downloads/paper" target="_blank" rel="noopener noreferrer">the official Paper downloads page</a> and save it as <code>paper.jar</code> in the folder above.</li>
-                            <li>Review <a href="https://aka.ms/MinecraftEULA" target="_blank" rel="noopener noreferrer">the Minecraft EULA</a>. If you agree, create <code>eula.txt</code> in that folder with <code>eula=true</code>.</li>
-                            <li>Stop Bedrock first if you need to conserve the VM's memory. Both servers can run, but may overload a micro VM.</li>
-                        </ol>
+                    <div class="paper-install-notice">
+                        <strong>Before installing</strong>
+                        <p>Paper will be downloaded from PaperMC, checksum-verified, then installed. Existing server jar files are backed up automatically. If Paper is running, it will be stopped cleanly and restarted after the update.</p>
+                        <p>The manager detects its Java runtime and offers the newest compatible stable Paper version. Java 21 supports current 1.20–1.21 releases; newer Minecraft releases may require Java 25 or later.</p>
                     </div>
-                </div>
 
-                <div class="soft-card" style="margin-top:20px;">
-                    <div class="card-header-bar">
-                        <div class="card-title-group"><h3>Paper Console</h3><p>Output is kept separate from the Bedrock terminal.</p></div>
-                        <button class="zentra-btn secondary" type="button" onclick="loadJavaOutput()">Refresh logs</button>
+                    <label class="eula-confirm-row">
+                        <input type="checkbox" id="paperEulaConfirm">
+                        <span>I have read and agree to the <a href="https://aka.ms/MinecraftEULA" target="_blank" rel="noopener noreferrer">Minecraft EULA</a>.</span>
+                    </label>
+
+                    <div class="paper-update-actions">
+                        <button class="zentra-btn emerald" type="button" id="paperInstallButton" onclick="installOrUpdatePaper()">Install latest Paper</button>
+                        <button class="zentra-btn secondary" type="button" onclick="loadJavaServer(); loadLatestPaper(); pollPaperUpdateStatus()">Refresh status</button>
                     </div>
-                    <pre id="javaConsoleOutput" style="height:360px; overflow:auto; white-space:pre-wrap; background:#09090b; color:#d4d4d8; padding:14px; border-radius:10px; font:12px 'Fira Code',monospace;">Paper console output will appear here.</pre>
-                    <form onsubmit="sendJavaCommand(event)" style="display:flex; gap:8px; margin-top:10px;">
-                        <input id="javaCommandInput" class="zentra-input" type="text" placeholder="Enter a Paper console command" autocomplete="off">
-                        <button class="zentra-btn primary" type="submit">Send</button>
-                    </form>
+
+                    <div class="update-progress-card" id="paperUpdateProgress" style="display:none;">
+                        <div class="update-progress-labels"><span id="paperUpdateMessage">Checking...</span><span id="paperUpdatePercent">0%</span></div>
+                        <div class="update-progress-track"><div id="paperUpdateBar" class="update-progress-fill"></div></div>
+                        <p id="paperUpdateError" class="update-error"></p>
+                    </div>
+
+                    <div class="setup-path-row">
+                        <div><span class="stat-label">EULA agreement</span><strong id="javaEulaStatus">Not yet recorded</strong></div>
+                        <div><span class="stat-label">Other edition status</span><strong id="javaBedrockStatus">Checking...</strong></div>
+                    </div>
                 </div>
             </section>
 
             <!-- 3. WORLDS VIEW -->
-            <section id="viewWorlds" class="tab-content" style="display:none;">
+            <section id="viewWorlds" class="tab-content" data-edition="bedrock" style="display:none;">
                 <div class="soft-card">
                     <div class="card-header-bar">
                         <div class="card-title-group">
@@ -614,7 +655,7 @@
             </section>
 
             <!-- 4. PLAYERS VIEW -->
-            <section id="viewPlayers" class="tab-content" style="display:none;">
+            <section id="viewPlayers" class="tab-content" data-edition="bedrock" style="display:none;">
                 <!-- Gameplay Cheats Controller -->
                 <div class="soft-card" style="margin-bottom: 20px;">
                     <div class="card-header-bar" style="flex-wrap:wrap; gap:12px;">
@@ -990,7 +1031,7 @@
             </section>
 
             <!-- 5. ADDONS VIEW -->
-            <section id="viewAddons" class="tab-content" style="display:none;">
+            <section id="viewAddons" class="tab-content" data-edition="bedrock" style="display:none;">
                 <div class="soft-card">
                     <div class="card-header-bar">
                         <div class="card-title-group">
@@ -1022,8 +1063,8 @@
                 <div class="soft-card">
                     <div class="card-header-bar" style="flex-wrap:wrap; gap:12px;">
                         <div class="card-title-group">
-                            <h3>Server Properties Editor</h3>
-                            <p>Configures server.properties (automatically saves to active world configuration)</p>
+                            <h3 id="propertiesPageTitle">Server Properties</h3>
+                            <p id="propertiesPageDescription">Common settings for the selected server edition.</p>
                         </div>
                         <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
                             <input type="text" id="propSearchInput" class="zentra-input" placeholder="🔍 Search properties..." oninput="filterProperties(this.value)" style="width: 200px; padding: 7px 12px; font-size: 12px;">
@@ -1040,7 +1081,7 @@
 
             <!-- 7. UPDATE VIEW -->
             <section id="viewUpdate" class="tab-content" style="display:none;">
-                <div class="soft-card">
+                <div class="soft-card" data-edition="bedrock">
                     <div class="card-header-bar">
                         <div class="card-title-group">
                             <h3>Bedrock Dedicated Server Updater</h3>
@@ -1075,6 +1116,17 @@
                             <div id="updateProgressBar" style="width:0%; height:100%; background:var(--zentra-green); transition: width 0.3s ease;"></div>
                         </div>
                     </div>
+                </div>
+                <div class="soft-card" data-edition="java">
+                    <div class="card-header-bar">
+                        <div class="card-title-group">
+                            <h3>Paper installation &amp; updates</h3>
+                            <p>Install the latest stable Paper build with one click. Existing jars are backed up before replacement.</p>
+                        </div>
+                        <span class="metric-pill" id="javaUpdateSummary">Checking Paper...</span>
+                    </div>
+                    <p style="color:var(--zentra-muted); margin-bottom:16px;">The manager detects its Java runtime and checks for the newest compatible stable Paper build. Downloads are verified against PaperMC's published SHA-256 checksum; update controls are also available on the Java Server page.</p>
+                    <button class="zentra-btn emerald" type="button" onclick="switchZentraTab('java')">Open Paper setup</button>
                 </div>
             </section>
 
@@ -1392,6 +1444,6 @@
     <!-- Toast Container -->
     <div id="toastContainer"></div>
 
-    <script src="/static/js/app.js?v=20261021_01"></script>
+    <script src="/static/js/app.js?v=20261021_02"></script>
 </body>
 </html>

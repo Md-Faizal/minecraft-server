@@ -30,17 +30,12 @@ In recent releases of the Minecraft Bedrock Dedicated Server, NetherNet (WebRTC-
 
 ## ☕ Paper Java Server
 
-The dashboard now has a separate **Java Server** tab for starting/stopping Paper, viewing its console, and sending commands. Paper data lives in a separate `java/` folder under the manager's data directory; it does not modify Bedrock worlds or settings.
+The dashboard has a separate **Java Server** page for Paper installation, updates, lifecycle controls, and console commands. Paper data lives in a separate `java/` folder under the manager's data directory; it does not modify Bedrock worlds or settings.
 
-1. Install a Java runtime compatible with the Paper version you download. For the Docker image, Java 21 is included. For a systemd install on Ubuntu, for example:
-   ```bash
-   sudo apt-get update
-   sudo apt-get install -y openjdk-21-jre-headless
-   ```
-2. Download a Paper server jar from [Paper's official downloads page](https://papermc.io/downloads/paper) and save it as `paper.jar` in the `java/` directory shown in the dashboard.
-3. Read and accept the [Minecraft EULA](https://aka.ms/MinecraftEULA) yourself. Only if you agree, create `eula.txt` in that same directory containing `eula=true`.
-4. Start Paper from the **Java Server** tab. The manager uses a conservative 256 MB initial / 512 MB maximum Java heap for small VMs.
-5. Allow inbound **TCP 25565** in the cloud firewall and host firewall. Bedrock continues to use its existing UDP ports.
+1. Install a Java runtime on the manager host. Java 21 supports current Minecraft 1.20–1.21 Paper releases; newer Minecraft releases may require Java 25 or later. The manager detects the installed Java version and offers the newest compatible stable Paper build.
+2. Open **Java Server**, read and accept the [Minecraft EULA](https://aka.ms/MinecraftEULA), then select **Install latest Paper**. The manager downloads the official PaperMC release, verifies its published SHA-256 checksum, and installs it. Updates preserve the previous jar in the `java/backups/` directory.
+3. Start Paper from the dashboard. The manager uses a conservative 256 MB initial / 512 MB maximum Java heap for small VMs.
+4. Allow inbound **TCP 25565** in the cloud firewall and host firewall. Bedrock continues to use its existing UDP ports.
 
 Bedrock remains configured to auto-start by default for backwards compatibility; Java auto-start is off by default. For Java-only mode, set `MC_AUTO_START_BEDROCK=false` and `MC_AUTO_START_JAVA=true` in the manager's service environment (or in the Compose `.env` file), then restart the manager. If you keep Bedrock auto-start enabled, stop it from its existing controls before starting Paper to conserve memory. Both processes can be run, but a micro VM may run out of memory.
 
