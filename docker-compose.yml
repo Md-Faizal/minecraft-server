@@ -13,7 +13,7 @@ services:
       - /home/ubuntu/minecraft-server:/data
     environment:
       - PORT=5000
-      # The control API is reached through the my-mac SSH tunnel, not public ingress.
+      # Nginx on pro serves the public site; keep the control API loopback-only.
       - HOST=127.0.0.1
       - MINECRAFT_BASE_DIR=/data
       # Start neither edition automatically on the memory-constrained GCP VM.

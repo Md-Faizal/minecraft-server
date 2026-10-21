@@ -2216,6 +2216,7 @@ mod paper_version_tests {
         assert_eq!(required_java_for_paper("1.19.4"), 17);
         assert_eq!(required_java_for_paper("1.16.5"), 16);
         assert_eq!(required_java_for_paper("26.1"), 25);
+        assert_eq!(required_java_for_paper("26.3"), 25);
     }
 
     #[test]
