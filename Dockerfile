@@ -1,9 +1,9 @@
 # Multi-stage production container for Bedrock Minecraft Server & Rust Manager
-FROM rust:1.82-bookworm AS builder
+FROM rust:1.88-bookworm AS builder
 WORKDIR /app
 COPY Cargo.toml Cargo.lock ./
 COPY src/ ./src/
-RUN cargo build --release
+RUN CARGO_PROFILE_RELEASE_LTO=false CARGO_PROFILE_RELEASE_CODEGEN_UNITS=16 cargo build --release -j 1
 
 FROM ubuntu:24.04 AS runner
 ENV DEBIAN_FRONTEND=noninteractive

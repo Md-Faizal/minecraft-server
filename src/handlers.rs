@@ -23,6 +23,8 @@ pub async fn index_page() -> Html<String> {
     // Try to read templates/index.html, fallback to basic dashboard if not found
     if let Ok(content) = fs::read_to_string("templates/index.html") {
         Html(content)
+    } else if let Ok(content) = fs::read_to_string("/app/templates/index.html") {
+        Html(content)
     } else if let Ok(content) = fs::read_to_string("/home/ubuntu/stack/games/minecraft/templates/index.html") {
         Html(content)
     } else {

@@ -911,6 +911,19 @@ function serverAction(action) {
         openLifecycleModal(action);
         return;
     }
+    if (action === 'start') {
+        const otherEditionRunning = serverEdition === 'java'
+            ? Boolean(lastBedrockStatus && lastBedrockStatus.server_running)
+            : Boolean(lastJavaStatus && lastJavaStatus.running);
+        if (otherEditionRunning) {
+            const otherEdition = serverEdition === 'java' ? 'Bedrock' : 'Paper';
+            const selectedEdition = serverEdition === 'java' ? 'Paper' : 'Bedrock';
+            const accepted = window.confirm(
+                `${otherEdition} is already running. This VM has about 1 GiB RAM; running both servers may cause severe lag or an out-of-memory shutdown. Start ${selectedEdition} anyway?`
+            );
+            if (!accepted) return;
+        }
+    }
     showToast(`Sending ${action} request to ${serverEdition === 'java' ? 'Paper' : 'Bedrock'}...`, 'info');
     const endpoint = serverEdition === 'java'
         ? `/api/java/${action}`

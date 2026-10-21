@@ -1,0 +1,13 @@
+[Unit]
+Description=SSH tunnel to the Minecraft manager on the GCP pro node
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=ubuntu
+ExecStart=/usr/bin/ssh -F /home/ubuntu/.ssh/config -NT -o BatchMode=yes -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -L 127.0.0.1:5000:127.0.0.1:5000 prometheus
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

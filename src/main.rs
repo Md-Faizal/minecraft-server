@@ -48,6 +48,8 @@ async fn main() {
     // Static dir detection
     let static_dir = if Path::new("static").exists() {
         "static"
+    } else if Path::new("/app/static").exists() {
+        "/app/static"
     } else if Path::new("/home/ubuntu/stack/games/minecraft/static").exists() {
         "/home/ubuntu/stack/games/minecraft/static"
     } else {

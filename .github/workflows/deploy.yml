@@ -8,13 +8,13 @@ on:
 
 concurrency:
   group: deploy-minecraft-manager
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build-and-deploy:
     name: Build & Deploy
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 30
 
     steps:
       - name: Checkout Repository
@@ -25,37 +25,54 @@ jobs:
         id: filter
         with:
           filters: |
-            rust:
+            manager:
               - 'src/**'
               - 'Cargo.toml'
               - 'Cargo.lock'
-              - '.github/workflows/deploy.yml'
-            frontend:
+              - 'Dockerfile'
+              - 'Dockerfile.runtime'
+              - 'docker-compose.yml'
+              - 'deploy/**'
               - 'static/**'
               - 'templates/**'
+              - '.github/workflows/deploy.yml'
 
       - name: Setup Rust Toolchain
-        if: steps.filter.outputs.rust == 'true' || github.event_name == 'workflow_dispatch'
+        if: steps.filter.outputs.manager == 'true' || github.event_name == 'workflow_dispatch'
         uses: dtolnay/rust-toolchain@stable
 
       - name: Setup Mold Linker
-        if: steps.filter.outputs.rust == 'true' || github.event_name == 'workflow_dispatch'
+        if: steps.filter.outputs.manager == 'true' || github.event_name == 'workflow_dispatch'
         uses: rui314/setup-mold@v1
 
       - name: Rust Cache
-        if: steps.filter.outputs.rust == 'true' || github.event_name == 'workflow_dispatch'
+        if: steps.filter.outputs.manager == 'true' || github.event_name == 'workflow_dispatch'
         uses: Swatinem/rust-cache@v2
         with:
           cache-all-crates: "true"
 
       - name: Build Release Binary
-        if: steps.filter.outputs.rust == 'true' || github.event_name == 'workflow_dispatch'
+        if: steps.filter.outputs.manager == 'true' || github.event_name == 'workflow_dispatch'
         env:
           RUSTFLAGS: "-C link-arg=-fuse-ld=mold"
-        run: cargo build --release
+          CARGO_PROFILE_RELEASE_LTO: "false"
+          CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "16"
+          CARGO_BUILD_JOBS: "1"
+        run: cargo build --release -j 1
 
-      - name: 🔌 Setup SSH & Deploy to Ubuntu
-        if: steps.filter.outputs.rust == 'true' || steps.filter.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch'
+      - name: Build Runtime Image
+        if: steps.filter.outputs.manager == 'true' || github.event_name == 'workflow_dispatch'
+        run: |
+          set -euo pipefail
+          mkdir -p .manager-image-build
+          cp Dockerfile.runtime .manager-image-build/Dockerfile
+          cp target/release/minecraft-server-manager .manager-image-build/
+          cp -r static templates .manager-image-build/
+          docker build -t minecraft-server-manager:latest .manager-image-build
+          docker save minecraft-server-manager:latest | gzip -1 > minecraft-manager-image.tar.gz
+
+      - name: Deploy to GCP pro
+        if: steps.filter.outputs.manager == 'true' || github.event_name == 'workflow_dispatch'
         env:
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_USER: ${{ secrets.SSH_USER || 'ubuntu' }}
@@ -65,18 +82,24 @@ jobs:
           set -euo pipefail
 
           if [ -z "$SSH_KEY" ]; then
-            echo "::error::SSH_KEY secret is missing! Please configure in GitHub Repository Settings."
+            echo "::error::SSH_KEY secret is missing."
             exit 1
           fi
           if [ -z "$SSH_HOST" ]; then
-            echo "::error::SSH_HOST secret is missing! Please configure in GitHub Repository Settings."
+            echo "::error::SSH_HOST must be set to the static external IP of the GCP pro VM."
+            exit 1
+          fi
+          if [ "$SSH_HOST" = "68.233.115.138" ]; then
+            echo "::error::SSH_HOST still points to my-mac. Set it to the GCP pro VM's static external IP."
+            exit 1
+          fi
+          if getent ahostsv4 "$SSH_HOST" | awk '{print $1}' | grep -qx '68.233.115.138'; then
+            echo "::error::SSH_HOST resolves to my-mac. Set it to the GCP pro VM's static external IP."
             exit 1
           fi
 
-          # 1. Setup SSH Directory & Key (Bloomberg Terminal standard)
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
-
           if echo "$SSH_KEY" | grep -q "^LS0t"; then
             echo "$SSH_KEY" | base64 -d > ~/.ssh/deploy_key
           elif echo "$SSH_KEY" | grep -q "BEGIN"; then
@@ -105,18 +128,7 @@ jobs:
           EOF
           chmod 600 ~/.ssh/config
 
-          TARGET_DIR="/home/ubuntu/stack/games/minecraft"
-
-          echo "🚀 Step 1: Syncing static assets and templates via rsync..."
-          rsync -avz static templates production:"$TARGET_DIR/"
-
-          if [ "${{ steps.filter.outputs.rust }}" = "true" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "📦 Step 2: Syncing compiled Rust binary via rsync..."
-            rsync -avz target/release/minecraft-server-manager production:"$TARGET_DIR/minecraft-server-manager.new"
-
-            echo "🚀 Step 3: Activating binary & reloading mc-manager..."
-            ssh production "chmod +x $TARGET_DIR/minecraft-server-manager.new && mv $TARGET_DIR/minecraft-server-manager.new $TARGET_DIR/minecraft-server-manager && sudo systemctl restart mc-manager"
-          fi
-
-          echo "🔍 Step 4: Verifying service health..."
-          ssh production "sleep 2 && curl -fsS http://127.0.0.1:5000/api/status && echo '✅ Deployment verified healthy!'"
+          TARGET_DIR="/home/ubuntu/minecraft-deploy"
+          ssh production "mkdir -p '$TARGET_DIR'"
+          rsync -av --partial docker-compose.yml deploy/deploy-manager-image.sh minecraft-manager-image.tar.gz production:"$TARGET_DIR/"
+          ssh production "chmod +x '$TARGET_DIR/deploy-manager-image.sh' && bash '$TARGET_DIR/deploy-manager-image.sh' '$TARGET_DIR/minecraft-manager-image.tar.gz'"

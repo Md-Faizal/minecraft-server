@@ -11,20 +11,19 @@ services:
     volumes:
       # Persistent worlds, server.properties, backups, and Bedrock binaries
       - /home/ubuntu/minecraft-server:/data
-      - ./data:/data/manager_data
     environment:
       - PORT=5000
-      - HOST=0.0.0.0
-      # Set to false for Java-only mode so Bedrock does not auto-start on manager restarts.
-      - MC_AUTO_START_BEDROCK=${MC_AUTO_START_BEDROCK:-true}
-      # Set to true to auto-start Paper after manager restarts.
+      # The control API is reached through the my-mac SSH tunnel, not public ingress.
+      - HOST=127.0.0.1
+      - MINECRAFT_BASE_DIR=/data
+      # Start neither edition automatically on the memory-constrained GCP VM.
+      - MC_AUTO_START_BEDROCK=${MC_AUTO_START_BEDROCK:-false}
       - MC_AUTO_START_JAVA=${MC_AUTO_START_JAVA:-false}
     deploy:
       resources:
         limits:
-          # Prevents BDS from consuming all RAM during chunk gen (causes kernel page-swap = chunk stall)
-          # Adjust to ~75% of your total host RAM
-          memory: 2G
+          # Leave memory for the host OS; warn before starting both editions.
+          memory: 768M
           cpus: '2.0'
         reservations:
-          memory: 350M
+          memory: 256M
