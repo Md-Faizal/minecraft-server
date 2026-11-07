@@ -955,10 +955,35 @@ function loadJavaServer() {
             const status = document.getElementById('javaServerStatus');
             lastJavaStatus = data;
             renderSelectedServerStatus();
+            pollWarfareGateway();
         })
         .catch(err => {
             const status = document.getElementById('javaServerStatus');
             if (status) status.textContent = `Unavailable: ${err.message}`;
+            pollWarfareGateway();
+        });
+}
+
+function pollWarfareGateway() {
+    const pill = document.getElementById('warfareGatewayPill');
+    if (pill) pill.textContent = 'Probing...';
+    fetch('/api/warfare/status')
+        .then(r => r.json())
+        .then(data => {
+            if (pill) {
+                if (data.tunnel_connected) {
+                    pill.textContent = '● Tunnel Active';
+                    pill.style.background = 'rgba(16,185,129,0.2)';
+                    pill.style.color = '#10b981';
+                } else {
+                    pill.textContent = '○ Gateway Standby';
+                    pill.style.background = 'rgba(234,179,8,0.2)';
+                    pill.style.color = '#f59e0b';
+                }
+            }
+        })
+        .catch(_ => {
+            if (pill) pill.textContent = 'Gateway Standby';
         });
 }
 
