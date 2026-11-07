@@ -964,19 +964,19 @@ function loadJavaServer() {
         });
 }
 
-function pollTunnelStatus() {
-    const pill = document.getElementById('tunnelGatewayPill');
-    const addrEl = document.getElementById('tunnelPublicAddr');
-    const ctrlEl = document.getElementById('tunnelControlPort');
-    const modeEl = document.getElementById('tunnelModeLabel');
+        function pollTunnelStatus() {
+            const pill = document.getElementById('tunnelGatewayPill');
+            const addrEl = document.getElementById('tunnelPublicAddr');
+            const ctrlEl = document.getElementById('tunnelControlPort');
+            const modeEl = document.getElementById('tunnelModeLabel');
 
-    if (pill) pill.textContent = 'Probing...';
-    fetch('/api/tunnel/status')
-        .then(r => r.json())
-        .then(data => {
-            if (addrEl && data.public_host) addrEl.textContent = `${data.public_host}:${data.public_port}`;
-            if (ctrlEl && data.control_port) ctrlEl.textContent = `TCP ${data.control_port}`;
-            if (modeEl && data.mode) modeEl.textContent = data.mode;
+                    if (pill) pill.textContent = 'Probing...';
+                    fetch('/api/tunnel/status')
+                        .then(r => r.json())
+                        .then(data => {
+                            if (addrEl && data.public_host) addrEl.textContent = `${data.public_host}:${data.public_port}`;
+                            if (ctrlEl && data.control_port) ctrlEl.textContent = `TCP ${data.control_port}`;
+                            if (modeEl && data.mode) modeEl.textContent = data.mode;
 
             if (pill) {
                 if (data.tunnel_active) {
@@ -990,10 +990,10 @@ function pollTunnelStatus() {
                 }
             }
         })
-        .catch(_ => {
+        .catch (_ => {
             if (pill) pill.textContent = 'Standby';
         });
-}
+    }
 
     function loadLatestPaper() {
         const latest = document.getElementById('javaLatestVersion');
