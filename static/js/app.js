@@ -955,36 +955,48 @@ function loadJavaServer() {
             const status = document.getElementById('javaServerStatus');
             lastJavaStatus = data;
             renderSelectedServerStatus();
-            pollWarfareGateway();
+            pollTunnelStatus();
         })
         .catch(err => {
             const status = document.getElementById('javaServerStatus');
             if (status) status.textContent = `Unavailable: ${err.message}`;
-            pollWarfareGateway();
+            pollTunnelStatus();
         });
 }
 
-function pollWarfareGateway() {
-    const pill = document.getElementById('warfareGatewayPill');
+function pollTunnelStatus() {
+    const pill = document.getElementById('tunnelGatewayPill');
+    const addrEl = document.getElementById('tunnelPublicAddr');
+    const ctrlEl = document.getElementById('tunnelControlPort');
+    const modeEl = document.getElementById('tunnelModeLabel');
+
     if (pill) pill.textContent = 'Probing...';
-    fetch('/api/warfare/status')
+    fetch('/api/tunnel/status')
         .then(r => r.json())
         .then(data => {
+            if (addrEl && data.public_host) addrEl.textContent = `${data.public_host}:${data.public_port}`;
+            if (ctrlEl && data.control_port) ctrlEl.textContent = `TCP ${data.control_port}`;
+            if (modeEl && data.mode) modeEl.textContent = data.mode;
+
             if (pill) {
-                if (data.tunnel_connected) {
-                    pill.textContent = '● Tunnel Active';
+                if (data.tunnel_active) {
+                    pill.textContent = '● Remote Node Connected';
                     pill.style.background = 'rgba(16,185,129,0.2)';
                     pill.style.color = '#10b981';
                 } else {
-                    pill.textContent = '○ Gateway Standby';
+                    pill.textContent = '○ Ingress Standby';
                     pill.style.background = 'rgba(234,179,8,0.2)';
                     pill.style.color = '#f59e0b';
                 }
             }
         })
         .catch(_ => {
-            if (pill) pill.textContent = 'Gateway Standby';
+            if (pill) pill.textContent = 'Standby';
         });
+}
+
+function pollWarfareGateway() {
+    pollTunnelStatus();
 }
 
 function loadLatestPaper() {

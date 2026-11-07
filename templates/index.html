@@ -558,39 +558,28 @@
             </section>
 
             <section id="viewJava" class="tab-content" style="display:none;">
-                <!-- NEXUS WARFARE & REVERSE TUNNEL GATEWAY -->
+                <!-- NEXUS FLEET REVERSE TUNNEL GATEWAY -->
                 <div class="soft-card" style="border-left: 4px solid var(--zentra-indigo, #6366f1); margin-bottom: 24px;">
                     <div class="card-header-bar" style="flex-wrap:wrap; gap:12px;">
                         <div class="card-title-group">
                             <h3 style="display:flex; align-items:center; gap:8px;">
-                                <span style="color:#ef4444;">⚔️</span> Nexus Warfare Fleet Gateway (Forge 1.20.1)
+                                <span style="color:#6366f1;">🌐</span> Fleet Reverse Tunnel Gateway
                             </h3>
-                            <p>Low-latency reverse tunnel gateway routing public players on <code>mine.faizal.uk:25565</code> directly to the bare-metal Zorin host.</p>
+                            <p>Low-latency reverse TCP gateway routing public player traffic from this cloud ingress node to your designated remote or bare-metal server node.</p>
                         </div>
-                        <span class="metric-pill" id="warfareGatewayPill" style="background:rgba(99,102,241,0.15); color:#818cf8;">Checking Gateway...</span>
+                        <span class="metric-pill" id="tunnelGatewayPill" style="background:rgba(99,102,241,0.15); color:#818cf8;">Checking Gateway...</span>
                     </div>
 
                     <div class="metrics-grid">
-                        <div class="stat-box"><div class="stat-label">Edge Ingress Node</div><div class="stat-value" style="font-size:1.1rem;">pro (GCP e2-micro)</div></div>
-                        <div class="stat-box"><div class="stat-label">Public Game Port</div><div class="stat-value" style="font-size:1.1rem; color:#10b981;">mine.faizal.uk:25565</div></div>
-                        <div class="stat-box"><div class="stat-label">Control Link Port</div><div class="stat-value" style="font-size:1.1rem;">TCP 25560 (Yamux/TLS)</div></div>
-                        <div class="stat-box"><div class="stat-label">Secondary Bare-Metal Host</div><div class="stat-value" style="font-size:1.1rem;">Zorin OS Headless (2.8GB Heap)</div></div>
+                        <div class="stat-box"><div class="stat-label">Public Ingress Address</div><div class="stat-value" id="tunnelPublicAddr" style="font-size:1.1rem; color:#10b981;">Checking...</div></div>
+                        <div class="stat-box"><div class="stat-label">Control Link Port</div><div class="stat-value" id="tunnelControlPort" style="font-size:1.1rem;">TCP 25560</div></div>
+                        <div class="stat-box"><div class="stat-label">Tunnel Engine</div><div class="stat-value" style="font-size:1.1rem;">Nexus CLI (`nexus tunnel`)</div></div>
+                        <div class="stat-box"><div class="stat-label">Ingress Mode</div><div class="stat-value" id="tunnelModeLabel" style="font-size:1.1rem;">Standby</div></div>
                     </div>
 
-                    <div style="background: rgba(15,23,42,0.6); padding: 14px 18px; border-radius: 8px; margin: 16px 0; border: 1px solid rgba(255,255,255,0.08);">
-                        <strong style="color:#f8fafc; font-size:0.95rem;">Active Military Warfare Mods</strong>
-                        <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;">
-                            <span style="background:rgba(239,68,68,0.2); color:#fca5a5; padding:3px 10px; border-radius:4px; font-size:0.85rem;">✈️ Modern Fighters (F-16 &amp; Su-27)</span>
-                            <span style="background:rgba(249,115,22,0.2); color:#fdba74; padding:3px 10px; border-radius:4px; font-size:0.85rem;">🎯 Homing Missiles (Radar Lock)</span>
-                            <span style="background:rgba(234,179,8,0.2); color:#fde047; padding:3px 10px; border-radius:4px; font-size:0.85rem;">🚀 Ballistix ICBMs &amp; SAM Silos</span>
-                            <span style="background:rgba(16,185,129,0.2); color:#6ee7b7; padding:3px 10px; border-radius:4px; font-size:0.85rem;">🔫 TaCZ Firearms &amp; Optics</span>
-                            <span style="background:rgba(59,130,246,0.2); color:#93c5fd; padding:3px 10px; border-radius:4px; font-size:0.85rem;">⚡ ModernFix &amp; FerriteCore</span>
-                        </div>
-                    </div>
-
-                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
-                        <span style="color:var(--zentra-muted); font-size:0.85rem;">Tunnel transport managed by <code>nexus tunnel</code> CLI client. Direct LAN bypass active on 192.168.x.x (&lt;1ms ping).</span>
-                        <button class="zentra-btn secondary" type="button" onclick="pollWarfareGateway()">Check Tunnel Link</button>
+                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-top:16px;">
+                        <span style="color:var(--zentra-muted); font-size:0.85rem;">Managed via <code>nexus tunnel listen</code> on this node and <code>nexus tunnel connect</code> on the target server.</span>
+                        <button class="zentra-btn secondary" type="button" onclick="pollTunnelStatus()">Check Tunnel Link</button>
                     </div>
                 </div>
 

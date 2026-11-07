@@ -157,33 +157,32 @@ pub async fn api_java_status(State(mgr): State<Arc<ServerManager>>) -> Json<Valu
     }))
 }
 
-pub async fn api_warfare_status() -> Json<Value> {
-    let tunnel_edge_active = tokio::net::TcpStream::connect("127.0.0.1:25565").await.is_ok();
+pub async fn api_tunnel_status() -> Json<Value> {
+    let tunnel_port = std::env::var("MC_TUNNEL_PORT")
+        .ok()
+        .and_then(|p| p.parse::<u16>().ok())
+        .unwrap_or(25565);
+    let control_port = std::env::var("MC_CONTROL_PORT")
+        .ok()
+        .and_then(|p| p.parse::<u16>().ok())
+        .unwrap_or(25560);
+    let public_domain = std::env::var("MC_PUBLIC_DOMAIN")
+        .unwrap_or_else(|_| "mine.faizal.uk".to_string());
+
+    let probe_addr = format!("127.0.0.1:{}", tunnel_port);
+    let is_connected = tokio::net::TcpStream::connect(&probe_addr).await.is_ok();
+
     Json(json!({
-        "warfare_enabled": true,
-        "gateway_node": "pro (GCP e2-micro)",
-        "public_host": "mine.faizal.uk",
-        "public_port": 25565,
-        "control_port": 25560,
-        "tunnel_connected": tunnel_edge_active,
-        "target_node": "Secondary Bare-Metal PC (Zorin OS 18.1 Headless)",
-        "hardware_profile": "Intel Core i3-6100 (2C/4T) | 2.8 GB JVM Heap",
-        "active_mods": [
-            "Immersive Aircraft (IA)",
-            "Modern Fighters [IA] (F-16 & Su-27)",
-            "Immersive Aircraft: Homing Missiles",
-            "Ballistix Forge 1.20.1 (ICBMs & SAM Turrets)",
-            "Electrodynamics",
-            "Timeless and Classics Zero (TaCZ)",
-            "ModernFix & FerriteCore"
-        ],
-        "latency_optimizations": [
-            "Linux BBR Congestion Control",
-            "FQ Queue Discipline",
-            "TCP_NODELAY Zero-Buffer Latency",
-            "G1GC Pause Millis: 25ms"
-        ]
+        "tunnel_active": is_connected,
+        "public_host": public_domain,
+        "public_port": tunnel_port,
+        "control_port": control_port,
+        "mode": if is_connected { "Remote Node Connected" } else { "Ingress Standby" }
     }))
+}
+
+pub async fn api_warfare_status() -> Json<Value> {
+    api_tunnel_status().await
 }
 
 pub async fn api_java_start(

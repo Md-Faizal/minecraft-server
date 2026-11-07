@@ -77,6 +77,7 @@ async fn main() {
         .route("/api/java/command", post(handlers::api_java_command))
         .route("/api/java/output", get(handlers::api_java_output))
         .route("/api/warfare/status", get(handlers::api_warfare_status))
+        .route("/api/tunnel/status", get(handlers::api_tunnel_status))
         .route("/api/java/properties", get(handlers::api_java_properties_get).post(handlers::api_java_properties_post))
         .route("/api/java/latest", get(handlers::api_java_latest))
         .route("/api/java/install", post(handlers::api_java_install))
