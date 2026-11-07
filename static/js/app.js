@@ -255,7 +255,7 @@ function initTabDragSelector() {
             hasDraggedTabs = true;
             isDraggingTabs = true;
             switcher.classList.add('dragging');
-            try { switcher.setPointerCapture(pointerId); } catch (_) {}
+            try { switcher.setPointerCapture(pointerId); } catch (_) { }
         }
 
         if (!hasDraggedTabs) return;
@@ -303,7 +303,7 @@ function initTabDragSelector() {
         isPointerDown = false;
         isDraggingTabs = false;
         switcher.classList.remove('dragging');
-        try { if (pointerId !== null) switcher.releasePointerCapture(pointerId); } catch (_) {}
+        try { if (pointerId !== null) switcher.releasePointerCapture(pointerId); } catch (_) { }
 
         if (hasDraggedTabs) {
             // Find which button the user dropped the slider on
@@ -695,23 +695,23 @@ function sendConsoleCommand(inputId) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ command: cmd })
     })
-    .then(async r => {
-        const data = await r.json();
-        if (!r.ok) throw new Error(data.result || `HTTP ${r.status}`);
-        return data;
-    })
-    .then(data => {
-        if (data.result === 'sent') {
-            showToast(`Executed: ${cmd}`, 'success');
-            input.value = '';
-            setTimeout(fetchLogs, 400);
-        } else {
-            showToast(`Server response: ${data.result || 'Failed'}`, 'error');
-        }
-    })
-    .catch(err => {
-        showToast(`Failed to execute command: ${err}`, 'error');
-    });
+        .then(async r => {
+            const data = await r.json();
+            if (!r.ok) throw new Error(data.result || `HTTP ${r.status}`);
+            return data;
+        })
+        .then(data => {
+            if (data.result === 'sent') {
+                showToast(`Executed: ${cmd}`, 'success');
+                input.value = '';
+                setTimeout(fetchLogs, 400);
+            } else {
+                showToast(`Server response: ${data.result || 'Failed'}`, 'error');
+            }
+        })
+        .catch(err => {
+            showToast(`Failed to execute command: ${err}`, 'error');
+        });
 
     hideAutocomplete();
 }
@@ -754,8 +754,8 @@ function initTerminalKeyboard() {
             return;
         }
 
-            const commandList = serverEdition === 'java' ? JAVA_COMMANDS : BDS_COMMANDS;
-            const matches = commandList.filter(c => c.cmd.toLowerCase().startsWith(val) || c.cmd.toLowerCase().includes(val));
+        const commandList = serverEdition === 'java' ? JAVA_COMMANDS : BDS_COMMANDS;
+        const matches = commandList.filter(c => c.cmd.toLowerCase().startsWith(val) || c.cmd.toLowerCase().includes(val));
         if (matches.length > 0) {
             box.innerHTML = matches.map(m => `
                 <div class="autocomplete-item" onclick="selectAutocomplete('${m.cmd}')">
@@ -995,11 +995,7 @@ function pollTunnelStatus() {
         });
 }
 
-function pollWarfareGateway() {
-    pollTunnelStatus();
-}
-
-function loadLatestPaper() {
+    function loadLatestPaper() {
         const latest = document.getElementById('javaLatestVersion');
         if (latest) latest.textContent = 'Checking...';
         fetch('/api/java/latest')
@@ -1025,9 +1021,9 @@ function loadLatestPaper() {
                 if (summary) summary.textContent = error.message;
                 showToast(`Could not check latest Paper build: ${error.message}`, 'error');
             });
-}
+    }
 
-function installOrUpdatePaper() {
+    function installOrUpdatePaper() {
         const eula = document.getElementById('paperEulaConfirm');
         if (!eula || !eula.checked) {
             showToast('Read and accept the Minecraft EULA before installing Paper.', 'error');
@@ -1055,9 +1051,9 @@ function installOrUpdatePaper() {
                 if (button) button.disabled = false;
                 showToast(`Paper install/update failed: ${error.message}`, 'error');
             });
-}
+    }
 
-function pollPaperUpdateStatus() {
+    function pollPaperUpdateStatus() {
         fetch('/api/java/update_status')
             .then(r => {
                 if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -1085,43 +1081,43 @@ function pollPaperUpdateStatus() {
                 lastPaperUpdateStatus = state.status;
             })
             .catch(error => console.error('Paper update status fetch failed:', error));
-}
-
-/* =========================================================================
-   6. WORLDS MANAGEMENT
-   ========================================================================= */
-function loadWorlds() {
-    const tbody = document.getElementById('worldsTableBody');
-    if (tbody) {
-        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--zentra-muted); padding:16px;"><span class="status-dot-pulse"></span> Loading worlds...</td></tr>`;
     }
 
-    fetch('/api/worlds')
-        .then(r => {
-            if (!r.ok) throw new Error(`HTTP ${r.status} ${r.statusText}`);
-            return r.json();
-        })
-        .then(data => {
-            const tbody = document.getElementById('worldsTableBody');
-            if (!tbody) return;
+    /* =========================================================================
+       6. WORLDS MANAGEMENT
+       ========================================================================= */
+    function loadWorlds() {
+        const tbody = document.getElementById('worldsTableBody');
+        if (tbody) {
+            tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--zentra-muted); padding:16px;"><span class="status-dot-pulse"></span> Loading worlds...</td></tr>`;
+        }
 
-            const worlds = data.worlds || [];
-            const activeWorld = data.active_world;
+        fetch('/api/worlds')
+            .then(r => {
+                if (!r.ok) throw new Error(`HTTP ${r.status} ${r.statusText}`);
+                return r.json();
+            })
+            .then(data => {
+                const tbody = document.getElementById('worldsTableBody');
+                if (!tbody) return;
 
-            if (worlds.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--zentra-muted); padding:16px;">No worlds found on server.</td></tr>`;
-                return;
-            }
+                const worlds = data.worlds || [];
+                const activeWorld = data.active_world;
 
-            tbody.innerHTML = worlds.map(w => {
-                const wName = typeof w === 'string' ? w : (w.name || '');
-                const wSeed = typeof w === 'object' ? (w.seed || '') : '';
-                const wGamemode = typeof w === 'object' ? (w.gamemode || 'survival') : 'survival';
-                const wDifficulty = typeof w === 'object' ? (w.difficulty || 'easy') : 'easy';
-                const wSize = typeof w === 'object' ? (w.size_formatted || '--') : '--';
-                const isActive = (typeof w === 'object' && w.is_active !== undefined) ? w.is_active : (wName === activeWorld);
+                if (worlds.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--zentra-muted); padding:16px;">No worlds found on server.</td></tr>`;
+                    return;
+                }
 
-                return `
+                tbody.innerHTML = worlds.map(w => {
+                    const wName = typeof w === 'string' ? w : (w.name || '');
+                    const wSeed = typeof w === 'object' ? (w.seed || '') : '';
+                    const wGamemode = typeof w === 'object' ? (w.gamemode || 'survival') : 'survival';
+                    const wDifficulty = typeof w === 'object' ? (w.difficulty || 'easy') : 'easy';
+                    const wSize = typeof w === 'object' ? (w.size_formatted || '--') : '--';
+                    const isActive = (typeof w === 'object' && w.is_active !== undefined) ? w.is_active : (wName === activeWorld);
+
+                    return `
                     <tr>
                         <td style="font-weight:700;">${escapeHtml(wName)}</td>
                         <td>
@@ -1150,17 +1146,17 @@ function loadWorlds() {
                         </td>
                     </tr>
                 `;
-            }).join('');
+                }).join('');
 
-            if (activeWorld) {
-                loadBackups(activeWorld);
-            }
-        })
-        .catch(err => {
-            console.error("Failed to load worlds:", err);
-            const tbody = document.getElementById('worldsTableBody');
-            if (tbody) {
-                tbody.innerHTML = `
+                if (activeWorld) {
+                    loadBackups(activeWorld);
+                }
+            })
+            .catch(err => {
+                console.error("Failed to load worlds:", err);
+                const tbody = document.getElementById('worldsTableBody');
+                if (tbody) {
+                    tbody.innerHTML = `
                     <tr>
                         <td colspan="7" style="text-align:center; color:var(--zentra-red); padding:16px;">
                             <div>Failed to load worlds (${escapeHtml(err.message || String(err))})</div>
@@ -1168,160 +1164,160 @@ function loadWorlds() {
                         </td>
                     </tr>
                 `;
-            }
-        });
-}
+                }
+            });
+    }
 
-function generateRandomSeed() {
-    const high = Math.floor(Math.random() * 0x7FFFFFFF);
-    const low = Math.floor(Math.random() * 0xFFFFFFFF);
-    const sign = Math.random() > 0.5 ? '' : '-';
-    const seed = sign + ((BigInt(high) << 32n) | BigInt(low)).toString();
-    const el = document.getElementById('newWorldSeed');
-    if (el) el.value = seed;
-}
+    function generateRandomSeed() {
+        const high = Math.floor(Math.random() * 0x7FFFFFFF);
+        const low = Math.floor(Math.random() * 0xFFFFFFFF);
+        const sign = Math.random() > 0.5 ? '' : '-';
+        const seed = sign + ((BigInt(high) << 32n) | BigInt(low)).toString();
+        const el = document.getElementById('newWorldSeed');
+        if (el) el.value = seed;
+    }
 
-function copyToClipboard(text, customMsg) {
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(text).then(() => {
-            showToast(customMsg || `Copied to clipboard: ${text}`, 'success');
-        }).catch(() => {
+    function copyToClipboard(text, customMsg) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(() => {
+                showToast(customMsg || `Copied to clipboard: ${text}`, 'success');
+            }).catch(() => {
+                prompt("Copy:", text);
+            });
+        } else {
             prompt("Copy:", text);
-        });
-    } else {
-        prompt("Copy:", text);
-    }
-}
-
-function setActiveWorld(world) {
-    if (!confirm(`Activate world '${world}'?\n\nThis will update server.properties to use this world. If the server is running, it will be restarted automatically.`)) return;
-
-    const btn = event && event.target;
-    if (btn) {
-        btn.disabled = true;
-        btn.textContent = 'Activating...';
+        }
     }
 
-    showToast(`Activating world '${world}'...`, 'info');
+    function setActiveWorld(world) {
+        if (!confirm(`Activate world '${world}'?\n\nThis will update server.properties to use this world. If the server is running, it will be restarted automatically.`)) return;
 
-    fetch('/api/set_active_world', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ world })
-    })
-    .then(r => {
-        if (!r.ok) return r.json().then(e => Promise.reject(e.result || `HTTP ${r.status}`));
-        return r.json();
-    })
-    .then(data => {
-        // Strip Minecraft colour codes (§x) before showing in the UI toast
-        const msg = (data.result || `World '${world}' switch initiated!`).replace(/§[0-9a-zA-Z]/g, '');
-        showToast(msg, 'success');
-        // The switch takes ~10s countdown + ~10s BDS restart.
-        // Refresh worlds table after restart completes (~12s), status after fully up (~20s).
-        setTimeout(loadWorlds, 12000);
-        setTimeout(loadStatus, 20000);
-    })
-    .catch(err => {
-        showToast(`Failed to activate world: ${err}`, 'error');
+        const btn = event && event.target;
         if (btn) {
-            btn.disabled = false;
-            btn.textContent = 'Activate';
+            btn.disabled = true;
+            btn.textContent = 'Activating...';
         }
-    });
-}
 
-function submitCreateWorld() {
-    const name = document.getElementById('newWorldName').value.trim();
-    const seed = document.getElementById('newWorldSeed').value.trim();
-    const gamemode = document.getElementById('newWorldGamemode') ? document.getElementById('newWorldGamemode').value : 'survival';
-    const difficulty = document.getElementById('newWorldDifficulty') ? document.getElementById('newWorldDifficulty').value : 'easy';
-    const world_type = document.getElementById('newWorldType') ? document.getElementById('newWorldType').value : 'default';
-    const force_gamemode = document.getElementById('newWorldForceGamemode') ? (document.getElementById('newWorldForceGamemode').value === 'true') : true;
-    const allow_cheats = document.getElementById('newWorldCheats') ? document.getElementById('newWorldCheats').checked : false;
-    const show_coordinates = document.getElementById('newWorldCoords') ? document.getElementById('newWorldCoords').checked : true;
-    const pvp = document.getElementById('newWorldPvp') ? document.getElementById('newWorldPvp').checked : true;
-    const activate_now = document.getElementById('newWorldActivateNow') ? document.getElementById('newWorldActivateNow').checked : false;
+        showToast(`Activating world '${world}'...`, 'info');
 
-    if (!name) return alert("Please specify a world folder name");
-
-    fetch('/api/worlds/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            name,
-            seed,
-            gamemode,
-            difficulty,
-            world_type,
-            force_gamemode,
-            allow_cheats,
-            show_coordinates,
-            pvp,
-            activate_now
+        fetch('/api/set_active_world', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ world })
         })
-    })
-    .then(r => r.json())
-    .then(data => {
-        showToast(data.result || 'World created successfully', 'success');
-        closeModal('createWorldModal');
-        loadWorlds();
-        if (activate_now) {
-            setTimeout(() => { loadStatus(); checkCheatsStatus(); }, 2500);
-        }
-    })
-    .catch(err => showToast(`Error creating world: ${err}`, 'error'));
-}
+            .then(r => {
+                if (!r.ok) return r.json().then(e => Promise.reject(e.result || `HTTP ${r.status}`));
+                return r.json();
+            })
+            .then(data => {
+                // Strip Minecraft colour codes (§x) before showing in the UI toast
+                const msg = (data.result || `World '${world}' switch initiated!`).replace(/§[0-9a-zA-Z]/g, '');
+                showToast(msg, 'success');
+                // The switch takes ~10s countdown + ~10s BDS restart.
+                // Refresh worlds table after restart completes (~12s), status after fully up (~20s).
+                setTimeout(loadWorlds, 12000);
+                setTimeout(loadStatus, 20000);
+            })
+            .catch(err => {
+                showToast(`Failed to activate world: ${err}`, 'error');
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = 'Activate';
+                }
+            });
+    }
 
-function submitUploadWorld() {
-    const fileInput = document.getElementById('uploadWorldFileInput');
-    if (!fileInput.files || fileInput.files.length === 0) return alert("Please select a world file");
+    function submitCreateWorld() {
+        const name = document.getElementById('newWorldName').value.trim();
+        const seed = document.getElementById('newWorldSeed').value.trim();
+        const gamemode = document.getElementById('newWorldGamemode') ? document.getElementById('newWorldGamemode').value : 'survival';
+        const difficulty = document.getElementById('newWorldDifficulty') ? document.getElementById('newWorldDifficulty').value : 'easy';
+        const world_type = document.getElementById('newWorldType') ? document.getElementById('newWorldType').value : 'default';
+        const force_gamemode = document.getElementById('newWorldForceGamemode') ? (document.getElementById('newWorldForceGamemode').value === 'true') : true;
+        const allow_cheats = document.getElementById('newWorldCheats') ? document.getElementById('newWorldCheats').checked : false;
+        const show_coordinates = document.getElementById('newWorldCoords') ? document.getElementById('newWorldCoords').checked : true;
+        const pvp = document.getElementById('newWorldPvp') ? document.getElementById('newWorldPvp').checked : true;
+        const activate_now = document.getElementById('newWorldActivateNow') ? document.getElementById('newWorldActivateNow').checked : false;
 
-    const formData = new FormData();
-    formData.append('file', fileInput.files[0]);
+        if (!name) return alert("Please specify a world folder name");
 
-    showToast("Uploading and importing world archive...", "info");
-    fetch('/api/worlds/upload', {
-        method: 'POST',
-        body: formData
-    })
-    .then(r => r.json())
-    .then(data => {
-        showToast(data.result || 'Imported successfully', 'success');
-        closeModal('uploadWorldModal');
-        loadWorlds();
-    })
-    .catch(err => showToast(`Upload failed: ${err}`, 'error'));
-}
+        fetch('/api/worlds/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name,
+                seed,
+                gamemode,
+                difficulty,
+                world_type,
+                force_gamemode,
+                allow_cheats,
+                show_coordinates,
+                pvp,
+                activate_now
+            })
+        })
+            .then(r => r.json())
+            .then(data => {
+                showToast(data.result || 'World created successfully', 'success');
+                closeModal('createWorldModal');
+                loadWorlds();
+                if (activate_now) {
+                    setTimeout(() => { loadStatus(); checkCheatsStatus(); }, 2500);
+                }
+            })
+            .catch(err => showToast(`Error creating world: ${err}`, 'error'));
+    }
 
-function backupWorld(world) {
-    showToast(`Creating snapshot archive for '${world}'...`, 'info');
-    fetch('/api/backup_world', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ world })
-    })
-    .then(r => r.json())
-    .then(data => {
-        showToast(data.result || 'Backup created', 'success');
-        loadBackups(world);
-    })
-    .catch(err => showToast(`Backup failed: ${err}`, 'error'));
-}
+    function submitUploadWorld() {
+        const fileInput = document.getElementById('uploadWorldFileInput');
+        if (!fileInput.files || fileInput.files.length === 0) return alert("Please select a world file");
 
-function loadBackups(world) {
-    const container = document.getElementById('backupsListContainer');
-    if (!container) return;
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
 
-    fetch(`/api/list_backups?world=${encodeURIComponent(world)}`)
-        .then(r => r.json())
-        .then(data => {
-            const backups = data.backups || [];
-            if (backups.length === 0) {
-                container.innerHTML = `<p style="color:var(--zentra-muted); font-size:13px;">No backups found for world '${escapeHtml(world)}'.</p>`;
-                return;
-            }
-            container.innerHTML = `
+        showToast("Uploading and importing world archive...", "info");
+        fetch('/api/worlds/upload', {
+            method: 'POST',
+            body: formData
+        })
+            .then(r => r.json())
+            .then(data => {
+                showToast(data.result || 'Imported successfully', 'success');
+                closeModal('uploadWorldModal');
+                loadWorlds();
+            })
+            .catch(err => showToast(`Upload failed: ${err}`, 'error'));
+    }
+
+    function backupWorld(world) {
+        showToast(`Creating snapshot archive for '${world}'...`, 'info');
+        fetch('/api/backup_world', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ world })
+        })
+            .then(r => r.json())
+            .then(data => {
+                showToast(data.result || 'Backup created', 'success');
+                loadBackups(world);
+            })
+            .catch(err => showToast(`Backup failed: ${err}`, 'error'));
+    }
+
+    function loadBackups(world) {
+        const container = document.getElementById('backupsListContainer');
+        if (!container) return;
+
+        fetch(`/api/list_backups?world=${encodeURIComponent(world)}`)
+            .then(r => r.json())
+            .then(data => {
+                const backups = data.backups || [];
+                if (backups.length === 0) {
+                    container.innerHTML = `<p style="color:var(--zentra-muted); font-size:13px;">No backups found for world '${escapeHtml(world)}'.</p>`;
+                    return;
+                }
+                container.innerHTML = `
                 <h4 style="font-size:14px; font-weight:700; margin-bottom:10px;">Backups for world: ${escapeHtml(world)}</h4>
                 <div class="zentra-table-wrap">
                     <table class="zentra-table">
@@ -1334,57 +1330,57 @@ function loadBackups(world) {
                     </table>
                 </div>
             `;
-        })
-        .catch(err => {
-            container.innerHTML = `<p style="color:var(--zentra-red); font-size:12px;">Failed to load backups for '${escapeHtml(world)}'.</p>`;
-        });
-}
-
-function deleteWorld(world) {
-    if (!confirm(`Are you sure you want to permanently delete world '${world}'?`)) return;
-    fetch('/api/worlds/delete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ world })
-    })
-    .then(r => r.json())
-    .then(data => {
-        showToast(data.result || 'Deleted', 'info');
-        loadWorlds();
-    })
-    .catch(err => showToast(`Delete failed: ${err}`, 'error'));
-}
-
-/* =========================================================================
-   7. PLAYERS MANAGEMENT (Directory, Cheats, Allowlist & History)
-   ========================================================================= */
-function loadPlayers() {
-    const tbody = document.getElementById('playersTableBody');
-    if (tbody) {
-        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--zentra-muted); padding:16px;"><span class="status-dot-pulse"></span> Loading players...</td></tr>`;
+            })
+            .catch(err => {
+                container.innerHTML = `<p style="color:var(--zentra-red); font-size:12px;">Failed to load backups for '${escapeHtml(world)}'.</p>`;
+            });
     }
 
-    checkCheatsStatus();
-    loadAllowlist();
-
-    fetch('/api/players')
-        .then(r => {
-            if (!r.ok) throw new Error(`HTTP ${r.status} ${r.statusText}`);
-            return r.json();
+    function deleteWorld(world) {
+        if (!confirm(`Are you sure you want to permanently delete world '${world}'?`)) return;
+        fetch('/api/worlds/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ world })
         })
-        .then(data => {
-            const tbody = document.getElementById('playersTableBody');
-            if (!tbody) return;
-            const players = data.players || [];
-            updatePlayerDropdowns(players);
-            if (players.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--zentra-muted); padding:16px;">No player records found.</td></tr>`;
-                return;
-            }
+            .then(r => r.json())
+            .then(data => {
+                showToast(data.result || 'Deleted', 'info');
+                loadWorlds();
+            })
+            .catch(err => showToast(`Delete failed: ${err}`, 'error'));
+    }
 
-            tbody.innerHTML = players.map(p => {
-                const isOnline = p.status === 'Online';
-                return `
+    /* =========================================================================
+       7. PLAYERS MANAGEMENT (Directory, Cheats, Allowlist & History)
+       ========================================================================= */
+    function loadPlayers() {
+        const tbody = document.getElementById('playersTableBody');
+        if (tbody) {
+            tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--zentra-muted); padding:16px;"><span class="status-dot-pulse"></span> Loading players...</td></tr>`;
+        }
+
+        checkCheatsStatus();
+        loadAllowlist();
+
+        fetch('/api/players')
+            .then(r => {
+                if (!r.ok) throw new Error(`HTTP ${r.status} ${r.statusText}`);
+                return r.json();
+            })
+            .then(data => {
+                const tbody = document.getElementById('playersTableBody');
+                if (!tbody) return;
+                const players = data.players || [];
+                updatePlayerDropdowns(players);
+                if (players.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--zentra-muted); padding:16px;">No player records found.</td></tr>`;
+                    return;
+                }
+
+                tbody.innerHTML = players.map(p => {
+                    const isOnline = p.status === 'Online';
+                    return `
                     <tr>
                         <td style="font-weight:700;">${escapeHtml(p.name)}</td>
                         <td style="font-family:var(--font-mono); font-size:11px; color:var(--zentra-muted);">${escapeHtml(p.xuid || '--')}</td>
@@ -1395,10 +1391,10 @@ function loadPlayers() {
                         <td>
                             <div style="display:flex; gap:6px; flex-wrap:wrap;">
                                 <button class="zentra-btn secondary" style="padding:4px 8px; font-size:11px; border-color:#f59e0b; color:#d97706;" onclick="selectGmPlayer('${escapeHtml(p.name)}')">🎮 Arsenal</button>
-                                ${p.in_allowlist 
-                                    ? `<button class="zentra-btn danger" style="padding:4px 8px; font-size:11px;" onclick="playerAction('${escapeHtml(p.name)}', 'ban')">Ban</button>`
-                                    : `<button class="zentra-btn emerald" style="padding:4px 8px; font-size:11px;" onclick="playerAction('${escapeHtml(p.name)}', 'unban')">Unban</button>`
-                                }
+                                ${p.in_allowlist
+                            ? `<button class="zentra-btn danger" style="padding:4px 8px; font-size:11px;" onclick="playerAction('${escapeHtml(p.name)}', 'ban')">Ban</button>`
+                            : `<button class="zentra-btn emerald" style="padding:4px 8px; font-size:11px;" onclick="playerAction('${escapeHtml(p.name)}', 'unban')">Unban</button>`
+                        }
                                 <button class="zentra-btn secondary" style="padding:4px 8px; font-size:11px;" onclick="playerAction('${escapeHtml(p.name)}', 'promote')">Promote</button>
                                 <button class="zentra-btn secondary" style="padding:4px 8px; font-size:11px;" onclick="playerAction('${escapeHtml(p.name)}', 'demote')">Demote</button>
                                 <button class="zentra-btn secondary" style="padding:4px 8px; font-size:11px;" onclick="openPlayerHistory('${escapeHtml(p.name)}')">📜 History</button>
@@ -1406,13 +1402,13 @@ function loadPlayers() {
                         </td>
                     </tr>
                 `;
-            }).join('');
-        })
-        .catch(err => {
-            console.error("Failed to load players:", err);
-            const tbody = document.getElementById('playersTableBody');
-            if (tbody) {
-                tbody.innerHTML = `
+                }).join('');
+            })
+            .catch(err => {
+                console.error("Failed to load players:", err);
+                const tbody = document.getElementById('playersTableBody');
+                if (tbody) {
+                    tbody.innerHTML = `
                     <tr>
                         <td colspan="7" style="text-align:center; color:var(--zentra-red); padding:16px;">
                             <div>Failed to load players (${escapeHtml(err.message || String(err))})</div>
@@ -1420,98 +1416,98 @@ function loadPlayers() {
                         </td>
                     </tr>
                 `;
-            }
-        });
-}
+                }
+            });
+    }
 
-function playerAction(player, action) {
-    fetch('/api/player_action', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ player, action })
-    })
-    .then(r => r.json())
-    .then(data => {
-        showToast(data.result || 'Updated', 'success');
-        loadPlayers();
-    })
-    .catch(err => showToast(`Player action failed: ${err}`, 'error'));
-}
-
-/* Cheats Controller */
-function checkCheatsStatus() {
-    fetch('/api/cheats_status')
-        .then(r => r.json())
-        .then(data => {
-            const badge = document.getElementById('cheatsStatusBadge');
-            if (!badge) return;
-            if (data.cheats_enabled) {
-                badge.className = 'metric-pill';
-                badge.textContent = '● Cheats Enabled';
-            } else {
-                badge.className = 'metric-pill neutral';
-                badge.textContent = '○ Cheats Disabled';
-            }
+    function playerAction(player, action) {
+        fetch('/api/player_action', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ player, action })
         })
-        .catch(() => {});
-}
+            .then(r => r.json())
+            .then(data => {
+                showToast(data.result || 'Updated', 'success');
+                loadPlayers();
+            })
+            .catch(err => showToast(`Player action failed: ${err}`, 'error'));
+    }
 
-function toggleCheats() {
-    showToast("Toggling world cheats...", "info");
-    fetch('/api/cheats/toggle', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({})
-    })
-    .then(r => r.json())
-    .then(data => {
-        showToast(data.message || (data.allow_cheats ? "Cheats enabled on world" : "Cheats disabled on world"), 'success');
-        checkCheatsStatus();
-    })
-    .catch(err => showToast(`Failed to toggle cheats: ${err}`, 'error'));
-}
+    /* Cheats Controller */
+    function checkCheatsStatus() {
+        fetch('/api/cheats_status')
+            .then(r => r.json())
+            .then(data => {
+                const badge = document.getElementById('cheatsStatusBadge');
+                if (!badge) return;
+                if (data.cheats_enabled) {
+                    badge.className = 'metric-pill';
+                    badge.textContent = '● Cheats Enabled';
+                } else {
+                    badge.className = 'metric-pill neutral';
+                    badge.textContent = '○ Cheats Disabled';
+                }
+            })
+            .catch(() => { });
+    }
 
-function sendPlayerCommand(cmd) {
-    if (!cmd) return;
-    fetch('/api/player_command', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ command: cmd })
-    })
-    .then(r => r.json())
-    .then(data => {
-        if (data.result) {
-            showToast(data.result, 'success');
-        } else if (data.error) {
-            showToast(data.error, 'error');
-        }
-    })
-    .catch(err => showToast(`Failed to run command: ${err}`, 'error'));
-}
+    function toggleCheats() {
+        showToast("Toggling world cheats...", "info");
+        fetch('/api/cheats/toggle', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({})
+        })
+            .then(r => r.json())
+            .then(data => {
+                showToast(data.message || (data.allow_cheats ? "Cheats enabled on world" : "Cheats disabled on world"), 'success');
+                checkCheatsStatus();
+            })
+            .catch(err => showToast(`Failed to toggle cheats: ${err}`, 'error'));
+    }
 
-function executeCustomCheat() {
-    const input = document.getElementById('customCheatCmd');
-    if (!input || !input.value.trim()) return;
-    const cmd = input.value.trim();
-    sendPlayerCommand(cmd);
-    input.value = '';
-}
+    function sendPlayerCommand(cmd) {
+        if (!cmd) return;
+        fetch('/api/player_command', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ command: cmd })
+        })
+            .then(r => r.json())
+            .then(data => {
+                if (data.result) {
+                    showToast(data.result, 'success');
+                } else if (data.error) {
+                    showToast(data.error, 'error');
+                }
+            })
+            .catch(err => showToast(`Failed to run command: ${err}`, 'error'));
+    }
 
-/* Allowlist Management */
-function loadAllowlist() {
-    const tbody = document.getElementById('allowlistTableBody');
-    if (!tbody) return;
+    function executeCustomCheat() {
+        const input = document.getElementById('customCheatCmd');
+        if (!input || !input.value.trim()) return;
+        const cmd = input.value.trim();
+        sendPlayerCommand(cmd);
+        input.value = '';
+    }
 
-    fetch('/api/allowlist')
-        .then(r => r.json())
-        .then(data => {
-            const list = data.allowlist || [];
-            if (list.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--zentra-muted); padding:14px;">Allowlist is currently empty.</td></tr>`;
-                return;
-            }
+    /* Allowlist Management */
+    function loadAllowlist() {
+        const tbody = document.getElementById('allowlistTableBody');
+        if (!tbody) return;
 
-            tbody.innerHTML = list.map(item => `
+        fetch('/api/allowlist')
+            .then(r => r.json())
+            .then(data => {
+                const list = data.allowlist || [];
+                if (list.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--zentra-muted); padding:14px;">Allowlist is currently empty.</td></tr>`;
+                    return;
+                }
+
+                tbody.innerHTML = list.map(item => `
                 <tr>
                     <td style="font-weight:700;">${escapeHtml(item.name || '--')}</td>
                     <td style="font-family:var(--font-mono); font-size:11px; color:var(--zentra-muted);">${escapeHtml(item.xuid || '--')}</td>
@@ -1521,123 +1517,123 @@ function loadAllowlist() {
                     </td>
                 </tr>
             `).join('');
+            })
+            .catch(err => {
+                tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--zentra-red);">Failed to load allowlist.</td></tr>`;
+            });
+    }
+
+    function submitAddToAllowlist(e) {
+        if (e) e.preventDefault();
+        const nameInput = document.getElementById('allowlistNewName');
+        const xuidInput = document.getElementById('allowlistNewXuid');
+        const limitCheck = document.getElementById('allowlistIgnoreLimit');
+
+        const name = nameInput ? nameInput.value.trim() : '';
+        const xuid = xuidInput ? xuidInput.value.trim() : '';
+        const ignoresPlayerLimit = limitCheck ? limitCheck.checked : false;
+
+        if (!name) return alert("Please specify a player name");
+
+        fetch('/api/allowlist', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, xuid, ignoresPlayerLimit, action: 'add' })
         })
-        .catch(err => {
-            tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--zentra-red);">Failed to load allowlist.</td></tr>`;
-        });
-}
+            .then(r => r.json())
+            .then(data => {
+                showToast(data.result || 'Added to allowlist', 'success');
+                if (nameInput) nameInput.value = '';
+                if (xuidInput) xuidInput.value = '';
+                if (limitCheck) limitCheck.checked = false;
+                loadAllowlist();
+                loadPlayers();
+            })
+            .catch(err => showToast(`Failed to add: ${err}`, 'error'));
+    }
 
-function submitAddToAllowlist(e) {
-    if (e) e.preventDefault();
-    const nameInput = document.getElementById('allowlistNewName');
-    const xuidInput = document.getElementById('allowlistNewXuid');
-    const limitCheck = document.getElementById('allowlistIgnoreLimit');
+    function removeFromAllowlist(name, xuid) {
+        if (!confirm(`Remove '${name || xuid}' from allowlist?`)) return;
+        fetch('/api/allowlist', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, xuid, action: 'remove' })
+        })
+            .then(r => r.json())
+            .then(data => {
+                showToast(data.result || 'Removed from allowlist', 'info');
+                loadAllowlist();
+                loadPlayers();
+            })
+            .catch(err => showToast(`Failed to remove: ${err}`, 'error'));
+    }
 
-    const name = nameInput ? nameInput.value.trim() : '';
-    const xuid = xuidInput ? xuidInput.value.trim() : '';
-    const ignoresPlayerLimit = limitCheck ? limitCheck.checked : false;
+    /* Player Session History Modal */
+    function openPlayerHistory(player) {
+        openModal('playerHistoryModal');
+        const titleEl = document.getElementById('historyModalPlayerName');
+        const timeEl = document.getElementById('historyModalTotalTime');
+        const tbody = document.getElementById('historyTableBody');
 
-    if (!name) return alert("Please specify a player name");
+        if (titleEl) titleEl.textContent = `Session History: ${player}`;
+        if (timeEl) timeEl.textContent = 'Loading records...';
+        if (tbody) tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; padding:16px;"><span class="status-dot-pulse"></span> Loading sessions...</td></tr>`;
 
-    fetch('/api/allowlist', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, xuid, ignoresPlayerLimit, action: 'add' })
-    })
-    .then(r => r.json())
-    .then(data => {
-        showToast(data.result || 'Added to allowlist', 'success');
-        if (nameInput) nameInput.value = '';
-        if (xuidInput) xuidInput.value = '';
-        if (limitCheck) limitCheck.checked = false;
-        loadAllowlist();
-        loadPlayers();
-    })
-    .catch(err => showToast(`Failed to add: ${err}`, 'error'));
-}
+        fetch(`/api/player_sessions?player=${encodeURIComponent(player)}`)
+            .then(r => r.json())
+            .then(data => {
+                const sessions = data.sessions || [];
+                const totalSecs = data.total || 0;
+                const hours = Math.floor(totalSecs / 3600);
+                const mins = Math.floor((totalSecs % 3600) / 60);
 
-function removeFromAllowlist(name, xuid) {
-    if (!confirm(`Remove '${name || xuid}' from allowlist?`)) return;
-    fetch('/api/allowlist', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, xuid, action: 'remove' })
-    })
-    .then(r => r.json())
-    .then(data => {
-        showToast(data.result || 'Removed from allowlist', 'info');
-        loadAllowlist();
-        loadPlayers();
-    })
-    .catch(err => showToast(`Failed to remove: ${err}`, 'error'));
-}
+                if (timeEl) timeEl.textContent = `Total Playtime: ${hours}h ${mins}m (${sessions.length} recorded session${sessions.length === 1 ? '' : 's'})`;
 
-/* Player Session History Modal */
-function openPlayerHistory(player) {
-    openModal('playerHistoryModal');
-    const titleEl = document.getElementById('historyModalPlayerName');
-    const timeEl = document.getElementById('historyModalTotalTime');
-    const tbody = document.getElementById('historyTableBody');
+                if (sessions.length === 0) {
+                    if (tbody) tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:var(--zentra-muted); padding:16px;">No session logs recorded yet for this player.</td></tr>`;
+                    return;
+                }
 
-    if (titleEl) titleEl.textContent = `Session History: ${player}`;
-    if (timeEl) timeEl.textContent = 'Loading records...';
-    if (tbody) tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; padding:16px;"><span class="status-dot-pulse"></span> Loading sessions...</td></tr>`;
-
-    fetch(`/api/player_sessions?player=${encodeURIComponent(player)}`)
-        .then(r => r.json())
-        .then(data => {
-            const sessions = data.sessions || [];
-            const totalSecs = data.total || 0;
-            const hours = Math.floor(totalSecs / 3600);
-            const mins = Math.floor((totalSecs % 3600) / 60);
-
-            if (timeEl) timeEl.textContent = `Total Playtime: ${hours}h ${mins}m (${sessions.length} recorded session${sessions.length === 1 ? '' : 's'})`;
-
-            if (sessions.length === 0) {
-                if (tbody) tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:var(--zentra-muted); padding:16px;">No session logs recorded yet for this player.</td></tr>`;
-                return;
-            }
-
-            if (tbody) {
-                tbody.innerHTML = sessions.map(s => `
+                if (tbody) {
+                    tbody.innerHTML = sessions.map(s => `
                     <tr>
                         <td style="font-family:var(--font-mono); font-size:12px;">${escapeHtml(s.start || '--')}</td>
                         <td style="font-family:var(--font-mono); font-size:12px;">${escapeHtml(s.end || '--')}</td>
                         <td style="font-weight:600;">${escapeHtml(s.world || 'Default')}</td>
                     </tr>
                 `).reverse().join('');
-            }
-        })
-        .catch(err => {
-            if (tbody) tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:var(--zentra-red);">Failed to load history.</td></tr>`;
-        });
-}
+                }
+            })
+            .catch(err => {
+                if (tbody) tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:var(--zentra-red);">Failed to load history.</td></tr>`;
+            });
+    }
 
-/* =========================================================================
-   8. ADDONS MANAGEMENT
-   ========================================================================= */
-function loadAddons() {
-    const bCont = document.getElementById('behaviorPacksContainer');
-    const rCont = document.getElementById('resourcePacksContainer');
-    if (bCont) bCont.innerHTML = `<p style="color:var(--zentra-muted); font-size:12px;"><span class="status-dot-pulse"></span> Loading behavior packs...</p>`;
-    if (rCont) rCont.innerHTML = `<p style="color:var(--zentra-muted); font-size:12px;"><span class="status-dot-pulse"></span> Loading resource packs...</p>`;
+    /* =========================================================================
+       8. ADDONS MANAGEMENT
+       ========================================================================= */
+    function loadAddons() {
+        const bCont = document.getElementById('behaviorPacksContainer');
+        const rCont = document.getElementById('resourcePacksContainer');
+        if (bCont) bCont.innerHTML = `<p style="color:var(--zentra-muted); font-size:12px;"><span class="status-dot-pulse"></span> Loading behavior packs...</p>`;
+        if (rCont) rCont.innerHTML = `<p style="color:var(--zentra-muted); font-size:12px;"><span class="status-dot-pulse"></span> Loading resource packs...</p>`;
 
-    fetch('/api/addons')
-        .then(r => {
-            if (!r.ok) throw new Error(`HTTP ${r.status} ${r.statusText}`);
-            return r.json();
-        })
-        .then(data => {
-            const bCont = document.getElementById('behaviorPacksContainer');
-            const rCont = document.getElementById('resourcePacksContainer');
-            if (!bCont || !rCont) return;
+        fetch('/api/addons')
+            .then(r => {
+                if (!r.ok) throw new Error(`HTTP ${r.status} ${r.statusText}`);
+                return r.json();
+            })
+            .then(data => {
+                const bCont = document.getElementById('behaviorPacksContainer');
+                const rCont = document.getElementById('resourcePacksContainer');
+                if (!bCont || !rCont) return;
 
-            const bPacks = data.behavior_packs || [];
-            const rPacks = data.resource_packs || [];
-            const appliedB = (data.applied_behavior || []).map(p => p.pack_id);
-            const appliedR = (data.applied_resource || []).map(p => p.pack_id);
+                const bPacks = data.behavior_packs || [];
+                const rPacks = data.resource_packs || [];
+                const appliedB = (data.applied_behavior || []).map(p => p.pack_id);
+                const appliedR = (data.applied_resource || []).map(p => p.pack_id);
 
-            bCont.innerHTML = bPacks.map(p => `
+                bCont.innerHTML = bPacks.map(p => `
                 <label class="stat-box" style="display:flex; align-items:center; gap:10px; cursor:pointer;">
                     <input type="checkbox" name="b_pack" value="${escapeHtml(p.folder)}" ${appliedB.includes(p.uuid) ? 'checked' : ''}>
                     <div>
@@ -1647,7 +1643,7 @@ function loadAddons() {
                 </label>
             `).join('') || '<p style="color:var(--zentra-muted); font-size:12px;">No behavior packs installed</p>';
 
-            rCont.innerHTML = rPacks.map(p => `
+                rCont.innerHTML = rPacks.map(p => `
                 <label class="stat-box" style="display:flex; align-items:center; gap:10px; cursor:pointer;">
                     <input type="checkbox" name="r_pack" value="${escapeHtml(p.folder)}" ${appliedR.includes(p.uuid) ? 'checked' : ''}>
                     <div>
@@ -1656,146 +1652,146 @@ function loadAddons() {
                     </div>
                 </label>
             `).join('') || '<p style="color:var(--zentra-muted); font-size:12px;">No resource packs installed</p>';
-        })
-        .catch(err => {
-            console.error("Failed to load addons:", err);
-            const bCont = document.getElementById('behaviorPacksContainer');
-            const rCont = document.getElementById('resourcePacksContainer');
-            const errHtml = `
+            })
+            .catch(err => {
+                console.error("Failed to load addons:", err);
+                const bCont = document.getElementById('behaviorPacksContainer');
+                const rCont = document.getElementById('resourcePacksContainer');
+                const errHtml = `
                 <div style="color:var(--zentra-red); font-size:12px; padding:10px;">
                     <div>Failed to load addons (${escapeHtml(err.message || String(err))})</div>
                     <button class="zentra-btn secondary" style="margin-top:6px; padding:3px 10px; font-size:11px;" onclick="loadAddons()">↻ Retry</button>
                 </div>
             `;
-            if (bCont) bCont.innerHTML = errHtml;
-            if (rCont) rCont.innerHTML = errHtml;
-        });
-}
+                if (bCont) bCont.innerHTML = errHtml;
+                if (rCont) rCont.innerHTML = errHtml;
+            });
+    }
 
-function applyAddonsToActiveWorld() {
-    const bCheckboxes = document.querySelectorAll('input[name="b_pack"]:checked');
-    const rCheckboxes = document.querySelectorAll('input[name="r_pack"]:checked');
+    function applyAddonsToActiveWorld() {
+        const bCheckboxes = document.querySelectorAll('input[name="b_pack"]:checked');
+        const rCheckboxes = document.querySelectorAll('input[name="r_pack"]:checked');
 
-    const bFolders = Array.from(bCheckboxes).map(c => c.value);
-    const rFolders = Array.from(rCheckboxes).map(c => c.value);
+        const bFolders = Array.from(bCheckboxes).map(c => c.value);
+        const rFolders = Array.from(rCheckboxes).map(c => c.value);
 
-    fetch('/api/addons/apply', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ behavior_packs: bFolders, resource_packs: rFolders })
-    })
-    .then(r => r.json())
-    .then(data => {
-        showToast(data.result || 'Addons applied', 'success');
-    })
-    .catch(err => showToast(`Failed to apply addons: ${err}`, 'error'));
-}
+        fetch('/api/addons/apply', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ behavior_packs: bFolders, resource_packs: rFolders })
+        })
+            .then(r => r.json())
+            .then(data => {
+                showToast(data.result || 'Addons applied', 'success');
+            })
+            .catch(err => showToast(`Failed to apply addons: ${err}`, 'error'));
+    }
 
-function submitUploadAddon() {
-    const input = document.getElementById('uploadAddonFileInput');
-    if (!input.files || input.files.length === 0) return alert("Select an addon pack");
+    function submitUploadAddon() {
+        const input = document.getElementById('uploadAddonFileInput');
+        if (!input.files || input.files.length === 0) return alert("Select an addon pack");
 
-    const formData = new FormData();
-    formData.append('file', input.files[0]);
+        const formData = new FormData();
+        formData.append('file', input.files[0]);
 
-    showToast("Extracting and installing addon...", "info");
-    fetch('/api/addons/upload', {
-        method: 'POST',
-        body: formData
-    })
-    .then(r => r.json())
-    .then(data => {
-        showToast(data.result || 'Addon installed', 'success');
-        closeModal('uploadAddonModal');
-        loadAddons();
-    })
-    .catch(err => showToast(`Upload failed: ${err}`, 'error'));
-}
+        showToast("Extracting and installing addon...", "info");
+        fetch('/api/addons/upload', {
+            method: 'POST',
+            body: formData
+        })
+            .then(r => r.json())
+            .then(data => {
+                showToast(data.result || 'Addon installed', 'success');
+                closeModal('uploadAddonModal');
+                loadAddons();
+            })
+            .catch(err => showToast(`Upload failed: ${err}`, 'error'));
+    }
 
-/* =========================================================================
-   9. SERVER PROPERTIES EDITOR (Robust Schema Form & Realtime Filter)
-   ========================================================================= */
-let _allPropertiesCache = [];
+    /* =========================================================================
+       9. SERVER PROPERTIES EDITOR (Robust Schema Form & Realtime Filter)
+       ========================================================================= */
+    let _allPropertiesCache = [];
 
-function loadProperties() {
-    const form = document.getElementById('propertiesForm');
-    if (!form) return;
+    function loadProperties() {
+        const form = document.getElementById('propertiesForm');
+        if (!form) return;
 
-    form.innerHTML = `
+        form.innerHTML = `
         <div style="grid-column: 1 / -1; display:flex; align-items:center; gap:12px; padding:24px; color:var(--zentra-muted);">
             <div class="status-dot-pulse"></div>
             <span>Fetching server.properties from dedicated server...</span>
         </div>
     `;
 
-    const endpoint = serverEdition === 'java' ? '/api/java/properties' : '/api/properties';
-    fetch(endpoint)
-        .then(r => {
-            if (!r.ok) throw new Error(`HTTP ${r.status} ${r.statusText}`);
-            return r.json();
-        })
-        .then(data => {
-            const props = data.properties || [];
-            _allPropertiesCache = props;
-            renderProperties(props);
-            const serverNameProp = props.find(p => p.key === 'server-name');
-            if (serverEdition === 'bedrock' && serverNameProp && serverNameProp.value) {
-                window._currentServerName = serverNameProp.value;
-                const heroServerName = document.getElementById('heroServerName');
-                const heroMotdPreview = document.getElementById('heroMotdPreview');
-                if (heroServerName) heroServerName.textContent = serverNameProp.value.replace(/§[0-9a-zA-Z]/g, '');
-                if (heroMotdPreview) heroMotdPreview.innerHTML = parseMinecraftColorCodes(serverNameProp.value);
-            }
-        })
-        .catch(err => {
-            console.error("Failed to load properties:", err);
-            form.innerHTML = `
+        const endpoint = serverEdition === 'java' ? '/api/java/properties' : '/api/properties';
+        fetch(endpoint)
+            .then(r => {
+                if (!r.ok) throw new Error(`HTTP ${r.status} ${r.statusText}`);
+                return r.json();
+            })
+            .then(data => {
+                const props = data.properties || [];
+                _allPropertiesCache = props;
+                renderProperties(props);
+                const serverNameProp = props.find(p => p.key === 'server-name');
+                if (serverEdition === 'bedrock' && serverNameProp && serverNameProp.value) {
+                    window._currentServerName = serverNameProp.value;
+                    const heroServerName = document.getElementById('heroServerName');
+                    const heroMotdPreview = document.getElementById('heroMotdPreview');
+                    if (heroServerName) heroServerName.textContent = serverNameProp.value.replace(/§[0-9a-zA-Z]/g, '');
+                    if (heroMotdPreview) heroMotdPreview.innerHTML = parseMinecraftColorCodes(serverNameProp.value);
+                }
+            })
+            .catch(err => {
+                console.error("Failed to load properties:", err);
+                form.innerHTML = `
                 <div style="grid-column: 1 / -1; padding: 20px; background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 12px; color: var(--zentra-red);">
                     <div style="font-weight: 700; margin-bottom: 6px;">Failed to load server.properties</div>
                     <div style="font-size: 13px; margin-bottom: 12px;">${escapeHtml(err.message || String(err))}</div>
                     <button type="button" class="zentra-btn secondary" onclick="loadProperties()">↻ Retry Loading</button>
                 </div>
             `;
-            showToast(`Could not load properties: ${err.message || err}`, 'error');
-        });
-}
-
-function renderProperties(props) {
-    const form = document.getElementById('propertiesForm');
-    if (!form) return;
-
-    if (!props || props.length === 0) {
-        form.innerHTML = `<div style="grid-column: 1 / -1; color: var(--zentra-muted); padding: 16px;">No matching properties found.</div>`;
-        return;
+                showToast(`Could not load properties: ${err.message || err}`, 'error');
+            });
     }
 
-    form.innerHTML = props.map(p => {
-        let inputHtml = '';
-        const curVal = (p.value !== undefined && p.value !== null) ? p.value : p.default;
+    function renderProperties(props) {
+        const form = document.getElementById('propertiesForm');
+        if (!form) return;
 
-        if (p.type === 'choice' && p.choices) {
-            inputHtml = `
+        if (!props || props.length === 0) {
+            form.innerHTML = `<div style="grid-column: 1 / -1; color: var(--zentra-muted); padding: 16px;">No matching properties found.</div>`;
+            return;
+        }
+
+        form.innerHTML = props.map(p => {
+            let inputHtml = '';
+            const curVal = (p.value !== undefined && p.value !== null) ? p.value : p.default;
+
+            if (p.type === 'choice' && p.choices) {
+                inputHtml = `
                 <select name="${p.key}" class="zentra-input">
                     ${p.choices.map(c => `<option value="${escapeHtml(c)}" ${String(c) === String(curVal) ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('')}
                 </select>
             `;
-        } else if (p.type === 'bool') {
-            const isTrue = String(curVal).toLowerCase() === 'true';
-            inputHtml = `
+            } else if (p.type === 'bool') {
+                const isTrue = String(curVal).toLowerCase() === 'true';
+                inputHtml = `
                 <select name="${p.key}" class="zentra-input">
                     <option value="true" ${isTrue ? 'selected' : ''}>true (enabled)</option>
                     <option value="false" ${!isTrue ? 'selected' : ''}>false (disabled)</option>
                 </select>
             `;
-        } else if (p.type === 'int') {
-            inputHtml = `<input type="number" step="1" name="${p.key}" value="${escapeHtml(String(curVal ?? ''))}" class="zentra-input">`;
-        } else if (p.type === 'float') {
-            inputHtml = `<input type="number" step="any" name="${p.key}" value="${escapeHtml(String(curVal ?? ''))}" class="zentra-input">`;
-        } else {
-            inputHtml = `<input type="text" name="${p.key}" value="${escapeHtml(String(curVal ?? ''))}" class="zentra-input">`;
-        }
+            } else if (p.type === 'int') {
+                inputHtml = `<input type="number" step="1" name="${p.key}" value="${escapeHtml(String(curVal ?? ''))}" class="zentra-input">`;
+            } else if (p.type === 'float') {
+                inputHtml = `<input type="number" step="any" name="${p.key}" value="${escapeHtml(String(curVal ?? ''))}" class="zentra-input">`;
+            } else {
+                inputHtml = `<input type="text" name="${p.key}" value="${escapeHtml(String(curVal ?? ''))}" class="zentra-input">`;
+            }
 
-        return `
+            return `
             <div class="zentra-input-group" data-prop-key="${escapeHtml(p.key)}" data-prop-label="${escapeHtml(p.label)}">
                 <label style="display:flex; justify-content:space-between; align-items:baseline;">
                     <span>${escapeHtml(p.label)}</span>
@@ -1804,638 +1800,638 @@ function renderProperties(props) {
                 ${inputHtml}
             </div>
         `;
-    }).join('');
-}
-
-function filterProperties(query) {
-    const q = (query || '').trim().toLowerCase();
-    if (!q) {
-        renderProperties(_allPropertiesCache);
-        return;
+        }).join('');
     }
 
-    const filtered = _allPropertiesCache.filter(p => {
-        const k = (p.key || '').toLowerCase();
-        const l = (p.label || '').toLowerCase();
-        const v = String(p.value ?? p.default ?? '').toLowerCase();
-        return k.includes(q) || l.includes(q) || v.includes(q);
-    });
+    function filterProperties(query) {
+        const q = (query || '').trim().toLowerCase();
+        if (!q) {
+            renderProperties(_allPropertiesCache);
+            return;
+        }
 
-    renderProperties(filtered);
-}
-
-function saveProperties() {
-    const form = document.getElementById('propertiesForm');
-    if (!form) return;
-    const formData = new FormData(form);
-    const obj = {};
-    formData.forEach((val, key) => { obj[key] = val; });
-
-    showToast(serverEdition === 'java' ? "Saving Paper server properties..." : "Saving properties and updating world config...", "info");
-    const endpoint = serverEdition === 'java' ? '/api/java/properties' : '/api/properties';
-    fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(obj)
-    })
-    .then(r => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.json();
-    })
-    .then(data => {
-        showToast(data.result || 'Properties saved successfully!', 'success');
-        setTimeout(loadProperties, 600);
-    })
-    .catch(err => {
-        showToast(`Failed to save properties: ${err.message || err}`, 'error');
-    });
-}
-
-/* =========================================================================
-   10. BDS VERSION UPDATER
-   ========================================================================= */
-function checkBdsUpdates() {
-    const curEl = document.getElementById('updateCurrentVer');
-    const latEl = document.getElementById('updateLatestVer');
-    if (curEl) curEl.textContent = 'Checking...';
-    if (latEl) latEl.textContent = 'Checking...';
-
-    fetch('/api/status')
-        .then(r => r.json())
-        .then(data => {
-            if (curEl) curEl.textContent = data.version || 'Unknown';
-        })
-        .catch(() => {
-            if (curEl) curEl.textContent = 'Unavailable';
+        const filtered = _allPropertiesCache.filter(p => {
+            const k = (p.key || '').toLowerCase();
+            const l = (p.label || '').toLowerCase();
+            const v = String(p.value ?? p.default ?? '').toLowerCase();
+            return k.includes(q) || l.includes(q) || v.includes(q);
         });
 
-    fetch('/api/latest_version_url')
-        .then(r => {
-            if (!r.ok) throw new Error(`HTTP ${r.status}`);
-            return r.json();
-        })
-        .then(data => {
-            if (latEl) latEl.textContent = data.version || 'Latest';
-        })
-        .catch(() => {
-            if (latEl) latEl.textContent = 'Unable to fetch';
-        });
-}
+        renderProperties(filtered);
+    }
 
-function triggerServerUpdate() {
-    if (!confirm("This will download and update the Bedrock Dedicated Server binary. Your worlds and properties will be preserved. Proceed?")) return;
+    function saveProperties() {
+        const form = document.getElementById('propertiesForm');
+        if (!form) return;
+        const formData = new FormData(form);
+        const obj = {};
+        formData.forEach((val, key) => { obj[key] = val; });
 
-    fetch('/api/update_server', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({})
-    })
-        .then(r => r.json())
-        .then(data => {
-            showToast(data.result || 'Update started', 'info');
-            document.getElementById('updateProgressCard').style.display = 'block';
-            pollUpdateStatus();
+        showToast(serverEdition === 'java' ? "Saving Paper server properties..." : "Saving properties and updating world config...", "info");
+        const endpoint = serverEdition === 'java' ? '/api/java/properties' : '/api/properties';
+        fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(obj)
         })
-        .catch(err => showToast(`Update failed to start: ${err}`, 'error'));
-}
+            .then(r => {
+                if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                return r.json();
+            })
+            .then(data => {
+                showToast(data.result || 'Properties saved successfully!', 'success');
+                setTimeout(loadProperties, 600);
+            })
+            .catch(err => {
+                showToast(`Failed to save properties: ${err.message || err}`, 'error');
+            });
+    }
 
-function pollUpdateStatus() {
-    const timer = setInterval(() => {
-        fetch('/api/update_status')
+    /* =========================================================================
+       10. BDS VERSION UPDATER
+       ========================================================================= */
+    function checkBdsUpdates() {
+        const curEl = document.getElementById('updateCurrentVer');
+        const latEl = document.getElementById('updateLatestVer');
+        if (curEl) curEl.textContent = 'Checking...';
+        if (latEl) latEl.textContent = 'Checking...';
+
+        fetch('/api/status')
             .then(r => r.json())
-            .then(state => {
-                document.getElementById('updateStatusMsg').textContent = state.message || state.status;
-                document.getElementById('updatePercent').textContent = `${state.progress}%`;
-                document.getElementById('updateProgressBar').style.width = `${state.progress}%`;
+            .then(data => {
+                if (curEl) curEl.textContent = data.version || 'Unknown';
+            })
+            .catch(() => {
+                if (curEl) curEl.textContent = 'Unavailable';
+            });
 
-                if (state.status === 'success' || state.status === 'failed') {
-                    clearInterval(timer);
-                    showToast(state.message || state.status, state.status === 'success' ? 'success' : 'error');
+        fetch('/api/latest_version_url')
+            .then(r => {
+                if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                return r.json();
+            })
+            .then(data => {
+                if (latEl) latEl.textContent = data.version || 'Latest';
+            })
+            .catch(() => {
+                if (latEl) latEl.textContent = 'Unable to fetch';
+            });
+    }
+
+    function triggerServerUpdate() {
+        if (!confirm("This will download and update the Bedrock Dedicated Server binary. Your worlds and properties will be preserved. Proceed?")) return;
+
+        fetch('/api/update_server', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({})
+        })
+            .then(r => r.json())
+            .then(data => {
+                showToast(data.result || 'Update started', 'info');
+                document.getElementById('updateProgressCard').style.display = 'block';
+                pollUpdateStatus();
+            })
+            .catch(err => showToast(`Update failed to start: ${err}`, 'error'));
+    }
+
+    function pollUpdateStatus() {
+        const timer = setInterval(() => {
+            fetch('/api/update_status')
+                .then(r => r.json())
+                .then(state => {
+                    document.getElementById('updateStatusMsg').textContent = state.message || state.status;
+                    document.getElementById('updatePercent').textContent = `${state.progress}%`;
+                    document.getElementById('updateProgressBar').style.width = `${state.progress}%`;
+
+                    if (state.status === 'success' || state.status === 'failed') {
+                        clearInterval(timer);
+                        showToast(state.message || state.status, state.status === 'success' ? 'success' : 'error');
+                    }
+                })
+                .catch(() => { });
+        }, 1000);
+    }
+
+    /* =========================================================================
+       11. SETTINGS & MODALS HELPERS
+       ========================================================================= */
+    function loadSettings() {
+        const intervalSelect = document.getElementById('settingPollInterval');
+        const scrollSelect = document.getElementById('settingAutoScroll');
+        if (intervalSelect) intervalSelect.value = String(pollInterval);
+        if (scrollSelect) scrollSelect.value = String(autoScroll);
+    }
+
+    function saveSettings() {
+        const interval = parseInt(document.getElementById('settingPollInterval').value, 10);
+        const scroll = document.getElementById('settingAutoScroll').value === 'true';
+        pollInterval = interval;
+        autoScroll = scroll;
+        showToast("Settings saved locally", "success");
+    }
+
+    /* =========================================================================
+       11. SMART AUTOMATED ANNOUNCEMENTS
+       ========================================================================= */
+    function loadAnnouncements() {
+        fetch('/api/announcements')
+            .then(r => r.json())
+            .then(data => {
+                const enabledEl = document.getElementById('annEnabled');
+                const intervalEl = document.getElementById('annInterval');
+                const modeEl = document.getElementById('annMode');
+                const onlyOnlineEl = document.getElementById('annOnlyOnline');
+                const prefixEl = document.getElementById('annPrefix');
+                const messagesEl = document.getElementById('annMessages');
+
+                if (enabledEl) enabledEl.value = String(data.enabled);
+                if (intervalEl) intervalEl.value = data.interval_seconds || 300;
+                if (modeEl) modeEl.value = data.mode || 'sequential';
+                if (onlyOnlineEl) onlyOnlineEl.value = String(data.only_when_online);
+                if (prefixEl) prefixEl.value = data.prefix || '§l§e[Server]§r §b';
+                if (messagesEl && Array.isArray(data.messages)) {
+                    messagesEl.value = data.messages.join('\n');
                 }
             })
-            .catch(() => {});
-    }, 1000);
-}
+            .catch(err => console.error("Failed to load announcements:", err));
+    }
 
-/* =========================================================================
-   11. SETTINGS & MODALS HELPERS
-   ========================================================================= */
-function loadSettings() {
-    const intervalSelect = document.getElementById('settingPollInterval');
-    const scrollSelect = document.getElementById('settingAutoScroll');
-    if (intervalSelect) intervalSelect.value = String(pollInterval);
-    if (scrollSelect) scrollSelect.value = String(autoScroll);
-}
+    function saveAnnouncements() {
+        const enabledEl = document.getElementById('annEnabled');
+        const intervalEl = document.getElementById('annInterval');
+        const modeEl = document.getElementById('annMode');
+        const onlyOnlineEl = document.getElementById('annOnlyOnline');
+        const prefixEl = document.getElementById('annPrefix');
+        const messagesEl = document.getElementById('annMessages');
 
-function saveSettings() {
-    const interval = parseInt(document.getElementById('settingPollInterval').value, 10);
-    const scroll = document.getElementById('settingAutoScroll').value === 'true';
-    pollInterval = interval;
-    autoScroll = scroll;
-    showToast("Settings saved locally", "success");
-}
+        const enabled = enabledEl ? enabledEl.value === 'true' : true;
+        const interval_seconds = intervalEl ? parseInt(intervalEl.value, 10) || 300 : 300;
+        const mode = modeEl ? modeEl.value : 'sequential';
+        const only_when_online = onlyOnlineEl ? onlyOnlineEl.value === 'true' : true;
+        const prefix = prefixEl ? prefixEl.value : '§l§e[Server]§r §b';
+        const rawMessages = messagesEl ? messagesEl.value : '';
+        const messages = rawMessages.split('\n').map(m => m.trim()).filter(m => m.length > 0);
 
-/* =========================================================================
-   11. SMART AUTOMATED ANNOUNCEMENTS
-   ========================================================================= */
-function loadAnnouncements() {
-    fetch('/api/announcements')
-        .then(r => r.json())
-        .then(data => {
-            const enabledEl = document.getElementById('annEnabled');
-            const intervalEl = document.getElementById('annInterval');
-            const modeEl = document.getElementById('annMode');
-            const onlyOnlineEl = document.getElementById('annOnlyOnline');
-            const prefixEl = document.getElementById('annPrefix');
-            const messagesEl = document.getElementById('annMessages');
+        const payload = {
+            enabled,
+            interval_seconds,
+            mode,
+            only_when_online,
+            prefix,
+            messages
+        };
 
-            if (enabledEl) enabledEl.value = String(data.enabled);
-            if (intervalEl) intervalEl.value = data.interval_seconds || 300;
-            if (modeEl) modeEl.value = data.mode || 'sequential';
-            if (onlyOnlineEl) onlyOnlineEl.value = String(data.only_when_online);
-            if (prefixEl) prefixEl.value = data.prefix || '§l§e[Server]§r §b';
-            if (messagesEl && Array.isArray(data.messages)) {
-                messagesEl.value = data.messages.join('\n');
-            }
+        fetch('/api/announcements', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
         })
-        .catch(err => console.error("Failed to load announcements:", err));
-}
+            .then(r => r.json())
+            .then(res => {
+                showToast(res.result || "Announcements saved successfully!", "success");
+            })
+            .catch(err => showToast(`Failed to save announcements: ${err}`, "error"));
+    }
 
-function saveAnnouncements() {
-    const enabledEl = document.getElementById('annEnabled');
-    const intervalEl = document.getElementById('annInterval');
-    const modeEl = document.getElementById('annMode');
-    const onlyOnlineEl = document.getElementById('annOnlyOnline');
-    const prefixEl = document.getElementById('annPrefix');
-    const messagesEl = document.getElementById('annMessages');
+    function broadcastNow() {
+        const messagesEl = document.getElementById('annMessages');
+        const rawMessages = messagesEl ? messagesEl.value : '';
+        const lines = rawMessages.split('\n').map(m => m.trim()).filter(m => m.length > 0);
+        const message = lines.length > 0 ? lines[0] : "Test server broadcast.";
 
-    const enabled = enabledEl ? enabledEl.value === 'true' : true;
-    const interval_seconds = intervalEl ? parseInt(intervalEl.value, 10) || 300 : 300;
-    const mode = modeEl ? modeEl.value : 'sequential';
-    const only_when_online = onlyOnlineEl ? onlyOnlineEl.value === 'true' : true;
-    const prefix = prefixEl ? prefixEl.value : '§l§e[Server]§r §b';
-    const rawMessages = messagesEl ? messagesEl.value : '';
-    const messages = rawMessages.split('\n').map(m => m.trim()).filter(m => m.length > 0);
+        fetch('/api/announcements/broadcast_now', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message })
+        })
+            .then(r => r.json())
+            .then(res => {
+                showToast(res.result || "Broadcast sent to all players!", "success");
+            })
+            .catch(err => showToast(`Broadcast failed: ${err}`, "error"));
+    }
 
-    const payload = {
-        enabled,
-        interval_seconds,
-        mode,
-        only_when_online,
-        prefix,
-        messages
-    };
+    function openModal(id) {
+        const el = document.getElementById(id);
+        if (el) el.classList.add('open');
+    }
 
-    fetch('/api/announcements', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-    })
-    .then(r => r.json())
-    .then(res => {
-        showToast(res.result || "Announcements saved successfully!", "success");
-    })
-    .catch(err => showToast(`Failed to save announcements: ${err}`, "error"));
-}
+    function closeModal(id) {
+        const el = document.getElementById(id);
+        if (el) el.classList.remove('open');
+    }
 
-function broadcastNow() {
-    const messagesEl = document.getElementById('annMessages');
-    const rawMessages = messagesEl ? messagesEl.value : '';
-    const lines = rawMessages.split('\n').map(m => m.trim()).filter(m => m.length > 0);
-    const message = lines.length > 0 ? lines[0] : "Test server broadcast.";
+    function escapeHtml(str) {
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
 
-    fetch('/api/announcements/broadcast_now', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message })
-    })
-    .then(r => r.json())
-    .then(res => {
-        showToast(res.result || "Broadcast sent to all players!", "success");
-    })
-    .catch(err => showToast(`Broadcast failed: ${err}`, "error"));
-}
+    /* =========================================================================
+       12. MOTD, BRANDING, LIFECYCLE COUNTDOWN & GAMERULES
+       ========================================================================= */
+    function parseMinecraftColorCodes(text) {
+        if (!text) return '';
+        const colorMap = {
+            '0': '#000000', '1': '#0000AA', '2': '#00AA00', '3': '#00AAAA',
+            '4': '#AA0000', '5': '#AA00AA', '6': '#FFAA00', '7': '#AAAAAA',
+            '8': '#555555', '9': '#5555FF', 'a': '#55FF55', 'b': '#55FFFF',
+            'c': '#FF5555', 'd': '#FF55FF', 'e': '#FFFF55', 'f': '#FFFFFF'
+        };
+        let html = '';
+        let currentColor = '#FFFFFF';
+        let isBold = false;
+        let isItalic = false;
 
-function openModal(id) {
-    const el = document.getElementById(id);
-    if (el) el.classList.add('open');
-}
-
-function closeModal(id) {
-    const el = document.getElementById(id);
-    if (el) el.classList.remove('open');
-}
-
-function escapeHtml(str) {
-    return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
-}
-
-/* =========================================================================
-   12. MOTD, BRANDING, LIFECYCLE COUNTDOWN & GAMERULES
-   ========================================================================= */
-function parseMinecraftColorCodes(text) {
-    if (!text) return '';
-    const colorMap = {
-        '0': '#000000', '1': '#0000AA', '2': '#00AA00', '3': '#00AAAA',
-        '4': '#AA0000', '5': '#AA00AA', '6': '#FFAA00', '7': '#AAAAAA',
-        '8': '#555555', '9': '#5555FF', 'a': '#55FF55', 'b': '#55FFFF',
-        'c': '#FF5555', 'd': '#FF55FF', 'e': '#FFFF55', 'f': '#FFFFFF'
-    };
-    let html = '';
-    let currentColor = '#FFFFFF';
-    let isBold = false;
-    let isItalic = false;
-
-    const parts = text.split(/(§[0-9a-zA-Z])/g);
-    for (const part of parts) {
-        if (part.startsWith('§')) {
-            const code = part.charAt(1).toLowerCase();
-            if (code === 'r') {
-                currentColor = '#FFFFFF';
-                isBold = false;
-                isItalic = false;
-            } else if (code === 'l') {
-                isBold = true;
-            } else if (code === 'o') {
-                isItalic = true;
-            } else if (colorMap[code]) {
-                currentColor = colorMap[code];
+        const parts = text.split(/(§[0-9a-zA-Z])/g);
+        for (const part of parts) {
+            if (part.startsWith('§')) {
+                const code = part.charAt(1).toLowerCase();
+                if (code === 'r') {
+                    currentColor = '#FFFFFF';
+                    isBold = false;
+                    isItalic = false;
+                } else if (code === 'l') {
+                    isBold = true;
+                } else if (code === 'o') {
+                    isItalic = true;
+                } else if (colorMap[code]) {
+                    currentColor = colorMap[code];
+                }
+            } else if (part.length > 0) {
+                let style = `color:${currentColor};`;
+                if (isBold) style += 'font-weight:bold;';
+                if (isItalic) style += 'font-style:italic;';
+                html += `<span style="${style}">${escapeHtml(part)}</span>`;
             }
-        } else if (part.length > 0) {
-            let style = `color:${currentColor};`;
-            if (isBold) style += 'font-weight:bold;';
-            if (isItalic) style += 'font-style:italic;';
-            html += `<span style="${style}">${escapeHtml(part)}</span>`;
+        }
+        return html || escapeHtml(text);
+    }
+
+    function updateMotdModalPreview(val) {
+        const preview = document.getElementById('motdLiveModalPreview');
+        if (preview) {
+            preview.innerHTML = parseMinecraftColorCodes(val) || '<span style="color:#6e7681;">Preview will appear here...</span>';
         }
     }
-    return html || escapeHtml(text);
-}
 
-function updateMotdModalPreview(val) {
-    const preview = document.getElementById('motdLiveModalPreview');
-    if (preview) {
-        preview.innerHTML = parseMinecraftColorCodes(val) || '<span style="color:#6e7681;">Preview will appear here...</span>';
+    function openMotdModal() {
+        fetch('/api/properties')
+            .then(r => r.json())
+            .then(data => {
+                const props = data.properties || [];
+                const serverNameProp = props.find(p => p.key === 'server-name');
+                const currentMotd = serverNameProp && serverNameProp.value ? serverNameProp.value : (window._currentServerName || 'LALALAND');
+                const input = document.getElementById('motdInput');
+                if (input) input.value = currentMotd;
+                updateMotdModalPreview(currentMotd);
+                openModal('motdModal');
+            })
+            .catch(() => {
+                openModal('motdModal');
+            });
     }
-}
 
-function openMotdModal() {
-    fetch('/api/properties')
-        .then(r => r.json())
-        .then(data => {
-            const props = data.properties || [];
-            const serverNameProp = props.find(p => p.key === 'server-name');
-            const currentMotd = serverNameProp && serverNameProp.value ? serverNameProp.value : (window._currentServerName || 'LALALAND');
-            const input = document.getElementById('motdInput');
-            if (input) input.value = currentMotd;
-            updateMotdModalPreview(currentMotd);
-            openModal('motdModal');
+    function insertMotdCode(code) {
+        const input = document.getElementById('motdInput');
+        if (!input) return;
+        const start = input.selectionStart || input.value.length;
+        const end = input.selectionEnd || input.value.length;
+        input.value = input.value.substring(0, start) + code + input.value.substring(end);
+        input.focus();
+        input.setSelectionRange(start + code.length, start + code.length);
+        updateMotdModalPreview(input.value);
+    }
+
+    function autoGenerateMotdTemplate() {
+        const templates = [
+            "§b§lAETERNA SURVIVAL§r §8| §eSurvival SMP §a[1.26] §f• §6Zero Lag",
+            "§e§lARCANE REALMS§r §8| §bNetherNet WebRTC §8• §dActive Community",
+            "§a§lBEDROCK EXPEDITION§r §8| §6Custom Biomes §8• §eHardcore SMP",
+            "§c§lLEGENDS BEDROCK§r §8| §bFast Chunks §8• §a24/7 Dedicated"
+        ];
+        const picked = templates[Math.floor(Math.random() * templates.length)];
+        const input = document.getElementById('motdInput');
+        if (input) {
+            input.value = picked;
+            updateMotdModalPreview(picked);
+        }
+    }
+
+    function saveMotdSettings() {
+        const input = document.getElementById('motdInput');
+        const newMotd = input ? input.value.trim() : '';
+        if (!newMotd) {
+            showToast("MOTD cannot be empty", "error");
+            return;
+        }
+
+        fetch('/api/properties', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ properties: { "server-name": newMotd } })
         })
-        .catch(() => {
-            openModal('motdModal');
+            .then(r => r.json())
+            .then(res => {
+                showToast("MOTD saved and applied to server!", "success");
+                window._currentServerName = newMotd;
+                closeModal('motdModal');
+                loadProperties();
+                loadStatus();
+            })
+            .catch(err => showToast(`Failed to update MOTD: ${err}`, "error"));
+    }
+
+    function openLifecycleModal(action, targetWorld = '') {
+        const title = document.getElementById('lifecycleModalTitle');
+        const desc = document.getElementById('lifecycleModalDesc');
+        const actionInput = document.getElementById('lifecycleActionType');
+        const targetInput = document.getElementById('lifecycleTargetWorld');
+        const reasonInput = document.getElementById('lifecycleReasonInput');
+
+        if (actionInput) actionInput.value = action;
+        if (targetInput) targetInput.value = targetWorld;
+
+        if (action === 'stop') {
+            if (title) title.textContent = "Schedule Server Shutdown";
+            if (desc) desc.textContent = "Broadcasts in-game countdown alerts to players and saves world data before stopping.";
+            if (reasonInput) reasonInput.value = "Scheduled server maintenance";
+        } else if (action === 'restart') {
+            if (title) title.textContent = "Schedule Server Restart";
+            if (desc) desc.textContent = "Warns active players, flushes chunks, and safely boots back up.";
+            if (reasonInput) reasonInput.value = "Restarting for performance optimization";
+        } else if (action === 'switch_world') {
+            if (title) title.textContent = `Schedule World Switch to '${targetWorld}'`;
+            if (desc) desc.textContent = `Alerts players, saves current world, and boots into '${targetWorld}'.`;
+            if (reasonInput) reasonInput.value = `Switching world to ${targetWorld}`;
+        }
+
+        openModal('lifecycleModal');
+    }
+
+    function confirmLifecycleAction() {
+        const action = document.getElementById('lifecycleActionType').value;
+        const targetWorld = document.getElementById('lifecycleTargetWorld').value;
+        const timerSelect = document.getElementById('lifecycleTimerSelect');
+        const countdown_seconds = timerSelect ? parseInt(timerSelect.value, 10) : 10;
+        const reasonInput = document.getElementById('lifecycleReasonInput');
+        const reason = reasonInput ? reasonInput.value.trim() : "Scheduled maintenance";
+
+        const payload = {
+            action,
+            countdown_seconds,
+            reason,
+            target_world: targetWorld ? targetWorld : undefined,
+            force: countdown_seconds === 0
+        };
+
+        fetch('/api/lifecycle/execute', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+            .then(r => r.json())
+            .then(res => {
+                closeModal('lifecycleModal');
+                showToast(res.result || "Action scheduled!", "success");
+                pollLifecycleStatus();
+            })
+            .catch(err => showToast(`Action failed: ${err}`, "error"));
+    }
+
+    function abortLifecycleCountdown() {
+        fetch('/api/lifecycle/abort', { method: 'POST' })
+            .then(r => r.json())
+            .then(res => {
+                showToast(res.result || "Cancelled", res.aborted ? "success" : "info");
+                pollLifecycleStatus();
+            })
+            .catch(err => showToast(`Abort failed: ${err}`, "error"));
+    }
+
+    function pollLifecycleStatus() {
+        fetch('/api/lifecycle/status')
+            .then(r => r.json())
+            .then(status => {
+                const banner = document.getElementById('lifecycleCountdownBanner');
+                const titleEl = document.getElementById('lifecycleActionTitle');
+                const badgeEl = document.getElementById('lifecycleSecondsBadge');
+                const reasonEl = document.getElementById('lifecycleReasonText');
+
+                if (!banner) return;
+
+                if (status.active) {
+                    banner.style.display = 'flex';
+                    if (titleEl) titleEl.textContent = `Server ${status.action.toUpperCase()} in progress`;
+                    if (badgeEl) badgeEl.textContent = `${status.seconds_remaining}s remaining`;
+                    if (reasonEl) reasonEl.textContent = `Reason: ${status.reason || 'Server maintenance'}`;
+                } else {
+                    banner.style.display = 'none';
+                }
+            })
+            .catch(() => { });
+    }
+
+    function setGamerule(rule, value) {
+        showToast(`Setting gamerule ${rule} to ${value}...`, 'info');
+        fetch('/api/gamerules/set', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ rule, value })
+        })
+            .then(r => r.json())
+            .then(data => {
+                showToast(data.result || `Gamerule ${rule} updated`, 'success');
+            })
+            .catch(err => showToast(`Failed to set gamerule: ${err}`, 'error'));
+    }
+
+    /* =========================================================================
+       12.5. GOD'S EYE REAL-TIME SATELLITE TACTICAL MAP
+       ========================================================================= */
+    const mapState = {
+        initialized: false,
+        camX: 0,
+        camZ: 0,
+        zoom: 1.0,
+        isDragging: false,
+        dragStartX: 0,
+        dragStartY: 0,
+        camStartX: 0,
+        camStartZ: 0,
+        followPlayerName: null,
+        layers: {
+            grid: true,
+            rings: true,
+            radar: true
+        },
+        radarAngle: 0,
+        data: {
+            world_name: 'Unicorn',
+            spawn_x: 0,
+            spawn_y: 64,
+            spawn_z: 0,
+            time_ticks: 1000,
+            time_formatted: 'Day (Morning)',
+            weather: 'clear',
+            players: [],
+            waypoints: []
+        },
+        hoverCoords: { x: 0, z: 0 },
+        contextCoords: { x: 0, z: 0 },
+        lightningFlashes: []
+    };
+
+    function initGodsEyeMap() {
+        if (mapState.initialized) return;
+        const canvas = document.getElementById('godseyeCanvas');
+        const viewport = document.getElementById('godseyeViewport');
+        if (!canvas || !viewport) return;
+
+        mapState.initialized = true;
+
+        function resizeCanvas() {
+            const rect = viewport.getBoundingClientRect();
+            const dpr = Math.min(window.devicePixelRatio || 1, 2);
+            canvas.width = Math.floor(rect.width * dpr);
+            canvas.height = Math.floor(rect.height * dpr);
+            canvas.style.width = `${rect.width}px`;
+            canvas.style.height = `${rect.height}px`;
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // Mouse drag for panning
+        viewport.addEventListener('mousedown', (e) => {
+            if (e.button !== 0) return;
+            const ctxMenu = document.getElementById('mapContextMenu');
+            if (ctxMenu && ctxMenu.style.display !== 'none' && !ctxMenu.contains(e.target)) {
+                closeMapContextMenu();
+            }
+
+            mapState.isDragging = true;
+            mapState.dragStartX = e.clientX;
+            mapState.dragStartY = e.clientY;
+            mapState.camStartX = mapState.camX;
+            mapState.camStartZ = mapState.camZ;
+            mapState.followPlayerName = null;
+            updateFollowBtnState();
         });
-}
 
-function insertMotdCode(code) {
-    const input = document.getElementById('motdInput');
-    if (!input) return;
-    const start = input.selectionStart || input.value.length;
-    const end = input.selectionEnd || input.value.length;
-    input.value = input.value.substring(0, start) + code + input.value.substring(end);
-    input.focus();
-    input.setSelectionRange(start + code.length, start + code.length);
-    updateMotdModalPreview(input.value);
-}
+        window.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const screenX = e.clientX - rect.left;
+            const screenY = e.clientY - rect.top;
 
-function autoGenerateMotdTemplate() {
-    const templates = [
-        "§b§lAETERNA SURVIVAL§r §8| §eSurvival SMP §a[1.26] §f• §6Zero Lag",
-        "§e§lARCANE REALMS§r §8| §bNetherNet WebRTC §8• §dActive Community",
-        "§a§lBEDROCK EXPEDITION§r §8| §6Custom Biomes §8• §eHardcore SMP",
-        "§c§lLEGENDS BEDROCK§r §8| §bFast Chunks §8• §a24/7 Dedicated"
-    ];
-    const picked = templates[Math.floor(Math.random() * templates.length)];
-    const input = document.getElementById('motdInput');
-    if (input) {
-        input.value = picked;
-        updateMotdModalPreview(picked);
-    }
-}
+            if (screenX >= 0 && screenX <= rect.width && screenY >= 0 && screenY <= rect.height) {
+                const centerX = rect.width / 2;
+                const centerY = rect.height / 2;
+                const worldX = Math.round(mapState.camX + (screenX - centerX) / mapState.zoom);
+                const worldZ = Math.round(mapState.camZ + (screenY - centerY) / mapState.zoom);
+                mapState.hoverCoords = { x: worldX, z: worldZ };
 
-function saveMotdSettings() {
-    const input = document.getElementById('motdInput');
-    const newMotd = input ? input.value.trim() : '';
-    if (!newMotd) {
-        showToast("MOTD cannot be empty", "error");
-        return;
-    }
-
-    fetch('/api/properties', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ properties: { "server-name": newMotd } })
-    })
-    .then(r => r.json())
-    .then(res => {
-        showToast("MOTD saved and applied to server!", "success");
-        window._currentServerName = newMotd;
-        closeModal('motdModal');
-        loadProperties();
-        loadStatus();
-    })
-    .catch(err => showToast(`Failed to update MOTD: ${err}`, "error"));
-}
-
-function openLifecycleModal(action, targetWorld = '') {
-    const title = document.getElementById('lifecycleModalTitle');
-    const desc = document.getElementById('lifecycleModalDesc');
-    const actionInput = document.getElementById('lifecycleActionType');
-    const targetInput = document.getElementById('lifecycleTargetWorld');
-    const reasonInput = document.getElementById('lifecycleReasonInput');
-
-    if (actionInput) actionInput.value = action;
-    if (targetInput) targetInput.value = targetWorld;
-
-    if (action === 'stop') {
-        if (title) title.textContent = "Schedule Server Shutdown";
-        if (desc) desc.textContent = "Broadcasts in-game countdown alerts to players and saves world data before stopping.";
-        if (reasonInput) reasonInput.value = "Scheduled server maintenance";
-    } else if (action === 'restart') {
-        if (title) title.textContent = "Schedule Server Restart";
-        if (desc) desc.textContent = "Warns active players, flushes chunks, and safely boots back up.";
-        if (reasonInput) reasonInput.value = "Restarting for performance optimization";
-    } else if (action === 'switch_world') {
-        if (title) title.textContent = `Schedule World Switch to '${targetWorld}'`;
-        if (desc) desc.textContent = `Alerts players, saves current world, and boots into '${targetWorld}'.`;
-        if (reasonInput) reasonInput.value = `Switching world to ${targetWorld}`;
-    }
-
-    openModal('lifecycleModal');
-}
-
-function confirmLifecycleAction() {
-    const action = document.getElementById('lifecycleActionType').value;
-    const targetWorld = document.getElementById('lifecycleTargetWorld').value;
-    const timerSelect = document.getElementById('lifecycleTimerSelect');
-    const countdown_seconds = timerSelect ? parseInt(timerSelect.value, 10) : 10;
-    const reasonInput = document.getElementById('lifecycleReasonInput');
-    const reason = reasonInput ? reasonInput.value.trim() : "Scheduled maintenance";
-
-    const payload = {
-        action,
-        countdown_seconds,
-        reason,
-        target_world: targetWorld ? targetWorld : undefined,
-        force: countdown_seconds === 0
-    };
-
-    fetch('/api/lifecycle/execute', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-    })
-    .then(r => r.json())
-    .then(res => {
-        closeModal('lifecycleModal');
-        showToast(res.result || "Action scheduled!", "success");
-        pollLifecycleStatus();
-    })
-    .catch(err => showToast(`Action failed: ${err}`, "error"));
-}
-
-function abortLifecycleCountdown() {
-    fetch('/api/lifecycle/abort', { method: 'POST' })
-        .then(r => r.json())
-        .then(res => {
-            showToast(res.result || "Cancelled", res.aborted ? "success" : "info");
-            pollLifecycleStatus();
-        })
-        .catch(err => showToast(`Abort failed: ${err}`, "error"));
-}
-
-function pollLifecycleStatus() {
-    fetch('/api/lifecycle/status')
-        .then(r => r.json())
-        .then(status => {
-            const banner = document.getElementById('lifecycleCountdownBanner');
-            const titleEl = document.getElementById('lifecycleActionTitle');
-            const badgeEl = document.getElementById('lifecycleSecondsBadge');
-            const reasonEl = document.getElementById('lifecycleReasonText');
-
-            if (!banner) return;
-
-            if (status.active) {
-                banner.style.display = 'flex';
-                if (titleEl) titleEl.textContent = `Server ${status.action.toUpperCase()} in progress`;
-                if (badgeEl) badgeEl.textContent = `${status.seconds_remaining}s remaining`;
-                if (reasonEl) reasonEl.textContent = `Reason: ${status.reason || 'Server maintenance'}`;
-            } else {
-                banner.style.display = 'none';
-            }
-        })
-        .catch(() => {});
-}
-
-function setGamerule(rule, value) {
-    showToast(`Setting gamerule ${rule} to ${value}...`, 'info');
-    fetch('/api/gamerules/set', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rule, value })
-    })
-    .then(r => r.json())
-    .then(data => {
-        showToast(data.result || `Gamerule ${rule} updated`, 'success');
-    })
-    .catch(err => showToast(`Failed to set gamerule: ${err}`, 'error'));
-}
-
-/* =========================================================================
-   12.5. GOD'S EYE REAL-TIME SATELLITE TACTICAL MAP
-   ========================================================================= */
-const mapState = {
-    initialized: false,
-    camX: 0,
-    camZ: 0,
-    zoom: 1.0,
-    isDragging: false,
-    dragStartX: 0,
-    dragStartY: 0,
-    camStartX: 0,
-    camStartZ: 0,
-    followPlayerName: null,
-    layers: {
-        grid: true,
-        rings: true,
-        radar: true
-    },
-    radarAngle: 0,
-    data: {
-        world_name: 'Unicorn',
-        spawn_x: 0,
-        spawn_y: 64,
-        spawn_z: 0,
-        time_ticks: 1000,
-        time_formatted: 'Day (Morning)',
-        weather: 'clear',
-        players: [],
-        waypoints: []
-    },
-    hoverCoords: { x: 0, z: 0 },
-    contextCoords: { x: 0, z: 0 },
-    lightningFlashes: []
-};
-
-function initGodsEyeMap() {
-    if (mapState.initialized) return;
-    const canvas = document.getElementById('godseyeCanvas');
-    const viewport = document.getElementById('godseyeViewport');
-    if (!canvas || !viewport) return;
-
-    mapState.initialized = true;
-
-    function resizeCanvas() {
-        const rect = viewport.getBoundingClientRect();
-        const dpr = Math.min(window.devicePixelRatio || 1, 2);
-        canvas.width = Math.floor(rect.width * dpr);
-        canvas.height = Math.floor(rect.height * dpr);
-        canvas.style.width = `${rect.width}px`;
-        canvas.style.height = `${rect.height}px`;
-    }
-
-    window.addEventListener('resize', resizeCanvas);
-    resizeCanvas();
-
-    // Mouse drag for panning
-    viewport.addEventListener('mousedown', (e) => {
-        if (e.button !== 0) return;
-        const ctxMenu = document.getElementById('mapContextMenu');
-        if (ctxMenu && ctxMenu.style.display !== 'none' && !ctxMenu.contains(e.target)) {
-            closeMapContextMenu();
-        }
-
-        mapState.isDragging = true;
-        mapState.dragStartX = e.clientX;
-        mapState.dragStartY = e.clientY;
-        mapState.camStartX = mapState.camX;
-        mapState.camStartZ = mapState.camZ;
-        mapState.followPlayerName = null;
-        updateFollowBtnState();
-    });
-
-    window.addEventListener('mousemove', (e) => {
-        const rect = canvas.getBoundingClientRect();
-        const screenX = e.clientX - rect.left;
-        const screenY = e.clientY - rect.top;
-
-        if (screenX >= 0 && screenX <= rect.width && screenY >= 0 && screenY <= rect.height) {
-            const centerX = rect.width / 2;
-            const centerY = rect.height / 2;
-            const worldX = Math.round(mapState.camX + (screenX - centerX) / mapState.zoom);
-            const worldZ = Math.round(mapState.camZ + (screenY - centerY) / mapState.zoom);
-            mapState.hoverCoords = { x: worldX, z: worldZ };
-
-            const cursorDisplay = document.getElementById('mapCursorCoords');
-            const chunkDisplay = document.getElementById('mapCursorChunk');
-            if (cursorDisplay) cursorDisplay.textContent = `X: ${worldX} • Z: ${worldZ}`;
-            if (chunkDisplay) {
-                const chunkX = Math.floor(worldX / 16);
-                const chunkZ = Math.floor(worldZ / 16);
-                chunkDisplay.textContent = `Chunk: ${chunkX}, ${chunkZ}`;
-            }
-        }
-
-        if (mapState.isDragging) {
-            const dx = e.clientX - mapState.dragStartX;
-            const dy = e.clientY - mapState.dragStartY;
-            mapState.camX = mapState.camStartX - dx / mapState.zoom;
-            mapState.camZ = mapState.camStartZ - dy / mapState.zoom;
-        }
-    });
-
-    window.addEventListener('mouseup', () => {
-        mapState.isDragging = false;
-    });
-
-    // Zoom on wheel
-    viewport.addEventListener('wheel', (e) => {
-        e.preventDefault();
-        const factor = e.deltaY < 0 ? 1.15 : 0.85;
-        zoomMap(factor);
-    }, { passive: false });
-
-    // Click anywhere on map to open Tactical Strike Context Menu
-    viewport.addEventListener('click', (e) => {
-        if (Math.abs(e.clientX - mapState.dragStartX) > 5 || Math.abs(e.clientY - mapState.dragStartY) > 5) {
-            return;
-        }
-        if (e.target.closest('.godseye-canvas-controls') || e.target.closest('.godseye-context-menu')) {
-            return;
-        }
-
-        const rect = viewport.getBoundingClientRect();
-        const clickX = e.clientX - rect.left;
-        const clickY = e.clientY - rect.top;
-        const centerX = rect.width / 2;
-        const centerY = rect.height / 2;
-
-        const worldX = Math.round(mapState.camX + (clickX - centerX) / mapState.zoom);
-        const worldZ = Math.round(mapState.camZ + (clickY - centerY) / mapState.zoom);
-        mapState.contextCoords = { x: worldX, z: worldZ };
-
-        openMapContextMenu(clickX, clickY, worldX, worldZ);
-    });
-
-    requestAnimationFrame(renderGodsEyeFrame);
-}
-
-function loadGodsEyeData() {
-    fetch('/api/map/data')
-        .then(r => r.json())
-        .then(data => {
-            mapState.data = data;
-
-            const worldName = document.getElementById('mapWorldName');
-            const timeText = document.getElementById('mapTimeText');
-            const weatherText = document.getElementById('mapWeatherText');
-            const playerCount = document.getElementById('mapPlayerCount');
-
-            if (worldName) worldName.textContent = data.world_name || 'World';
-            if (timeText) timeText.textContent = data.time_formatted || 'Day';
-            if (weatherText) weatherText.textContent = (data.weather || 'Clear').toUpperCase();
-            if (playerCount) playerCount.textContent = data.players.length;
-
-            renderGodsEyePlayerList(data.players);
-            renderGodsEyeWaypointList(data.waypoints);
-
-            if (mapState.followPlayerName) {
-                const target = data.players.find(p => p.name === mapState.followPlayerName);
-                if (target) {
-                    mapState.camX += (target.x - mapState.camX) * 0.15;
-                    mapState.camZ += (target.z - mapState.camZ) * 0.15;
+                const cursorDisplay = document.getElementById('mapCursorCoords');
+                const chunkDisplay = document.getElementById('mapCursorChunk');
+                if (cursorDisplay) cursorDisplay.textContent = `X: ${worldX} • Z: ${worldZ}`;
+                if (chunkDisplay) {
+                    const chunkX = Math.floor(worldX / 16);
+                    const chunkZ = Math.floor(worldZ / 16);
+                    chunkDisplay.textContent = `Chunk: ${chunkX}, ${chunkZ}`;
                 }
             }
-        })
-        .catch(err => console.error("Failed to load map data:", err));
-}
 
-function renderGodsEyePlayerList(players) {
-    const container = document.getElementById('mapPlayersList');
-    if (!container) return;
+            if (mapState.isDragging) {
+                const dx = e.clientX - mapState.dragStartX;
+                const dy = e.clientY - mapState.dragStartY;
+                mapState.camX = mapState.camStartX - dx / mapState.zoom;
+                mapState.camZ = mapState.camStartZ - dy / mapState.zoom;
+            }
+        });
 
-    if (!players || players.length === 0) {
-        container.innerHTML = `<div class="deck-empty-state">No players currently connected.</div>`;
-        return;
+        window.addEventListener('mouseup', () => {
+            mapState.isDragging = false;
+        });
+
+        // Zoom on wheel
+        viewport.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const factor = e.deltaY < 0 ? 1.15 : 0.85;
+            zoomMap(factor);
+        }, { passive: false });
+
+        // Click anywhere on map to open Tactical Strike Context Menu
+        viewport.addEventListener('click', (e) => {
+            if (Math.abs(e.clientX - mapState.dragStartX) > 5 || Math.abs(e.clientY - mapState.dragStartY) > 5) {
+                return;
+            }
+            if (e.target.closest('.godseye-canvas-controls') || e.target.closest('.godseye-context-menu')) {
+                return;
+            }
+
+            const rect = viewport.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const clickY = e.clientY - rect.top;
+            const centerX = rect.width / 2;
+            const centerY = rect.height / 2;
+
+            const worldX = Math.round(mapState.camX + (clickX - centerX) / mapState.zoom);
+            const worldZ = Math.round(mapState.camZ + (clickY - centerY) / mapState.zoom);
+            mapState.contextCoords = { x: worldX, z: worldZ };
+
+            openMapContextMenu(clickX, clickY, worldX, worldZ);
+        });
+
+        requestAnimationFrame(renderGodsEyeFrame);
     }
 
-    container.innerHTML = players.map(p => {
-        const isFollowed = mapState.followPlayerName === p.name;
-        return `
+    function loadGodsEyeData() {
+        fetch('/api/map/data')
+            .then(r => r.json())
+            .then(data => {
+                mapState.data = data;
+
+                const worldName = document.getElementById('mapWorldName');
+                const timeText = document.getElementById('mapTimeText');
+                const weatherText = document.getElementById('mapWeatherText');
+                const playerCount = document.getElementById('mapPlayerCount');
+
+                if (worldName) worldName.textContent = data.world_name || 'World';
+                if (timeText) timeText.textContent = data.time_formatted || 'Day';
+                if (weatherText) weatherText.textContent = (data.weather || 'Clear').toUpperCase();
+                if (playerCount) playerCount.textContent = data.players.length;
+
+                renderGodsEyePlayerList(data.players);
+                renderGodsEyeWaypointList(data.waypoints);
+
+                if (mapState.followPlayerName) {
+                    const target = data.players.find(p => p.name === mapState.followPlayerName);
+                    if (target) {
+                        mapState.camX += (target.x - mapState.camX) * 0.15;
+                        mapState.camZ += (target.z - mapState.camZ) * 0.15;
+                    }
+                }
+            })
+            .catch(err => console.error("Failed to load map data:", err));
+    }
+
+    function renderGodsEyePlayerList(players) {
+        const container = document.getElementById('mapPlayersList');
+        if (!container) return;
+
+        if (!players || players.length === 0) {
+            container.innerHTML = `<div class="deck-empty-state">No players currently connected.</div>`;
+            return;
+        }
+
+        container.innerHTML = players.map(p => {
+            const isFollowed = mapState.followPlayerName === p.name;
+            return `
             <div class="deck-player-item ${isFollowed ? 'selected' : ''}">
                 <div>
                     <div style="font-weight:700; font-size:12px; color:#f1f5f9; display:flex; align-items:center; gap:6px;">
@@ -2452,19 +2448,19 @@ function renderGodsEyePlayerList(players) {
                 </div>
             </div>
         `;
-    }).join('');
-}
-
-function renderGodsEyeWaypointList(waypoints) {
-    const container = document.getElementById('mapWaypointsList');
-    if (!container) return;
-
-    if (!waypoints || waypoints.length === 0) {
-        container.innerHTML = `<div class="deck-empty-state">No waypoints saved yet.</div>`;
-        return;
+        }).join('');
     }
 
-    container.innerHTML = waypoints.map(wp => `
+    function renderGodsEyeWaypointList(waypoints) {
+        const container = document.getElementById('mapWaypointsList');
+        if (!container) return;
+
+        if (!waypoints || waypoints.length === 0) {
+            container.innerHTML = `<div class="deck-empty-state">No waypoints saved yet.</div>`;
+            return;
+        }
+
+        container.innerHTML = waypoints.map(wp => `
         <div class="deck-waypoint-item" onclick="centerMapOnCoords(${wp.x}, ${wp.z})">
             <div style="display:flex; align-items:center; gap:8px;">
                 <span style="font-size:16px;">${wp.icon || '📍'}</span>
@@ -2476,516 +2472,499 @@ function renderGodsEyeWaypointList(waypoints) {
             ${wp.id !== 'spawn' ? `<button class="zentra-btn danger" style="padding:2px 6px; font-size:10px;" onclick="event.stopPropagation(); deleteWaypoint('${wp.id}')">🗑</button>` : ''}
         </div>
     `).join('');
-}
-
-function renderGodsEyeFrame() {
-    const canvas = document.getElementById('godseyeCanvas');
-    if (!canvas || currentTab !== 'map') {
-        requestAnimationFrame(renderGodsEyeFrame);
-        return;
     }
 
-    const ctx = canvas.getContext('2d');
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const width = canvas.width / dpr;
-    const height = canvas.height / dpr;
+    function renderGodsEyeFrame() {
+        const canvas = document.getElementById('godseyeCanvas');
+        if (!canvas || currentTab !== 'map') {
+            requestAnimationFrame(renderGodsEyeFrame);
+            return;
+        }
 
-    ctx.save();
-    ctx.scale(dpr, dpr);
+        const ctx = canvas.getContext('2d');
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const width = canvas.width / dpr;
+        const height = canvas.height / dpr;
 
-    // Clear background
-    ctx.fillStyle = '#060a12';
-    ctx.fillRect(0, 0, width, height);
+        ctx.save();
+        ctx.scale(dpr, dpr);
 
-    const centerX = width / 2;
-    const centerY = height / 2;
-    const zoom = mapState.zoom;
-    const camX = mapState.camX;
-    const camZ = mapState.camZ;
+        // Clear background
+        ctx.fillStyle = '#060a12';
+        ctx.fillRect(0, 0, width, height);
 
-    function worldToScreen(wx, wz) {
-        return {
-            x: centerX + (wx - camX) * zoom,
-            y: centerY + (wz - camZ) * zoom
-        };
-    }
+        const centerX = width / 2;
+        const centerY = height / 2;
+        const zoom = mapState.zoom;
+        const camX = mapState.camX;
+        const camZ = mapState.camZ;
 
-    // Procedural Top-Down Biome Topography
-    const stepSize = Math.max(32, Math.floor(64 / zoom));
-    const startWorldX = Math.floor((camX - centerX / zoom) / stepSize) * stepSize;
-    const endWorldX = Math.ceil((camX + centerX / zoom) / stepSize) * stepSize;
-    const startWorldZ = Math.floor((camZ - centerY / zoom) / stepSize) * stepSize;
-    const endWorldZ = Math.ceil((camZ + centerY / zoom) / stepSize) * stepSize;
+        function worldToScreen(wx, wz) {
+            return {
+                x: centerX + (wx - camX) * zoom,
+                y: centerY + (wz - camZ) * zoom
+            };
+        }
 
-    for (let wx = startWorldX; wx <= endWorldX; wx += stepSize) {
-        for (let wz = startWorldZ; wz <= endWorldZ; wz += stepSize) {
-            const p = worldToScreen(wx, wz);
-            const p2 = worldToScreen(wx + stepSize, wz + stepSize);
-            const w = p2.x - p.x;
-            const h = p2.y - p.y;
+        // Procedural Top-Down Biome Topography
+        const stepSize = Math.max(32, Math.floor(64 / zoom));
+        const startWorldX = Math.floor((camX - centerX / zoom) / stepSize) * stepSize;
+        const endWorldX = Math.ceil((camX + centerX / zoom) / stepSize) * stepSize;
+        const startWorldZ = Math.floor((camZ - centerY / zoom) / stepSize) * stepSize;
+        const endWorldZ = Math.ceil((camZ + centerY / zoom) / stepSize) * stepSize;
 
-            const n = Math.sin(wx * 0.003) * Math.cos(wz * 0.003) + Math.sin(wx * 0.012 + wz * 0.008) * 0.4;
-            let biomeColor = '#1e3a1e';
+        for (let wx = startWorldX; wx <= endWorldX; wx += stepSize) {
+            for (let wz = startWorldZ; wz <= endWorldZ; wz += stepSize) {
+                const p = worldToScreen(wx, wz);
+                const p2 = worldToScreen(wx + stepSize, wz + stepSize);
+                const w = p2.x - p.x;
+                const h = p2.y - p.y;
 
-            if (n < -0.35) {
-                biomeColor = '#0c2340';
-            } else if (n < -0.15) {
-                biomeColor = '#1a4b75';
-            } else if (n < -0.05) {
-                biomeColor = '#c2b280';
-            } else if (n < 0.25) {
-                biomeColor = '#1f4e24';
-            } else if (n < 0.45) {
-                biomeColor = '#4a5d4e';
-            } else {
-                biomeColor = '#d9e2ec';
+                const n = Math.sin(wx * 0.003) * Math.cos(wz * 0.003) + Math.sin(wx * 0.012 + wz * 0.008) * 0.4;
+                let biomeColor = '#1e3a1e';
+
+                if (n < -0.35) {
+                    biomeColor = '#0c2340';
+                } else if (n < -0.15) {
+                    biomeColor = '#1a4b75';
+                } else if (n < -0.05) {
+                    biomeColor = '#c2b280';
+                } else if (n < 0.25) {
+                    biomeColor = '#1f4e24';
+                } else if (n < 0.45) {
+                    biomeColor = '#4a5d4e';
+                } else {
+                    biomeColor = '#d9e2ec';
+                }
+
+                ctx.fillStyle = biomeColor;
+                ctx.fillRect(p.x, p.y, w + 1, h + 1);
             }
-
-            ctx.fillStyle = biomeColor;
-            ctx.fillRect(p.x, p.y, w + 1, h + 1);
         }
-    }
 
-    // 16x16 Chunk Grid Lines
-    if (mapState.layers.grid && zoom > 0.4) {
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.07)';
-        ctx.lineWidth = 1;
+        // 16x16 Chunk Grid Lines
+        if (mapState.layers.grid && zoom > 0.4) {
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.07)';
+            ctx.lineWidth = 1;
 
-        const chunkStartWX = Math.floor((camX - centerX / zoom) / 16) * 16;
-        const chunkEndWX = Math.ceil((camX + centerX / zoom) / 16) * 16;
-        const chunkStartWZ = Math.floor((camZ - centerY / zoom) / 16) * 16;
-        const chunkEndWZ = Math.ceil((camZ + centerY / zoom) / 16) * 16;
+            const chunkStartWX = Math.floor((camX - centerX / zoom) / 16) * 16;
+            const chunkEndWX = Math.ceil((camX + centerX / zoom) / 16) * 16;
+            const chunkStartWZ = Math.floor((camZ - centerY / zoom) / 16) * 16;
+            const chunkEndWZ = Math.ceil((camZ + centerY / zoom) / 16) * 16;
 
+            ctx.beginPath();
+            for (let x = chunkStartWX; x <= chunkEndWX; x += 16) {
+                const sp = worldToScreen(x, 0);
+                ctx.moveTo(sp.x, 0);
+                ctx.lineTo(sp.x, height);
+            }
+            for (let z = chunkStartWZ; z <= chunkEndWZ; z += 16) {
+                const sp = worldToScreen(0, z);
+                ctx.moveTo(0, sp.y);
+                ctx.lineTo(width, sp.y);
+            }
+            ctx.stroke();
+        }
+
+        // Concentric Range Distance Rings
+        if (mapState.layers.rings) {
+            const spawnScr = worldToScreen(0, 0);
+            const ranges = [100, 250, 500, 1000];
+            ctx.lineWidth = 1;
+
+            ranges.forEach(r => {
+                const radiusPx = r * zoom;
+                if (radiusPx > 10 && radiusPx < Math.max(width, height) * 2) {
+                    ctx.strokeStyle = 'rgba(56, 189, 248, 0.2)';
+                    ctx.setLineDash([4, 4]);
+                    ctx.beginPath();
+                    ctx.arc(spawnScr.x, spawnScr.y, radiusPx, 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+
+                    ctx.fillStyle = 'rgba(56, 189, 248, 0.5)';
+                    ctx.font = '10px "Fira Code", monospace';
+                    ctx.fillText(`${r}m`, spawnScr.x + radiusPx + 4, spawnScr.y);
+                }
+            });
+        }
+
+        // Radar Sweep Line
+        if (mapState.layers.radar) {
+            mapState.radarAngle = (mapState.radarAngle + 0.02) % (Math.PI * 2);
+            const sweepCenter = worldToScreen(mapState.camX, mapState.camZ);
+            const maxDist = Math.max(width, height);
+
+            const sweepEnd = {
+                x: sweepCenter.x + Math.cos(mapState.radarAngle) * maxDist,
+                y: sweepCenter.y + Math.sin(mapState.radarAngle) * maxDist
+            };
+
+            const grad = ctx.createLinearGradient(sweepCenter.x, sweepCenter.y, sweepEnd.x, sweepEnd.y);
+            grad.addColorStop(0, 'rgba(16, 185, 129, 0.4)');
+            grad.addColorStop(0.5, 'rgba(16, 185, 129, 0.15)');
+            grad.addColorStop(1, 'rgba(16, 185, 129, 0)');
+
+            ctx.strokeStyle = grad;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(sweepCenter.x, sweepCenter.y);
+            ctx.lineTo(sweepEnd.x, sweepEnd.y);
+            ctx.stroke();
+        }
+
+        // World Spawn Marker
+        const spawnP = worldToScreen(mapState.data.spawn_x || 0, mapState.data.spawn_z || 0);
+        ctx.save();
+        ctx.fillStyle = '#10b981';
+        ctx.shadowColor = '#10b981';
+        ctx.shadowBlur = 12;
         ctx.beginPath();
-        for (let x = chunkStartWX; x <= chunkEndWX; x += 16) {
-            const sp = worldToScreen(x, 0);
-            ctx.moveTo(sp.x, 0);
-            ctx.lineTo(sp.x, height);
-        }
-        for (let z = chunkStartWZ; z <= chunkEndWZ; z += 16) {
-            const sp = worldToScreen(0, z);
-            ctx.moveTo(0, sp.y);
-            ctx.lineTo(width, sp.y);
-        }
-        ctx.stroke();
-    }
+        ctx.arc(spawnP.x, spawnP.y, 7, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
 
-    // Concentric Range Distance Rings
-    if (mapState.layers.rings) {
-        const spawnScr = worldToScreen(0, 0);
-        const ranges = [100, 250, 500, 1000];
-        ctx.lineWidth = 1;
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 11px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('WORLD SPAWN (0,0)', spawnP.x, spawnP.y - 12);
 
-        ranges.forEach(r => {
-            const radiusPx = r * zoom;
-            if (radiusPx > 10 && radiusPx < Math.max(width, height) * 2) {
-                ctx.strokeStyle = 'rgba(56, 189, 248, 0.2)';
-                ctx.setLineDash([4, 4]);
+        // Saved Waypoints
+        if (mapState.data.waypoints) {
+            mapState.data.waypoints.forEach(wp => {
+                if (wp.id === 'spawn') return;
+                const wpScr = worldToScreen(wp.x, wp.z);
+
+                ctx.font = '16px serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(wp.icon || '📍', wpScr.x, wpScr.y + 4);
+
+                ctx.fillStyle = '#e2e8f0';
+                ctx.font = '600 11px Inter, sans-serif';
+                ctx.fillText(wp.name, wpScr.x, wpScr.y - 14);
+            });
+        }
+
+        // Online Players
+        if (mapState.data.players) {
+            const now = performance.now();
+            mapState.data.players.forEach(p => {
+                const pScr = worldToScreen(p.x, p.z);
+
+                const pulse = (now * 0.003) % 1.0;
+                ctx.strokeStyle = `rgba(56, 189, 248, ${1.0 - pulse})`;
+                ctx.lineWidth = 1.5;
                 ctx.beginPath();
-                ctx.arc(spawnScr.x, spawnScr.y, radiusPx, 0, Math.PI * 2);
+                ctx.arc(pScr.x, pScr.y, 8 + pulse * 18, 0, Math.PI * 2);
                 ctx.stroke();
-                ctx.setLineDash([]);
 
-                ctx.fillStyle = 'rgba(56, 189, 248, 0.5)';
-                ctx.font = '10px "Fira Code", monospace';
-                ctx.fillText(`${r}m`, spawnScr.x + radiusPx + 4, spawnScr.y);
-            }
-        });
-    }
+                const yawRad = ((p.yaw || 0) * Math.PI) / 180;
+                ctx.fillStyle = 'rgba(56, 189, 248, 0.25)';
+                ctx.beginPath();
+                ctx.moveTo(pScr.x, pScr.y);
+                ctx.arc(pScr.x, pScr.y, 22, yawRad - 0.5, yawRad + 0.5);
+                ctx.closePath();
+                ctx.fill();
 
-    // Radar Sweep Line
-    if (mapState.layers.radar) {
-        mapState.radarAngle = (mapState.radarAngle + 0.02) % (Math.PI * 2);
-        const sweepCenter = worldToScreen(mapState.camX, mapState.camZ);
-        const maxDist = Math.max(width, height);
+                ctx.save();
+                ctx.fillStyle = '#38bdf8';
+                ctx.shadowColor = '#38bdf8';
+                ctx.shadowBlur = 10;
+                ctx.beginPath();
+                ctx.arc(pScr.x, pScr.y, 6, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
 
-        const sweepEnd = {
-            x: sweepCenter.x + Math.cos(mapState.radarAngle) * maxDist,
-            y: sweepCenter.y + Math.sin(mapState.radarAngle) * maxDist
-        };
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 11px Inter, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(p.name, pScr.x, pScr.y - 14);
 
-        const grad = ctx.createLinearGradient(sweepCenter.x, sweepCenter.y, sweepEnd.x, sweepEnd.y);
-        grad.addColorStop(0, 'rgba(16, 185, 129, 0.4)');
-        grad.addColorStop(0.5, 'rgba(16, 185, 129, 0.15)');
-        grad.addColorStop(1, 'rgba(16, 185, 129, 0)');
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+                ctx.fillRect(pScr.x - 14, pScr.y - 10, 28, 4);
+                ctx.fillStyle = '#ef4444';
+                const hpWidth = Math.min(28, (p.health / 20) * 28);
+                ctx.fillRect(pScr.x - 14, pScr.y - 10, hpWidth, 4);
+            });
+        }
 
-        ctx.strokeStyle = grad;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(sweepCenter.x, sweepCenter.y);
-        ctx.lineTo(sweepEnd.x, sweepEnd.y);
-        ctx.stroke();
-    }
-
-    // World Spawn Marker
-    const spawnP = worldToScreen(mapState.data.spawn_x || 0, mapState.data.spawn_z || 0);
-    ctx.save();
-    ctx.fillStyle = '#10b981';
-    ctx.shadowColor = '#10b981';
-    ctx.shadowBlur = 12;
-    ctx.beginPath();
-    ctx.arc(spawnP.x, spawnP.y, 7, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 11px Inter, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('WORLD SPAWN (0,0)', spawnP.x, spawnP.y - 12);
-
-    // Saved Waypoints
-    if (mapState.data.waypoints) {
-        mapState.data.waypoints.forEach(wp => {
-            if (wp.id === 'spawn') return;
-            const wpScr = worldToScreen(wp.x, wp.z);
-
-            ctx.font = '16px serif';
-            ctx.textAlign = 'center';
-            ctx.fillText(wp.icon || '📍', wpScr.x, wpScr.y + 4);
-
-            ctx.fillStyle = '#e2e8f0';
-            ctx.font = '600 11px Inter, sans-serif';
-            ctx.fillText(wp.name, wpScr.x, wpScr.y - 14);
-        });
-    }
-
-    // Online Players
-    if (mapState.data.players) {
-        const now = performance.now();
-        mapState.data.players.forEach(p => {
-            const pScr = worldToScreen(p.x, p.z);
-
-            const pulse = (now * 0.003) % 1.0;
-            ctx.strokeStyle = `rgba(56, 189, 248, ${1.0 - pulse})`;
-            ctx.lineWidth = 1.5;
-            ctx.beginPath();
-            ctx.arc(pScr.x, pScr.y, 8 + pulse * 18, 0, Math.PI * 2);
-            ctx.stroke();
-
-            const yawRad = ((p.yaw || 0) * Math.PI) / 180;
-            ctx.fillStyle = 'rgba(56, 189, 248, 0.25)';
-            ctx.beginPath();
-            ctx.moveTo(pScr.x, pScr.y);
-            ctx.arc(pScr.x, pScr.y, 22, yawRad - 0.5, yawRad + 0.5);
-            ctx.closePath();
-            ctx.fill();
-
-            ctx.save();
-            ctx.fillStyle = '#38bdf8';
+        // Animated Lightning Bolt Visual Flashes
+        if (mapState.lightningFlashes.length > 0) {
+            ctx.strokeStyle = '#ffffff';
             ctx.shadowColor = '#38bdf8';
-            ctx.shadowBlur = 10;
-            ctx.beginPath();
-            ctx.arc(pScr.x, pScr.y, 6, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.restore();
+            ctx.shadowBlur = 20;
+            ctx.lineWidth = 3;
 
-            ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 11px Inter, sans-serif';
-            ctx.textAlign = 'center';
-            ctx.fillText(p.name, pScr.x, pScr.y - 14);
+            for (let i = mapState.lightningFlashes.length - 1; i >= 0; i--) {
+                const bolt = mapState.lightningFlashes[i];
+                const bScr = worldToScreen(bolt.x, bolt.z);
 
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-            ctx.fillRect(pScr.x - 14, pScr.y - 10, 28, 4);
-            ctx.fillStyle = '#ef4444';
-            const hpWidth = Math.min(28, (p.health / 20) * 28);
-            ctx.fillRect(pScr.x - 14, pScr.y - 10, hpWidth, 4);
-        });
-    }
+                ctx.beginPath();
+                ctx.moveTo(bScr.x, bScr.y - 120);
+                ctx.lineTo(bScr.x - 10, bScr.y - 80);
+                ctx.lineTo(bScr.x + 8, bScr.y - 45);
+                ctx.lineTo(bScr.x - 6, bScr.y - 20);
+                ctx.lineTo(bScr.x, bScr.y);
+                ctx.stroke();
 
-    // Animated Lightning Bolt Visual Flashes
-    if (mapState.lightningFlashes.length > 0) {
-        ctx.strokeStyle = '#ffffff';
-        ctx.shadowColor = '#38bdf8';
-        ctx.shadowBlur = 20;
-        ctx.lineWidth = 3;
-
-        for (let i = mapState.lightningFlashes.length - 1; i >= 0; i--) {
-            const bolt = mapState.lightningFlashes[i];
-            const bScr = worldToScreen(bolt.x, bolt.z);
-
-            ctx.beginPath();
-            ctx.moveTo(bScr.x, bScr.y - 120);
-            ctx.lineTo(bScr.x - 10, bScr.y - 80);
-            ctx.lineTo(bScr.x + 8, bScr.y - 45);
-            ctx.lineTo(bScr.x - 6, bScr.y - 20);
-            ctx.lineTo(bScr.x, bScr.y);
-            ctx.stroke();
-
-            bolt.framesLeft--;
-            if (bolt.framesLeft <= 0) {
-                mapState.lightningFlashes.splice(i, 1);
+                bolt.framesLeft--;
+                if (bolt.framesLeft <= 0) {
+                    mapState.lightningFlashes.splice(i, 1);
+                }
             }
         }
+
+        ctx.restore();
+        requestAnimationFrame(renderGodsEyeFrame);
     }
 
-    ctx.restore();
-    requestAnimationFrame(renderGodsEyeFrame);
-}
+    function zoomMap(factor) {
+        mapState.zoom = Math.max(0.15, Math.min(6.0, mapState.zoom * factor));
+    }
 
-function zoomMap(factor) {
-    mapState.zoom = Math.max(0.15, Math.min(6.0, mapState.zoom * factor));
-}
+    function resetMapZoom() {
+        mapState.zoom = 1.0;
+        centerMapOnSpawn();
+    }
 
-function resetMapZoom() {
-    mapState.zoom = 1.0;
-    centerMapOnSpawn();
-}
-
-function centerMapOnSpawn() {
-    mapState.camX = 0;
-    mapState.camZ = 0;
-    mapState.followPlayerName = null;
-    updateFollowBtnState();
-}
-
-function centerMapOnPlayer(name) {
-    const p = mapState.data.players.find(x => x.name === name);
-    if (p) {
-        mapState.camX = p.x;
-        mapState.camZ = p.z;
-        mapState.followPlayerName = name;
+    function centerMapOnSpawn() {
+        mapState.camX = 0;
+        mapState.camZ = 0;
+        mapState.followPlayerName = null;
         updateFollowBtnState();
     }
-}
 
-function centerMapOnCoords(x, z) {
-    mapState.camX = x;
-    mapState.camZ = z;
-    mapState.followPlayerName = null;
-    updateFollowBtnState();
-}
+    function centerMapOnPlayer(name) {
+        const p = mapState.data.players.find(x => x.name === name);
+        if (p) {
+            mapState.camX = p.x;
+            mapState.camZ = p.z;
+            mapState.followPlayerName = name;
+            updateFollowBtnState();
+        }
+    }
 
-function toggleFollowPlayer() {
-    if (mapState.followPlayerName) {
+    function centerMapOnCoords(x, z) {
+        mapState.camX = x;
+        mapState.camZ = z;
         mapState.followPlayerName = null;
-    } else if (mapState.data.players.length > 0) {
-        mapState.followPlayerName = mapState.data.players[0].name;
+        updateFollowBtnState();
     }
-    updateFollowBtnState();
-}
 
-function updateFollowBtnState() {
-    const btn = document.getElementById('btnFollowPlayer');
-    if (btn) {
+    function toggleFollowPlayer() {
         if (mapState.followPlayerName) {
-            btn.classList.add('emerald');
-            btn.innerHTML = `👁️ Follow: ${escapeHtml(mapState.followPlayerName)}`;
-        } else {
-            btn.classList.remove('emerald');
-            btn.innerHTML = `👁️ Follow: OFF`;
+            mapState.followPlayerName = null;
+        } else if (mapState.data.players.length > 0) {
+            mapState.followPlayerName = mapState.data.players[0].name;
         }
-    }
-}
-
-function toggleMapLayer(layer) {
-    if (mapState.layers.hasOwnProperty(layer)) {
-        mapState.layers[layer] = !mapState.layers[layer];
-        const btn = document.getElementById(`ctrl${layer.charAt(0).toUpperCase() + layer.slice(1)}Toggle`);
-        if (btn) btn.classList.toggle('active', mapState.layers[layer]);
-    }
-}
-
-function openMapContextMenu(screenX, screenY, worldX, worldZ) {
-    const menu = document.getElementById('mapContextMenu');
-    const coordsText = document.getElementById('ctxCoordsText');
-    if (!menu) return;
-
-    if (coordsText) coordsText.textContent = `TARGET: X: ${worldX}, Z: ${worldZ}`;
-    menu.style.left = `${Math.min(screenX, window.innerWidth - 240)}px`;
-    menu.style.top = `${Math.min(screenY, window.innerHeight - 280)}px`;
-    menu.style.display = 'block';
-}
-
-function closeMapContextMenu() {
-    const menu = document.getElementById('mapContextMenu');
-    if (menu) menu.style.display = 'none';
-}
-
-function executeMapContextAction(action) {
-    const { x, z } = mapState.contextCoords;
-    closeMapContextMenu();
-
-    let payload = { action, x, z };
-
-    if (action === 'teleport') {
-        const player = mapState.followPlayerName || (mapState.data.players.length > 0 ? mapState.data.players[0].name : prompt("Enter player name to teleport:"));
-        if (!player) return;
-        payload.player = player;
-    } else if (action === 'summon_golem') {
-        payload.action = 'summon';
-        payload.entity = 'iron_golem';
-    } else if (action === 'lightning') {
-        mapState.lightningFlashes.push({ x, z, framesLeft: 8 });
+        updateFollowBtnState();
     }
 
-    fetch('/api/map/action', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-    })
-    .then(r => r.json())
-    .then(res => {
-        showToast(res.result || `Action ${action} executed`, 'success');
-        loadGodsEyeData();
-    })
-    .catch(err => showToast(`Failed action: ${err}`, 'error'));
-}
-
-function quickTeleportPlayerToSpawn(playerName) {
-    fetch('/api/map/action', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'teleport', player: playerName, x: 0, y: 64, z: 0 })
-    })
-    .then(r => r.json())
-    .then(res => {
-        showToast(res.result || `Teleported ${playerName} to spawn`, 'success');
-        loadGodsEyeData();
-    })
-    .catch(err => showToast(`Failed: ${err}`, 'error'));
-}
-
-function triggerWorldAtmosphere(type, val) {
-    fetch('/api/map/action', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: type, value: val })
-    })
-    .then(r => r.json())
-    .then(res => {
-        showToast(res.result || `Updated ${type} to ${val}`, 'success');
-        loadGodsEyeData();
-    })
-    .catch(err => showToast(`Failed: ${err}`, 'error'));
-}
-
-function openAddWaypointModal() {
-    const modal = document.getElementById('addWaypointModal');
-    if (!modal) return;
-    const nameInput = document.getElementById('wpNameInput');
-    const xInput = document.getElementById('wpXInput');
-    const zInput = document.getElementById('wpZInput');
-    if (nameInput) nameInput.value = '';
-    if (xInput) xInput.value = Math.round(mapState.camX);
-    if (zInput) zInput.value = Math.round(mapState.camZ);
-    modal.classList.add('active');
-}
-
-function openAddWaypointModalAtCursor() {
-    closeMapContextMenu();
-    const modal = document.getElementById('addWaypointModal');
-    if (!modal) return;
-    const nameInput = document.getElementById('wpNameInput');
-    const xInput = document.getElementById('wpXInput');
-    const zInput = document.getElementById('wpZInput');
-    if (nameInput) nameInput.value = 'Tactical Marker';
-    if (xInput) xInput.value = Math.round(mapState.contextCoords.x);
-    if (zInput) zInput.value = Math.round(mapState.contextCoords.z);
-    modal.classList.add('active');
-}
-
-function selectWaypointIcon(icon, btn) {
-    const group = document.getElementById('wpIconGroup');
-    const input = document.getElementById('wpSelectedIcon');
-    if (group) {
-        group.querySelectorAll('.wp-icon-choice-btn').forEach(b => b.classList.remove('active'));
-    }
-    if (btn) btn.classList.add('active');
-    if (input) input.value = icon;
-}
-
-function saveNewWaypoint() {
-    const name = document.getElementById('wpNameInput').value.trim() || 'Waypoint';
-    const x = parseFloat(document.getElementById('wpXInput').value) || 0;
-    const z = parseFloat(document.getElementById('wpZInput').value) || 0;
-    const icon = document.getElementById('wpSelectedIcon').value || '📍';
-
-    fetch('/api/map/waypoint', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, x, z, icon, color: '#10b981' })
-    })
-    .then(r => r.json())
-    .then(wp => {
-        showToast(`Waypoint "${name}" pinned to God's Eye!`, 'success');
-        closeModal('addWaypointModal');
-        loadGodsEyeData();
-    })
-    .catch(err => showToast(`Failed to save waypoint: ${err}`, 'error'));
-}
-
-function deleteWaypoint(id) {
-    fetch('/api/map/waypoint/delete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id })
-    })
-    .then(r => r.json())
-    .then(() => {
-        showToast("Waypoint removed", 'info');
-        loadGodsEyeData();
-    })
-    .catch(err => showToast(`Failed: ${err}`, 'error'));
-}
-
-/* =========================================================================
-   13. INITIALIZATION (Hash Routing & Font Alignment)
-   ========================================================================= */
-document.addEventListener('DOMContentLoaded', () => {
-    initZentraHalftoneBackground();
-    initTerminalKeyboard();
-    initTabDragSelector();
-    syncServerEditionUI();
-
-    // Determine initial tab from window.location.hash
-    let initialTab = 'home';
-    if (window.location.hash) {
-        const hash = window.location.hash.replace(/^#/, '').trim().toLowerCase();
-        if (hash === 'terminal') initialTab = 'console';
-        else if (['home', 'map', 'console', 'java', 'worlds', 'players', 'addons', 'properties', 'update', 'settings'].includes(hash)) {
-            initialTab = hash;
+    function updateFollowBtnState() {
+        const btn = document.getElementById('btnFollowPlayer');
+        if (btn) {
+            if (mapState.followPlayerName) {
+                btn.classList.add('emerald');
+                btn.innerHTML = `👁️ Follow: ${escapeHtml(mapState.followPlayerName)}`;
+            } else {
+                btn.classList.remove('emerald');
+                btn.innerHTML = `👁️ Follow: OFF`;
+            }
         }
     }
 
-    switchZentraTab(initialTab);
+    function toggleMapLayer(layer) {
+        if (mapState.layers.hasOwnProperty(layer)) {
+            mapState.layers[layer] = !mapState.layers[layer];
+            const btn = document.getElementById(`ctrl${layer.charAt(0).toUpperCase() + layer.slice(1)}Toggle`);
+            if (btn) btn.classList.toggle('active', mapState.layers[layer]);
+        }
+    }
 
-    // Update tab slider once fonts are loaded for pixel-perfect pill width
-    if (document.fonts && document.fonts.ready) {
-        document.fonts.ready.then(() => {
-            const activeBtn = document.querySelector(`.nav-tab-btn[data-tab="${currentTab}"]`);
-            if (activeBtn) updateTabSlider(activeBtn);
+    function openMapContextMenu(screenX, screenY, worldX, worldZ) {
+        const menu = document.getElementById('mapContextMenu');
+        const coordsText = document.getElementById('ctxCoordsText');
+        if (!menu) return;
+
+        if (coordsText) coordsText.textContent = `TARGET: X: ${worldX}, Z: ${worldZ}`;
+        menu.style.left = `${Math.min(screenX, window.innerWidth - 240)}px`;
+        menu.style.top = `${Math.min(screenY, window.innerHeight - 280)}px`;
+        menu.style.display = 'block';
+    }
+
+    function closeMapContextMenu() {
+        const menu = document.getElementById('mapContextMenu');
+        if (menu) menu.style.display = 'none';
+    }
+
+    function executeMapContextAction(action) {
+        const { x, z } = mapState.contextCoords;
+        closeMapContextMenu();
+
+        let payload = { action, x, z };
+
+        if (action === 'teleport') {
+            const player = mapState.followPlayerName || (mapState.data.players.length > 0 ? mapState.data.players[0].name : prompt("Enter player name to teleport:"));
+            if (!player) return;
+            payload.player = player;
+        } else if (action === 'summon_golem') {
+            payload.action = 'summon';
+            payload.entity = 'iron_golem';
+        } else if (action === 'lightning') {
+            mapState.lightningFlashes.push({ x, z, framesLeft: 8 });
+        }
+
+        fetch('/api/map/action', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+            .then(r => r.json())
+            .then(res => {
+                showToast(res.result || `Action ${action} executed`, 'success');
+                loadGodsEyeData();
+            })
+            .catch(err => showToast(`Failed action: ${err}`, 'error'));
+    }
+
+    function quickTeleportPlayerToSpawn(playerName) {
+        fetch('/api/map/action', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'teleport', player: playerName, x: 0, y: 64, z: 0 })
+        })
+            .then(r => r.json())
+            .then(res => {
+                showToast(res.result || `Teleported ${playerName} to spawn`, 'success');
+                loadGodsEyeData();
+            })
+            .catch(err => showToast(`Failed: ${err}`, 'error'));
+    }
+
+    function triggerWorldAtmosphere(type, val) {
+        fetch('/api/map/action', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: type, value: val })
+        })
+            .then(r => r.json())
+            .then(res => {
+                showToast(res.result || `Updated ${type} to ${val}`, 'success');
+                loadGodsEyeData();
+            })
+            .catch(err => showToast(`Failed: ${err}`, 'error'));
+    }
+
+    function openAddWaypointModal() {
+        const modal = document.getElementById('addWaypointModal');
+        if (!modal) return;
+        const nameInput = document.getElementById('wpNameInput');
+        const xInput = document.getElementById('wpXInput');
+        const zInput = document.getElementById('wpZInput');
+        if (nameInput) nameInput.value = '';
+        if (xInput) xInput.value = Math.round(mapState.camX);
+        if (zInput) zInput.value = Math.round(mapState.camZ);
+        modal.classList.add('active');
+    }
+
+    function openAddWaypointModalAtCursor() {
+        closeMapContextMenu();
+        const modal = document.getElementById('addWaypointModal');
+        if (!modal) return;
+        const nameInput = document.getElementById('wpNameInput');
+        const xInput = document.getElementById('wpXInput');
+        const zInput = document.getElementById('wpZInput');
+        if (nameInput) nameInput.value = 'Tactical Marker';
+        if (xInput) xInput.value = Math.round(mapState.contextCoords.x);
+        if (zInput) zInput.value = Math.round(mapState.contextCoords.z);
+        modal.classList.add('active');
+    }
+
+    function selectWaypointIcon(icon, btn) {
+        const group = document.getElementById('wpIconGroup');
+        const input = document.getElementById('wpSelectedIcon');
+        if (group) {
+            group.querySelectorAll('.wp-icon-choice-btn').forEach(b => b.classList.remove('active'));
+        }
+        if (btn) btn.classList.add('active');
+        if (input) input.value = icon;
+    }
+
+    function saveNewWaypoint() {
+        const name = document.getElementById('wpNameInput').value.trim() || 'Waypoint';
+        const x = parseFloat(document.getElementById('wpXInput').value) || 0;
+        const z = parseFloat(document.getElementById('wpZInput').value) || 0;
+        const icon = document.getElementById('wpSelectedIcon').value || '📍';
+
+        fetch('/api/map/waypoint', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, x, z, icon, color: '#10b981' })
+        })
+            .then(r => r.json())
+            .then(wp => {
+                showToast(`Waypoint "${name}" pinned to God's Eye!`, 'success');
+                closeModal('addWaypointModal');
+                loadGodsEyeData();
+            })
+            .catch(err => showToast(`Failed to save waypoint: ${err}`, 'error'));
+    }
+
+    function deleteWaypoint(id) {
+        fetch('/api/map/waypoint/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id })
+        })
+            .then(r => r.json())
+            .then(() => {
+                showToast("Waypoint removed", 'info');
+                loadGodsEyeData();
+            })
+            .catch(err => showToast(`Failed: ${err}`, 'error'));
+    }
+
+    /* =========================================================================
+       13. INITIALIZATION (Hash Routing & Font Alignment)
+       ========================================================================= */
+    document.addEventListener('DOMContentLoaded', () => {
+        initZentraHalftoneBackground();
+        initTerminalKeyboard();
+        initTabDragSelector();
+        syncServerEditionUI();
+
+        // Determine initial tab from window.location.hash
+        let initialTab = 'home';
+        if (window.location.hash) {
+            const hash = window.location.hash.replace(/^#/, '').trim().toLowerCase();
+            if (hash === 'terminal') initialTab = 'console';
+            else if (['home', 'map', 'console', 'java', 'worlds', 'players', 'addons', 'properties', 'update', 'settings'].includes(hash)) {
+                initialTab = hash;
+            }
+        }
+
+        switchZentraTab(initialTab);
+
+        // Update tab slider once fonts are loaded for pixel-perfect pill width
+        if (document.fonts && document.fonts.ready) {
+            document.fonts.ready.then(() => {
+                const activeBtn = document.querySelector(`.nav-tab-btn[data-tab="${currentTab}"]`);
+                if (activeBtn) updateTabSlider(activeBtn);
+            });
+        }
+
+        // Listen for browser back/forward buttons (hashchange)
+        window.addEventListener('hashchange', () => {
+            let h = window.location.hash.replace(/^#/, '').trim().toLowerCase();
+            if (h === 'terminal') h = 'console';
+            if (h && h !== currentTab && ['home', 'map', 'console', 'java', 'worlds', 'players', 'addons', 'properties', 'update', 'settings'].includes(h)) {
+                switchZentraTab(h);
+            }
         });
-    }
 
-    // Listen for browser back/forward buttons (hashchange)
-    window.addEventListener('hashchange', () => {
-        let h = window.location.hash.replace(/^#/, '').trim().toLowerCase();
-        if (h === 'terminal') h = 'console';
-        if (h && h !== currentTab && ['home', 'map', 'console', 'java', 'worlds', 'players', 'addons', 'properties', 'update', 'settings'].includes(h)) {
-            switchZentraTab(h);
-        }
-    });
-
-    loadStatus();
-    if (serverEdition === 'bedrock') loadAnnouncements();
-    loadProperties();
-    pollLifecycleStatus();
-    if (currentTab === 'console') {
-        fetchLogs();
-    } else if (currentTab === 'map') {
-        loadGodsEyeData();
-    } else if (currentTab === 'java') {
-        loadJavaServer();
-        loadLatestPaper();
-        pollPaperUpdateStatus();
-    }
-
-    initGameMasterArsenal();
-    updateBroadcastPreview();
-
-    // Polling loop for status, lifecycle countdown & logs
-    setInterval(() => {
         loadStatus();
+        if (serverEdition === 'bedrock') loadAnnouncements();
+        loadProperties();
         pollLifecycleStatus();
         if (currentTab === 'console') {
             fetchLogs();
@@ -2993,40 +2972,57 @@ document.addEventListener('DOMContentLoaded', () => {
             loadGodsEyeData();
         } else if (currentTab === 'java') {
             loadJavaServer();
+            loadLatestPaper();
+            pollPaperUpdateStatus();
         }
-    }, pollInterval);
-});
 
-/* =========================================================================
-   13. IN-GAME BROADCASTER & GAME MASTER ARSENAL
-   ========================================================================= */
-let _currentBroadcastType = 'chat';
-let _currentDispenseAmount = 1;
+        initGameMasterArsenal();
+        updateBroadcastPreview();
 
-const ARSENAL_ITEMS = [
-    { id: 'netherite_sword', name: 'Netherite Sword', icon: '⚔️', rarity: 'mythic' },
-    { id: 'netherite_pickaxe', name: 'Netherite Pickaxe', icon: '⛏️', rarity: 'mythic' },
-    { id: 'netherite_axe', name: 'Netherite Axe', icon: '🪓', rarity: 'mythic' },
-    { id: 'netherite_chestplate', name: 'Netherite Armor', icon: '🛡️', rarity: 'mythic' },
-    { id: 'elytra', name: 'Elytra Wings', icon: '🪽', rarity: 'legendary' },
-    { id: 'firework_rocket', name: 'Rockets x64', icon: '🎆', rarity: 'epic', defaultAmt: 64 },
-    { id: 'enchanted_golden_apple', name: 'God Apple', icon: '🍏', rarity: 'mythic' },
-    { id: 'totem_of_undying', name: 'Totem Undying', icon: '🧿', rarity: 'legendary' },
-    { id: 'diamond', name: 'Diamond Gem', icon: '💎', rarity: 'rare' },
-    { id: 'ender_pearl', name: 'Ender Pearl x16', icon: '🔮', rarity: 'epic', defaultAmt: 16 },
-    { id: 'tnt', name: 'TNT Block', icon: '🧨', rarity: 'epic' },
-    { id: 'cooked_beef', name: 'Cooked Steak', icon: '🥩', rarity: 'rare' },
-    { id: 'bow', name: 'Master Bow', icon: '🏹', rarity: 'epic' },
-    { id: 'arrow', name: 'Arrows x64', icon: '🎯', rarity: 'rare', defaultAmt: 64 },
-    { id: 'wind_charge', name: 'Wind Charge', icon: '💨', rarity: 'legendary' },
-    { id: 'mace', name: 'Heavy Mace', icon: '🔨', rarity: 'mythic' }
-];
+        // Polling loop for status, lifecycle countdown & logs
+        setInterval(() => {
+            loadStatus();
+            pollLifecycleStatus();
+            if (currentTab === 'console') {
+                fetchLogs();
+            } else if (currentTab === 'map') {
+                loadGodsEyeData();
+            } else if (currentTab === 'java') {
+                loadJavaServer();
+            }
+        }, pollInterval);
+    });
 
-function initGameMasterArsenal() {
-    const grid = document.getElementById('mcArsenalGrid');
-    if (!grid) return;
+    /* =========================================================================
+       13. IN-GAME BROADCASTER & GAME MASTER ARSENAL
+       ========================================================================= */
+    let _currentBroadcastType = 'chat';
+    let _currentDispenseAmount = 1;
 
-    grid.innerHTML = ARSENAL_ITEMS.map(item => `
+    const ARSENAL_ITEMS = [
+        { id: 'netherite_sword', name: 'Netherite Sword', icon: '⚔️', rarity: 'mythic' },
+        { id: 'netherite_pickaxe', name: 'Netherite Pickaxe', icon: '⛏️', rarity: 'mythic' },
+        { id: 'netherite_axe', name: 'Netherite Axe', icon: '🪓', rarity: 'mythic' },
+        { id: 'netherite_chestplate', name: 'Netherite Armor', icon: '🛡️', rarity: 'mythic' },
+        { id: 'elytra', name: 'Elytra Wings', icon: '🪽', rarity: 'legendary' },
+        { id: 'firework_rocket', name: 'Rockets x64', icon: '🎆', rarity: 'epic', defaultAmt: 64 },
+        { id: 'enchanted_golden_apple', name: 'God Apple', icon: '🍏', rarity: 'mythic' },
+        { id: 'totem_of_undying', name: 'Totem Undying', icon: '🧿', rarity: 'legendary' },
+        { id: 'diamond', name: 'Diamond Gem', icon: '💎', rarity: 'rare' },
+        { id: 'ender_pearl', name: 'Ender Pearl x16', icon: '🔮', rarity: 'epic', defaultAmt: 16 },
+        { id: 'tnt', name: 'TNT Block', icon: '🧨', rarity: 'epic' },
+        { id: 'cooked_beef', name: 'Cooked Steak', icon: '🥩', rarity: 'rare' },
+        { id: 'bow', name: 'Master Bow', icon: '🏹', rarity: 'epic' },
+        { id: 'arrow', name: 'Arrows x64', icon: '🎯', rarity: 'rare', defaultAmt: 64 },
+        { id: 'wind_charge', name: 'Wind Charge', icon: '💨', rarity: 'legendary' },
+        { id: 'mace', name: 'Heavy Mace', icon: '🔨', rarity: 'mythic' }
+    ];
+
+    function initGameMasterArsenal() {
+        const grid = document.getElementById('mcArsenalGrid');
+        if (!grid) return;
+
+        grid.innerHTML = ARSENAL_ITEMS.map(item => `
         <div class="mc-slot ${item.rarity}" onclick="dispenseItem('${item.id}', 'give', ${item.defaultAmt || _currentDispenseAmount})">
             <div class="mc-slot-icon-row">
                 <span class="mc-slot-icon">${item.icon}</span>
@@ -3039,331 +3035,331 @@ function initGameMasterArsenal() {
             </div>
         </div>
     `).join('');
-}
-
-function updatePlayerDropdowns(players) {
-    const bcSelect = document.getElementById('bcTargetPlayer');
-    const gmSelect = document.getElementById('gmTargetPlayer');
-    if (!bcSelect || !gmSelect) return;
-
-    const bcVal = bcSelect.value || '@a';
-    const gmVal = gmSelect.value || '@a';
-
-    const opts = ['<option value="@a">👥 @a - All Players</option>'];
-    players.forEach(p => {
-        opts.push(`<option value="${escapeHtml(p.name)}">🎮 ${escapeHtml(p.name)} (${p.status})</option>`);
-    });
-
-    const optHtml = opts.join('');
-    bcSelect.innerHTML = optHtml;
-    gmSelect.innerHTML = optHtml;
-
-    if (Array.from(bcSelect.options).some(o => o.value === bcVal)) bcSelect.value = bcVal;
-    if (Array.from(gmSelect.options).some(o => o.value === gmVal)) gmSelect.value = gmVal;
-}
-
-function selectGmPlayer(playerName) {
-    const gmSelect = document.getElementById('gmTargetPlayer');
-    if (gmSelect) {
-        gmSelect.value = playerName;
-    }
-    const card = document.getElementById('gmArsenalCard');
-    if (card) {
-        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        card.style.outline = '3px solid #f59e0b';
-        setTimeout(() => { card.style.outline = 'none'; }, 1500);
-    }
-    showToast(`Operator controls focused on ${playerName}`, 'info');
-}
-
-function syncGmTarget(val) {
-    // optional sync
-}
-
-/* Broadcaster functions */
-function setBroadcastType(type) {
-    _currentBroadcastType = type;
-    document.querySelectorAll('.bc-type-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.type === type);
-    });
-
-    const subGroup = document.getElementById('bcSubtitleGroup');
-    if (subGroup) {
-        subGroup.style.display = (type === 'title') ? 'block' : 'none';
     }
 
-    const modeLabel = document.getElementById('previewModeLabel');
-    if (modeLabel) modeLabel.textContent = type.toUpperCase();
+    function updatePlayerDropdowns(players) {
+        const bcSelect = document.getElementById('bcTargetPlayer');
+        const gmSelect = document.getElementById('gmTargetPlayer');
+        if (!bcSelect || !gmSelect) return;
 
-    updateBroadcastPreview();
-}
+        const bcVal = bcSelect.value || '@a';
+        const gmVal = gmSelect.value || '@a';
 
-function insertColorCode(code) {
-    const input = document.getElementById('bcMessageInput');
-    if (!input) return;
+        const opts = ['<option value="@a">👥 @a - All Players</option>'];
+        players.forEach(p => {
+            opts.push(`<option value="${escapeHtml(p.name)}">🎮 ${escapeHtml(p.name)} (${p.status})</option>`);
+        });
 
-    const start = input.selectionStart || input.value.length;
-    const end = input.selectionEnd || input.value.length;
-    const val = input.value;
-    input.value = val.substring(0, start) + code + val.substring(end);
-    input.focus();
-    input.selectionStart = input.selectionEnd = start + code.length;
-    updateBroadcastPreview();
-}
+        const optHtml = opts.join('');
+        bcSelect.innerHTML = optHtml;
+        gmSelect.innerHTML = optHtml;
 
-function applyBroadcastPreset(key) {
-    const input = document.getElementById('bcMessageInput');
-    const subInput = document.getElementById('bcSubtitleInput');
-    const soundSelect = document.getElementById('bcSoundEffect');
-
-    switch (key) {
-        case 'welcome':
-            setBroadcastType('title');
-            if (input) input.value = "§bWelcome to §eLALALAND§b!";
-            if (subInput) subInput.value = "§aHave fun and respect the community rules!";
-            if (soundSelect) soundSelect.value = "levelup";
-            break;
-        case 'restart':
-            setBroadcastType('title');
-            if (input) input.value = "§c⚠ SERVER RESTART IN 5M ⚠";
-            if (subInput) subInput.value = "§ePlease finish your trades and save!";
-            if (soundSelect) soundSelect.value = "thunder";
-            break;
-        case 'pvp':
-            setBroadcastType('title');
-            if (input) input.value = "§6⚔ PVP ARENA EVENT ⚔";
-            if (subInput) subInput.value = "§fStarting now at World Spawn coordinates!";
-            if (soundSelect) soundSelect.value = "totem";
-            break;
-        case 'night':
-            setBroadcastType('actionbar');
-            if (input) input.value = "§9🌙 Night has fallen! Beware of monsters!";
-            if (soundSelect) soundSelect.value = "orb";
-            break;
-        case 'rules':
-            setBroadcastType('chat');
-            if (input) input.value = "§e[Server Rules] §7No griefing, no hacked clients, keep chat civil. Have fun!";
-            if (soundSelect) soundSelect.value = "none";
-            break;
+        if (Array.from(bcSelect.options).some(o => o.value === bcVal)) bcSelect.value = bcVal;
+        if (Array.from(gmSelect.options).some(o => o.value === gmVal)) gmSelect.value = gmVal;
     }
-    updateBroadcastPreview();
-}
 
-function updateBroadcastPreview() {
-    const msg = (document.getElementById('bcMessageInput')?.value || '').trim();
-    const sub = (document.getElementById('bcSubtitleInput')?.value || '').trim();
-
-    const titleBox = document.getElementById('previewTitleDisplay');
-    const chatBox = document.getElementById('previewChatDisplay');
-    const actionbarBox = document.getElementById('previewActionbarDisplay');
-
-    if (!titleBox || !chatBox || !actionbarBox) return;
-
-    titleBox.style.display = 'none';
-    chatBox.style.display = 'none';
-    actionbarBox.style.display = 'none';
-
-    if (_currentBroadcastType === 'title') {
-        titleBox.style.display = 'block';
-        const mainEl = document.getElementById('previewMainTitle');
-        const subEl = document.getElementById('previewSubTitle');
-        if (mainEl) mainEl.innerHTML = parseMinecraftColorCodes(msg || "TITLE BANNER");
-        if (subEl) subEl.innerHTML = parseMinecraftColorCodes(sub || "Subtitle text here");
-    } else if (_currentBroadcastType === 'actionbar') {
-        actionbarBox.style.display = 'block';
-        const actEl = document.getElementById('previewActionbarMsg');
-        if (actEl) actEl.innerHTML = parseMinecraftColorCodes(msg || "Actionbar toast notification");
-    } else {
-        // chat or whisper
-        chatBox.style.display = 'block';
-        const chatMsgEl = document.getElementById('previewChatMsg');
-        if (chatMsgEl) chatMsgEl.innerHTML = parseMinecraftColorCodes(msg || "Welcome to the server!");
+    function selectGmPlayer(playerName) {
+        const gmSelect = document.getElementById('gmTargetPlayer');
+        if (gmSelect) {
+            gmSelect.value = playerName;
+        }
+        const card = document.getElementById('gmArsenalCard');
+        if (card) {
+            card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            card.style.outline = '3px solid #f59e0b';
+            setTimeout(() => { card.style.outline = 'none'; }, 1500);
+        }
+        showToast(`Operator controls focused on ${playerName}`, 'info');
     }
-}
 
-function dispatchCustomBroadcast() {
-    const input = document.getElementById('bcMessageInput');
-    const msg = input ? input.value.trim() : '';
-    if (!msg) return showToast("Enter a message to broadcast", "error");
+    function syncGmTarget(val) {
+        // optional sync
+    }
 
-    const target = document.getElementById('bcTargetPlayer')?.value || '@a';
-    const sound = document.getElementById('bcSoundEffect')?.value || 'none';
-    const sub = document.getElementById('bcSubtitleInput')?.value.trim() || undefined;
+    /* Broadcaster functions */
+    function setBroadcastType(type) {
+        _currentBroadcastType = type;
+        document.querySelectorAll('.bc-type-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.type === type);
+        });
 
-    const payload = {
-        message: msg,
-        broadcast_type: _currentBroadcastType,
-        target_player: target === '@a' ? null : target,
-        subtitle: (_currentBroadcastType === 'title' && sub) ? sub : null,
-        sound: sound === 'none' ? null : sound
-    };
+        const subGroup = document.getElementById('bcSubtitleGroup');
+        if (subGroup) {
+            subGroup.style.display = (type === 'title') ? 'block' : 'none';
+        }
 
-    showToast("Broadcasting message in-game...", "info");
-    fetch('/api/broadcast/custom', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-    })
-    .then(r => r.json())
-    .then(data => {
-        showToast(data.result || "Broadcast sent!", "success");
-        if (input) input.value = '';
-        const subInput = document.getElementById('bcSubtitleInput');
-        if (subInput) subInput.value = '';
+        const modeLabel = document.getElementById('previewModeLabel');
+        if (modeLabel) modeLabel.textContent = type.toUpperCase();
+
         updateBroadcastPreview();
-    })
-    .catch(err => showToast(`Broadcast failed: ${err}`, "error"));
-}
-
-/* Game Master Arsenal & Controls */
-function setItemDispenseAmount(amt, btn) {
-    _currentDispenseAmount = amt;
-    document.querySelectorAll('.amount-pill-btn').forEach(b => b.classList.remove('active'));
-    if (btn) btn.classList.add('active');
-    initGameMasterArsenal();
-}
-
-function dispenseItem(itemId, action, amount) {
-    const target = document.getElementById('gmTargetPlayer')?.value || '@a';
-    const amt = amount || _currentDispenseAmount || 1;
-
-    showToast(`Sending ${action} for ${amt}x ${itemId}...`, "info");
-    fetch('/api/player/gamemaster', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            player: target,
-            action: action, // "give" or "clear_item"
-            item: itemId,
-            amount: amt
-        })
-    })
-    .then(r => r.json())
-    .then(data => {
-        showToast(data.result || "Action executed", "success");
-    })
-    .catch(err => showToast(`Action failed: ${err}`, "error"));
-}
-
-function dispenseCustomItem(action) {
-    const itemId = document.getElementById('gmCustomItemId')?.value.trim();
-    if (!itemId) return showToast("Enter an item ID (e.g. mace, breeze_rod)", "error");
-    const amt = parseInt(document.getElementById('gmCustomItemAmt')?.value, 10) || 1;
-    dispenseItem(itemId, action === 'give' ? 'give' : 'clear_item', amt);
-}
-
-function clearPlayerInventoryConfirm() {
-    const target = document.getElementById('gmTargetPlayer')?.value || '@a';
-    if (!confirm(`Are you sure you want to completely clear the inventory of '${target}'?`)) return;
-
-    fetch('/api/player/gamemaster', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            player: target,
-            action: 'clear_all'
-        })
-    })
-    .then(r => r.json())
-    .then(data => showToast(data.result || "Inventory cleared", "success"))
-    .catch(err => showToast(`Clear failed: ${err}`, "error"));
-}
-
-/* XP & Level Scrubber */
-function updateGmLevelInput(val) {
-    const input = document.getElementById('gmLevelInput');
-    const badge = document.getElementById('mcLevelDisplay');
-    const bar = document.getElementById('mcXpBarFill');
-    if (input) input.value = val;
-    if (badge) badge.textContent = val;
-    if (bar) bar.style.width = `${Math.min(100, Math.max(5, (val % 30) / 30 * 100))}%`;
-}
-
-function updateGmLevelSlider(val) {
-    const slider = document.getElementById('gmLevelSlider');
-    const badge = document.getElementById('mcLevelDisplay');
-    const bar = document.getElementById('mcXpBarFill');
-    const num = parseInt(val, 10) || 0;
-    if (slider) slider.value = Math.min(100, num);
-    if (badge) badge.textContent = num;
-    if (bar) bar.style.width = `${Math.min(100, Math.max(5, (num % 30) / 30 * 100))}%`;
-}
-
-function applyGmLevel() {
-    const val = parseInt(document.getElementById('gmLevelInput')?.value, 10) || 0;
-    setGmLevelDirect(val);
-}
-
-function setGmLevelDirect(lvl) {
-    const target = document.getElementById('gmTargetPlayer')?.value || '@a';
-    updateGmLevelInput(lvl);
-
-    showToast(`Setting ${target}'s level to ${lvl}...`, "info");
-    fetch('/api/player/gamemaster', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            player: target,
-            action: 'set_level',
-            level: lvl
-        })
-    })
-    .then(r => r.json())
-    .then(data => showToast(data.result || `Level set to ${lvl}`, "success"))
-    .catch(err => showToast(`Failed to set level: ${err}`, "error"));
-}
-
-function addGmXp(lvl) {
-    const target = document.getElementById('gmTargetPlayer')?.value || '@a';
-    showToast(`Adding ${lvl} levels to ${target}...`, "info");
-
-    fetch('/api/player/gamemaster', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            player: target,
-            action: 'add_xp',
-            level: lvl
-        })
-    })
-    .then(r => r.json())
-    .then(data => {
-        showToast(data.result || `Added ${lvl} levels`, "success");
-        const cur = parseInt(document.getElementById('gmLevelInput')?.value, 10) || 0;
-        updateGmLevelInput(cur + lvl);
-    })
-    .catch(err => showToast(`Failed to add XP: ${err}`, "error"));
-}
-
-/* God Mode Spells & Trolls */
-function castGmSpell(spellKey) {
-    const target = document.getElementById('gmTargetPlayer')?.value || '@a';
-
-    let action = spellKey;
-    let effect = null;
-    let duration = 30;
-    let amplifier = 1;
-
-    if (spellKey === 'speed') {
-        action = 'effect';
-        effect = 'speed';
-        duration = 30;
-        amplifier = 10;
     }
 
-    showToast(`Casting ${spellKey} on ${target}...`, "info");
-    fetch('/api/player/gamemaster', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            player: target,
-            action: action,
-            effect: effect,
-            duration: duration,
-            amplifier: amplifier
+    function insertColorCode(code) {
+        const input = document.getElementById('bcMessageInput');
+        if (!input) return;
+
+        const start = input.selectionStart || input.value.length;
+        const end = input.selectionEnd || input.value.length;
+        const val = input.value;
+        input.value = val.substring(0, start) + code + val.substring(end);
+        input.focus();
+        input.selectionStart = input.selectionEnd = start + code.length;
+        updateBroadcastPreview();
+    }
+
+    function applyBroadcastPreset(key) {
+        const input = document.getElementById('bcMessageInput');
+        const subInput = document.getElementById('bcSubtitleInput');
+        const soundSelect = document.getElementById('bcSoundEffect');
+
+        switch (key) {
+            case 'welcome':
+                setBroadcastType('title');
+                if (input) input.value = "§bWelcome to §eLALALAND§b!";
+                if (subInput) subInput.value = "§aHave fun and respect the community rules!";
+                if (soundSelect) soundSelect.value = "levelup";
+                break;
+            case 'restart':
+                setBroadcastType('title');
+                if (input) input.value = "§c⚠ SERVER RESTART IN 5M ⚠";
+                if (subInput) subInput.value = "§ePlease finish your trades and save!";
+                if (soundSelect) soundSelect.value = "thunder";
+                break;
+            case 'pvp':
+                setBroadcastType('title');
+                if (input) input.value = "§6⚔ PVP ARENA EVENT ⚔";
+                if (subInput) subInput.value = "§fStarting now at World Spawn coordinates!";
+                if (soundSelect) soundSelect.value = "totem";
+                break;
+            case 'night':
+                setBroadcastType('actionbar');
+                if (input) input.value = "§9🌙 Night has fallen! Beware of monsters!";
+                if (soundSelect) soundSelect.value = "orb";
+                break;
+            case 'rules':
+                setBroadcastType('chat');
+                if (input) input.value = "§e[Server Rules] §7No griefing, no hacked clients, keep chat civil. Have fun!";
+                if (soundSelect) soundSelect.value = "none";
+                break;
+        }
+        updateBroadcastPreview();
+    }
+
+    function updateBroadcastPreview() {
+        const msg = (document.getElementById('bcMessageInput')?.value || '').trim();
+        const sub = (document.getElementById('bcSubtitleInput')?.value || '').trim();
+
+        const titleBox = document.getElementById('previewTitleDisplay');
+        const chatBox = document.getElementById('previewChatDisplay');
+        const actionbarBox = document.getElementById('previewActionbarDisplay');
+
+        if (!titleBox || !chatBox || !actionbarBox) return;
+
+        titleBox.style.display = 'none';
+        chatBox.style.display = 'none';
+        actionbarBox.style.display = 'none';
+
+        if (_currentBroadcastType === 'title') {
+            titleBox.style.display = 'block';
+            const mainEl = document.getElementById('previewMainTitle');
+            const subEl = document.getElementById('previewSubTitle');
+            if (mainEl) mainEl.innerHTML = parseMinecraftColorCodes(msg || "TITLE BANNER");
+            if (subEl) subEl.innerHTML = parseMinecraftColorCodes(sub || "Subtitle text here");
+        } else if (_currentBroadcastType === 'actionbar') {
+            actionbarBox.style.display = 'block';
+            const actEl = document.getElementById('previewActionbarMsg');
+            if (actEl) actEl.innerHTML = parseMinecraftColorCodes(msg || "Actionbar toast notification");
+        } else {
+            // chat or whisper
+            chatBox.style.display = 'block';
+            const chatMsgEl = document.getElementById('previewChatMsg');
+            if (chatMsgEl) chatMsgEl.innerHTML = parseMinecraftColorCodes(msg || "Welcome to the server!");
+        }
+    }
+
+    function dispatchCustomBroadcast() {
+        const input = document.getElementById('bcMessageInput');
+        const msg = input ? input.value.trim() : '';
+        if (!msg) return showToast("Enter a message to broadcast", "error");
+
+        const target = document.getElementById('bcTargetPlayer')?.value || '@a';
+        const sound = document.getElementById('bcSoundEffect')?.value || 'none';
+        const sub = document.getElementById('bcSubtitleInput')?.value.trim() || undefined;
+
+        const payload = {
+            message: msg,
+            broadcast_type: _currentBroadcastType,
+            target_player: target === '@a' ? null : target,
+            subtitle: (_currentBroadcastType === 'title' && sub) ? sub : null,
+            sound: sound === 'none' ? null : sound
+        };
+
+        showToast("Broadcasting message in-game...", "info");
+        fetch('/api/broadcast/custom', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
         })
-    })
-    .then(r => r.json())
-    .then(data => showToast(data.result || `Spell cast on ${target}`, "success"))
-    .catch(err => showToast(`Spell failed: ${err}`, "error"));
-}
+            .then(r => r.json())
+            .then(data => {
+                showToast(data.result || "Broadcast sent!", "success");
+                if (input) input.value = '';
+                const subInput = document.getElementById('bcSubtitleInput');
+                if (subInput) subInput.value = '';
+                updateBroadcastPreview();
+            })
+            .catch(err => showToast(`Broadcast failed: ${err}`, "error"));
+    }
+
+    /* Game Master Arsenal & Controls */
+    function setItemDispenseAmount(amt, btn) {
+        _currentDispenseAmount = amt;
+        document.querySelectorAll('.amount-pill-btn').forEach(b => b.classList.remove('active'));
+        if (btn) btn.classList.add('active');
+        initGameMasterArsenal();
+    }
+
+    function dispenseItem(itemId, action, amount) {
+        const target = document.getElementById('gmTargetPlayer')?.value || '@a';
+        const amt = amount || _currentDispenseAmount || 1;
+
+        showToast(`Sending ${action} for ${amt}x ${itemId}...`, "info");
+        fetch('/api/player/gamemaster', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                player: target,
+                action: action, // "give" or "clear_item"
+                item: itemId,
+                amount: amt
+            })
+        })
+            .then(r => r.json())
+            .then(data => {
+                showToast(data.result || "Action executed", "success");
+            })
+            .catch(err => showToast(`Action failed: ${err}`, "error"));
+    }
+
+    function dispenseCustomItem(action) {
+        const itemId = document.getElementById('gmCustomItemId')?.value.trim();
+        if (!itemId) return showToast("Enter an item ID (e.g. mace, breeze_rod)", "error");
+        const amt = parseInt(document.getElementById('gmCustomItemAmt')?.value, 10) || 1;
+        dispenseItem(itemId, action === 'give' ? 'give' : 'clear_item', amt);
+    }
+
+    function clearPlayerInventoryConfirm() {
+        const target = document.getElementById('gmTargetPlayer')?.value || '@a';
+        if (!confirm(`Are you sure you want to completely clear the inventory of '${target}'?`)) return;
+
+        fetch('/api/player/gamemaster', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                player: target,
+                action: 'clear_all'
+            })
+        })
+            .then(r => r.json())
+            .then(data => showToast(data.result || "Inventory cleared", "success"))
+            .catch(err => showToast(`Clear failed: ${err}`, "error"));
+    }
+
+    /* XP & Level Scrubber */
+    function updateGmLevelInput(val) {
+        const input = document.getElementById('gmLevelInput');
+        const badge = document.getElementById('mcLevelDisplay');
+        const bar = document.getElementById('mcXpBarFill');
+        if (input) input.value = val;
+        if (badge) badge.textContent = val;
+        if (bar) bar.style.width = `${Math.min(100, Math.max(5, (val % 30) / 30 * 100))}%`;
+    }
+
+    function updateGmLevelSlider(val) {
+        const slider = document.getElementById('gmLevelSlider');
+        const badge = document.getElementById('mcLevelDisplay');
+        const bar = document.getElementById('mcXpBarFill');
+        const num = parseInt(val, 10) || 0;
+        if (slider) slider.value = Math.min(100, num);
+        if (badge) badge.textContent = num;
+        if (bar) bar.style.width = `${Math.min(100, Math.max(5, (num % 30) / 30 * 100))}%`;
+    }
+
+    function applyGmLevel() {
+        const val = parseInt(document.getElementById('gmLevelInput')?.value, 10) || 0;
+        setGmLevelDirect(val);
+    }
+
+    function setGmLevelDirect(lvl) {
+        const target = document.getElementById('gmTargetPlayer')?.value || '@a';
+        updateGmLevelInput(lvl);
+
+        showToast(`Setting ${target}'s level to ${lvl}...`, "info");
+        fetch('/api/player/gamemaster', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                player: target,
+                action: 'set_level',
+                level: lvl
+            })
+        })
+            .then(r => r.json())
+            .then(data => showToast(data.result || `Level set to ${lvl}`, "success"))
+            .catch(err => showToast(`Failed to set level: ${err}`, "error"));
+    }
+
+    function addGmXp(lvl) {
+        const target = document.getElementById('gmTargetPlayer')?.value || '@a';
+        showToast(`Adding ${lvl} levels to ${target}...`, "info");
+
+        fetch('/api/player/gamemaster', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                player: target,
+                action: 'add_xp',
+                level: lvl
+            })
+        })
+            .then(r => r.json())
+            .then(data => {
+                showToast(data.result || `Added ${lvl} levels`, "success");
+                const cur = parseInt(document.getElementById('gmLevelInput')?.value, 10) || 0;
+                updateGmLevelInput(cur + lvl);
+            })
+            .catch(err => showToast(`Failed to add XP: ${err}`, "error"));
+    }
+
+    /* God Mode Spells & Trolls */
+    function castGmSpell(spellKey) {
+        const target = document.getElementById('gmTargetPlayer')?.value || '@a';
+
+        let action = spellKey;
+        let effect = null;
+        let duration = 30;
+        let amplifier = 1;
+
+        if (spellKey === 'speed') {
+            action = 'effect';
+            effect = 'speed';
+            duration = 30;
+            amplifier = 10;
+        }
+
+        showToast(`Casting ${spellKey} on ${target}...`, "info");
+        fetch('/api/player/gamemaster', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                player: target,
+                action: action,
+                effect: effect,
+                duration: duration,
+                amplifier: amplifier
+            })
+        })
+            .then(r => r.json())
+            .then(data => showToast(data.result || `Spell cast on ${target}`, "success"))
+            .catch(err => showToast(`Spell failed: ${err}`, "error"));
+    }
