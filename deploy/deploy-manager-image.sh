@@ -48,8 +48,8 @@ if [[ "$(docker inspect -f '{{.State.Running}}' "$container" 2>/dev/null || true
   fi
 fi
 
-if [[ -n "$previous_image_id" ]]; then
-  docker tag "$previous_image_id" "$rollback_image"
+if [[ -n "$previous_image_id" ]] && docker image inspect "$previous_image_id" >/dev/null 2>&1; then
+  docker tag "$previous_image_id" "$rollback_image" 2>/dev/null || true
 fi
 docker load -i "$archive"
 

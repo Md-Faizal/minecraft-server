@@ -72,7 +72,6 @@ pub async fn api_status(State(mgr): State<Arc<ServerManager>>) -> Json<StatusRes
     let is_rcon_alive = rcon_players.is_some() || chunky_stats.is_some();
 
     let bedrock_running = mgr.is_server_running().await;
-    let running = bedrock_running || is_rcon_alive;
 
     let online_players = if let Some(ref players) = rcon_players {
         players.clone()
@@ -91,7 +90,7 @@ pub async fn api_status(State(mgr): State<Arc<ServerManager>>) -> Json<StatusRes
     }
 
     Json(StatusResponse {
-        server_running: running,
+        server_running: bedrock_running,
         online_players,
         active_world,
         version,
