@@ -32,6 +32,49 @@ pub struct HardwareTelemetryResponse {
     pub swap_used_mb: u64,
     pub temp_c: Option<f32>,
     pub uptime_secs: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cpu_model: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AuthStatusResponse {
+    pub auth_required: bool,
+    pub pin_configured: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct PinVerifyRequest {
+    pub pin: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PinVerifyResponse {
+    pub success: bool,
+    pub token: Option<String>,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct PinChangeRequest {
+    pub current_pin: String,
+    pub new_pin: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CapabilitiesResponse {
+    pub bedrock_available: bool,
+    pub bedrock_running: bool,
+    pub java_remote: bool,
+    pub java_running: bool,
+    pub nexus_configured: bool,
+    pub rcon_configured: bool,
+    pub node_id: Option<String>,
+    pub node_hostname: Option<String>,
+    pub os: String,
+    pub editions: Vec<String>,
+    pub bedrock_address: String,
+    pub java_address: String,
+    pub version_manager: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -222,8 +265,8 @@ fn default_announcement_prefix() -> String { "§l§e[Server]§r §b".to_string()
 fn default_announcement_mode() -> String { "sequential".to_string() }
 fn default_messages() -> Vec<String> {
     vec![
-        "Welcome to Nexus Warfare! Equip your weapons and hold the perimeter.".to_string(),
-        "Report bugs and coordinates in chat or on the operations deck.".to_string(),
+        "Welcome to the server! Explore, build, and have fun!".to_string(),
+        "Remember to save your coordinates and keep your items secure.".to_string(),
     ]
 }
 

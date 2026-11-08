@@ -31,11 +31,9 @@ async fn main() {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    // Determine base directory
+    // Determine base directory dynamically
     let base_dir_str = std::env::var("MINECRAFT_BASE_DIR").unwrap_or_else(|_| {
-        if Path::new("/home/ubuntu/minecraft-server").exists() {
-            "/home/ubuntu/minecraft-server".to_string()
-        } else if Path::new("Path.txt").exists() {
+        if Path::new("Path.txt").exists() {
             std::fs::read_to_string("Path.txt")
                 .map(|s| s.trim().to_string())
                 .unwrap_or_else(|_| ".".to_string())
@@ -52,8 +50,6 @@ async fn main() {
         "static"
     } else if Path::new("/app/static").exists() {
         "/app/static"
-    } else if Path::new("/home/ubuntu/stack/games/minecraft/static").exists() {
-        "/home/ubuntu/stack/games/minecraft/static"
     } else {
         "static"
     };
@@ -67,6 +63,11 @@ async fn main() {
         .route("/", get(handlers::index_page))
         .route("/index.html", get(handlers::index_page))
         .route("/download/mods", get(handlers::download_mods))
+        .route("/api/capabilities", get(handlers::api_capabilities))
+        .route("/api/auth/status", get(handlers::api_auth_status))
+        .route("/api/auth/verify", post(handlers::api_auth_verify))
+        .route("/api/auth/change_pin", post(handlers::api_auth_change_pin))
+        .route("/api/telemetry", get(handlers::api_telemetry))
         .route("/api/status", get(handlers::api_status))
         .route("/api/action", post(handlers::api_action))
         .route("/api/start", post(handlers::api_start))
@@ -140,32 +141,17 @@ async fn main() {
         .layer(TraceLayer::new_for_http())
         .with_state(Arc::clone(&manager));
 
-    // Keep existing Bedrock auto-start behavior unless the host chooses Java-only mode.
+    // Bedrock auto-start only if binary exists and explicitly enabled
     let auto_start_bedrock = std::env::var("MC_AUTO_START_BEDROCK")
-        .map(|value| !matches!(value.trim().to_ascii_lowercase().as_str(), "false" | "0" | "no"))
-        .unwrap_or(true);
+        .map(|value| matches!(value.trim().to_ascii_lowercase().as_str(), "true" | "1" | "yes"))
+        .unwrap_or(false);
     if auto_start_bedrock {
         let auto_start_mgr = Arc::clone(&manager);
         tokio::spawn(async move {
             tokio::time::sleep(tokio::time::Duration::from_millis(600)).await;
-            if !auto_start_mgr.is_server_running().await {
-                info!("�붿 Auto-starting Bedrock Dedicated Server daemon on manager boot...");
+            if auto_start_mgr.is_bedrock_installed() && !auto_start_mgr.is_server_running().await {
+                info!("Auto-starting Bedrock Dedicated Server daemon on manager boot...");
                 auto_start_mgr.start_server().await;
-            }
-        });
-    }
-
-    let auto_start_java = std::env::var("MC_AUTO_START_JAVA")
-        .map(|value| matches!(value.trim().to_ascii_lowercase().as_str(), "true" | "1" | "yes"))
-        .unwrap_or(false);
-    if auto_start_java {
-        let auto_start_mgr = Arc::clone(&manager);
-        tokio::spawn(async move {
-            tokio::time::sleep(tokio::time::Duration::from_millis(900)).await;
-            if !auto_start_mgr.java_server.is_running().await {
-                if let Err(error) = auto_start_mgr.java_server.start().await {
-                    tracing::error!("Could not auto-start Paper Java server: {error}");
-                }
             }
         });
     }
@@ -211,7 +197,7 @@ async fn main() {
 
             if let Some(msg) = message {
                 let formatted = format!("say {}{}", current_settings.prefix, msg);
-                info!("붿뿯붿 Broadcasting automated announcement: {}", formatted);
+                info!("Broadcasting automated announcement: {}", formatted);
                 ann_mgr.send_server_command(&formatted).await;
             }
         }
@@ -227,7 +213,7 @@ async fn main() {
         .parse()
         .expect("Invalid listen address");
 
-    info!("�붿 Minecraft Server Manager (Rust) running at http://{}", addr);
+    info!("Minecraft Server Manager running at http://{}", addr);
 
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     axum::serve(listener, app).await.unwrap();

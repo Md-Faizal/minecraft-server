@@ -1948,3 +1948,314 @@ body {
   color: var(--zentra-muted);
   margin-top: 2px;
 }
+
+/* ==========================================================================
+   4-DIGIT PIN AUTHENTICATION GATE & LOCK CONTROLS
+   ========================================================================== */
+.pin-auth-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  background: rgba(9, 13, 22, 0.88);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.pin-auth-card {
+  background: #111827;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 24px;
+  padding: 36px 32px;
+  max-width: 400px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6), 0 0 40px rgba(16, 185, 129, 0.1);
+  animation: pinPopIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes pinPopIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.pin-auth-icon {
+  font-size: 42px;
+  margin-bottom: 12px;
+}
+
+.pin-auth-card h2 {
+  font-size: 22px;
+  font-weight: 800;
+  color: #fff;
+  margin: 0 0 6px 0;
+}
+
+.pin-auth-card p {
+  font-size: 13px;
+  color: #94a3b8;
+  margin: 0 0 24px 0;
+}
+
+.pin-inputs-wrap {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.pin-box {
+  width: 54px;
+  height: 60px;
+  text-align: center;
+  font-size: 26px;
+  font-weight: 800;
+  color: #10b981;
+  background: #1f2937;
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  border-radius: 14px;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.pin-box:focus {
+  border-color: #10b981;
+  box-shadow: 0 0 16px rgba(16, 185, 129, 0.35);
+  background: #111827;
+}
+
+.pin-error-msg {
+  color: #ef4444;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 14px;
+  background: rgba(239, 68, 68, 0.1);
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.pin-auth-actions button {
+  width: 100%;
+  padding: 12px 20px;
+  font-size: 15px;
+  font-weight: 700;
+  border-radius: 12px;
+}
+
+.pin-remember-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #94a3b8;
+  margin-top: 18px;
+  cursor: pointer;
+}
+
+.lock-deck-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #fff;
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.lock-deck-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.4);
+}
+
+/* ==========================================================================
+   HOST TELEMETRY PROGRESS & METRICS
+   ========================================================================== */
+.stat-subtext {
+  font-size: 11px;
+  color: var(--zentra-muted, #94a3b8);
+  margin-top: 4px;
+  font-weight: 500;
+}
+
+.stat-progress-bar {
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: 8px;
+}
+
+.stat-progress-bar div {
+  height: 100%;
+  background: linear-gradient(90deg, #10b981, #3b82f6);
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+
+/* ==========================================================================
+   UNIVERSAL PROPERTIES EDITOR
+   ========================================================================== */
+.properties-category-chips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.properties-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 14px;
+}
+
+.property-card-row {
+  background: var(--zentra-surface, #1e293b);
+  border: 1px solid var(--zentra-border, rgba(255, 255, 255, 0.08));
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: all 0.2s ease;
+}
+
+.property-card-row:hover {
+  border-color: var(--zentra-accent, #10b981);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1);
+}
+
+.prop-meta-wrap {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.prop-label-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--zentra-text, #f1f5f9);
+}
+
+.prop-key-tag {
+  font-family: 'Fira Code', monospace;
+  font-size: 11px;
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.prop-input-control {
+  width: 100%;
+}
+
+/* Toggle Switch for Boolean Properties */
+.prop-toggle-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.prop-toggle-btn {
+  background: #334155;
+  border: none;
+  border-radius: 20px;
+  width: 48px;
+  height: 26px;
+  position: relative;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.prop-toggle-btn.active {
+  background: #10b981;
+}
+
+.prop-toggle-knob {
+  width: 20px;
+  height: 20px;
+  background: #fff;
+  border-radius: 50%;
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  transition: transform 0.2s ease;
+}
+
+.prop-toggle-btn.active .prop-toggle-knob {
+  transform: translateX(22px);
+}
+
+/* ==========================================================================
+   MODAL DIALOGS
+   ========================================================================== */
+.zentra-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.zentra-modal-content {
+  background: #111827;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 18px;
+  max-width: 520px;
+  width: 100%;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+  animation: pinPopIn 0.2s ease;
+}
+
+.zentra-modal-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.zentra-modal-header h3 {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0;
+  color: #fff;
+}
+
+.zentra-modal-body {
+  padding: 20px;
+}
+
+.zentra-modal-footer {
+  padding: 14px 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.ctx-close-btn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 4px;
+}
+
+.ctx-close-btn:hover {
+  color: #fff;
+}

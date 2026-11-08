@@ -51,7 +51,15 @@ impl ServerManager {
         info!("Initializing ServerManager at {:?}", base_dir);
         let worlds_dir = base_dir.join("worlds");
         let backup_dir = base_dir.join("backups");
-        let server_path = base_dir.join("bedrock_server");
+        let server_path = if let Ok(bin) = std::env::var("MC_BEDROCK_BIN") {
+            PathBuf::from(bin)
+        } else if base_dir.join("bedrock_server.exe").exists() {
+            base_dir.join("bedrock_server.exe")
+        } else if base_dir.join("bedrock_server").exists() {
+            base_dir.join("bedrock_server")
+        } else {
+            base_dir.join("bedrock_server")
+        };
         let server_properties = base_dir.join("server.properties");
         let resource_packs_dir = base_dir.join("resource_packs");
         let behavior_packs_dir = base_dir.join("behavior_packs");
@@ -76,60 +84,6 @@ impl ServerManager {
             let _ = fs::write(&hist_json, "{}");
         }
 
-        // Auto-optimize server.properties for zero chunk lag on boot
-        if server_properties.exists() {
-            if let Ok(content) = fs::read_to_string(&server_properties) {
-                let mut map: HashMap<String, String> = HashMap::new();
-                let mut key_order: Vec<String> = Vec::new();
-                for line in content.lines() {
-                    let trimmed = line.trim();
-                    if trimmed.is_empty() || trimmed.starts_with('#') {
-                        continue;
-                    }
-                    if let Some((k, v)) = trimmed.split_once('=') {
-                        let k = k.trim().to_string();
-                        if !map.contains_key(&k) {
-                            key_order.push(k.clone());
-                        }
-                        map.insert(k, v.trim().to_string());
-                    }
-                }
-                // --- Chunk performance: balanced for both stationary players AND elytra flight ---
-                // client-side-chunk-generation MUST be true: without it the client shows void
-                // (black/empty chunks) until the server sends every chunk — fatal for elytra.
-                map.insert("client-side-chunk-generation-enabled".to_string(), "true".to_string());
-                // view-distance=10: elytra+fireworks travel fast; 6 was too short and caused
-                // players to outrun the loaded chunk bubble. 10 is the practical minimum.
-                map.insert("view-distance".to_string(), "10".to_string());
-                // tick-distance=4: standard BDS default; keeps mobs/pistons working in a
-                // reasonable radius without simulating the entire view bubble.
-                map.insert("tick-distance".to_string(), "4".to_string());
-                // max-threads=0 lets BDS use all available cores for chunk I/O
-                map.insert("max-threads".to_string(), "0".to_string());
-                // Async chunk writes — never block the main tick on disk flush
-                map.insert("sync-chunk-writes".to_string(), "false".to_string());
-                // snappy is far cheaper than zlib for chunk packet compression
-                map.insert("compression-algorithm".to_string(), "snappy".to_string());
-                map.insert("compression-threshold".to_string(), "512".to_string());
-                // server-build-radius-ratio=Disabled stops BDS pre-generating chunks
-                // in ALL directions equally — chunks are prioritised toward the player instead.
-                map.insert("server-build-radius-ratio".to_string(), "Disabled".to_string());
-                if !map.contains_key("transport") {
-                    map.insert("transport".to_string(), "nethernet".to_string());
-                }
-
-                let mut out = String::new();
-                for k in &key_order {
-                    if let Some(v) = map.remove(k) {
-                        out.push_str(&format!("{}={}\n", k, v));
-                    }
-                }
-                for (k, v) in map {
-                    out.push_str(&format!("{}={}\n", k, v));
-                }
-                let _ = fs::write(&server_properties, out);
-            }
-        }
 
         let waypoints_file = data_dir.join("waypoints.json");
         let initial_waypoints = if waypoints_file.exists() {
@@ -221,11 +175,6 @@ impl ServerManager {
         }
 
         if self.is_running.load(Ordering::SeqCst) {
-            return true;
-        }
-
-        // Check if Forge server RCON is responsive
-        if self.rcon.get_chunky_progress().await.is_ok() {
             return true;
         }
 
@@ -768,30 +717,6 @@ impl ServerManager {
             map.insert("level-seed".to_string(), profile.seed.clone());
         }
 
-        // --- Chunk performance: balanced for both stationary players AND elytra flight ---
-        // client-side-chunk-generation MUST be true: without it the client shows void
-        // (black/empty chunks) until the server sends every chunk — fatal for elytra.
-        map.insert("client-side-chunk-generation-enabled".to_string(), "true".to_string());
-        // view-distance=10: elytra+fireworks travel fast; 6 was too short and caused
-        // players to outrun the loaded chunk bubble. 10 is the practical minimum.
-        map.insert("view-distance".to_string(), "10".to_string());
-        // tick-distance=4: standard BDS default; keeps mobs/pistons working in a
-        // reasonable radius without simulating the entire view bubble.
-        map.insert("tick-distance".to_string(), "4".to_string());
-        // max-threads=0 lets BDS use all available cores for chunk I/O
-        map.insert("max-threads".to_string(), "0".to_string());
-        // Async chunk writes — never block the main tick on disk flush
-        map.insert("sync-chunk-writes".to_string(), "false".to_string());
-        // snappy is far cheaper than zlib for chunk packet compression
-        map.insert("compression-algorithm".to_string(), "snappy".to_string());
-        map.insert("compression-threshold".to_string(), "512".to_string());
-        // server-build-radius-ratio=Disabled stops BDS pre-generating chunks
-        // in ALL directions equally — chunks are prioritised toward the player instead.
-        map.insert("server-build-radius-ratio".to_string(), "Disabled".to_string());
-        if !map.contains_key("transport") {
-            map.insert("transport".to_string(), "nethernet".to_string());
-        }
-
 
         let mut out = String::new();
         for k in &key_order {
@@ -903,7 +828,7 @@ impl ServerManager {
             PropertySchemaItem { key: "server-port".into(), label: "Server Port".into(), field_type: "int".into(), choices: None, default: json!(19132), value: None },
             PropertySchemaItem { key: "server-portv6".into(), label: "Server Port (v6)".into(), field_type: "int".into(), choices: None, default: json!(19133), value: None },
             PropertySchemaItem { key: "transport".into(), label: "Transport".into(), field_type: "choice".into(), choices: Some(vec!["nethernet".into(), "raknet".into()]), default: json!("nethernet"), value: None },
-            PropertySchemaItem { key: "server-udp-ports".into(), label: "Server UDP Ports (NetherNet)".into(), field_type: "str".into(), choices: None, default: json!("68.233.115.138:19132-19142:19132-19142"), value: None },
+            PropertySchemaItem { key: "server-udp-ports".into(), label: "Server UDP Ports (NetherNet)".into(), field_type: "str".into(), choices: None, default: json!(""), value: None },
             PropertySchemaItem { key: "enable-lan-visibility".into(), label: "Enable LAN Visibility".into(), field_type: "bool".into(), choices: None, default: json!(true), value: None },
             PropertySchemaItem { key: "level-name".into(), label: "Level Name".into(), field_type: "str".into(), choices: None, default: json!("Bedrock level"), value: None },
             PropertySchemaItem { key: "level-seed".into(), label: "Level Seed".into(), field_type: "str".into(), choices: None, default: json!(""), value: None },
@@ -1257,5 +1182,98 @@ impl ServerManager {
             _ => Err("Unknown Game Master action".to_string()),
         }
     }
+
+    pub fn is_bedrock_installed(&self) -> bool {
+        self.server_path.is_file()
+    }
+
+    pub fn get_auth_pin_hash(&self) -> String {
+        let pin_file = self.data_dir.join("auth_pin.json");
+        if pin_file.exists() {
+            if let Ok(c) = fs::read_to_string(&pin_file) {
+                if let Ok(val) = serde_json::from_str::<serde_json::Value>(&c) {
+                    if let Some(hash) = val.get("pin_hash").and_then(|v| v.as_str()) {
+                        return hash.to_string();
+                    }
+                }
+            }
+        }
+        let env_pin = std::env::var("ADMIN_PIN").unwrap_or_else(|_| "0000".to_string());
+        Self::hash_pin(&env_pin)
+    }
+
+    pub fn is_pin_configured(&self) -> bool {
+        self.data_dir.join("auth_pin.json").exists() || std::env::var("ADMIN_PIN").is_ok()
+    }
+
+    pub fn verify_pin(&self, pin: &str) -> bool {
+        let clean = pin.trim();
+        let expected = self.get_auth_pin_hash();
+        Self::hash_pin(clean) == expected
+    }
+
+    pub fn change_pin(&self, current: &str, new_pin: &str) -> Result<(), String> {
+        if !self.verify_pin(current) {
+            return Err("Current PIN is incorrect".to_string());
+        }
+        let clean = new_pin.trim();
+        if clean.len() < 4 || clean.len() > 8 || !clean.chars().all(|c| c.is_ascii_digit()) {
+            return Err("New PIN must be 4 to 8 digits".to_string());
+        }
+        let hash = Self::hash_pin(clean);
+        let pin_file = self.data_dir.join("auth_pin.json");
+        let val = serde_json::json!({
+            "pin_hash": hash,
+            "updated_at": chrono::Utc::now().to_rfc3339()
+        });
+        fs::write(pin_file, serde_json::to_string_pretty(&val).unwrap_or_default())
+            .map_err(|e| format!("Failed to save PIN: {e}"))?;
+        Ok(())
+    }
+
+    pub fn hash_pin(pin: &str) -> String {
+        use sha2::{Digest, Sha256};
+        let mut hasher = Sha256::new();
+        hasher.update(b"mc_manager_pin_salt_v1_");
+        hasher.update(pin.as_bytes());
+        format!("{:x}", hasher.finalize())
+    }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_pin_hashing_consistency() {
+        let hash1 = ServerManager::hash_pin("1234");
+        let hash2 = ServerManager::hash_pin("1234");
+        let hash3 = ServerManager::hash_pin("4321");
+        assert_eq!(hash1, hash2);
+        assert_ne!(hash1, hash3);
+        assert_eq!(hash1.len(), 64);
+    }
+
+    #[test]
+    fn test_pin_verify_and_change() {
+        let temp_dir = std::env::temp_dir().join(format!("mc_test_{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        let _ = std::fs::create_dir_all(&temp_dir);
+        let mgr = ServerManager::new(temp_dir.clone());
+
+        // Default PIN when ADMIN_PIN is unset is "0000"
+        assert!(mgr.verify_pin("0000"));
+        assert!(!mgr.verify_pin("9999"));
+
+        // Changing PIN with wrong current PIN fails
+        assert!(mgr.change_pin("wrong", "5678").is_err());
+
+        // Changing PIN with valid current PIN succeeds
+        assert!(mgr.change_pin("0000", "5678").is_ok());
+        assert!(mgr.verify_pin("5678"));
+        assert!(!mgr.verify_pin("0000"));
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+}
+
 

@@ -194,3 +194,4 @@ nc -zv 127.0.0.1 25565
 | GCP Java/Paper Folder | 7.2 GB | 0 GB (Removed) | **7.2 GB Reclaimed** |
 | GCP Backup Archives | 2.1 GB | 0 GB (Removed) | **2.1 GB Reclaimed** |
 | GCP Docker Build Cache| 800 MB | 0 MB (Pruned) | **800 MB Reclaimed** |
+

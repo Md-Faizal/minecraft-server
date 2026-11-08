@@ -65,29 +65,11 @@ pub async fn api_status(State(mgr): State<Arc<ServerManager>>) -> Json<StatusRes
         }
     }
 
-    // Dynamic Fleet & RCON check
-    let rcon_players = mgr.rcon.get_players().await.ok();
-    let chunky_stats = mgr.rcon.get_chunky_progress().await.ok();
-    let hardware = mgr.nexus_mesh.get_active_telemetry().await.ok();
-    let is_rcon_alive = rcon_players.is_some() || chunky_stats.is_some();
-
     let bedrock_running = mgr.is_server_running().await;
-
-    let online_players = if let Some(ref players) = rcon_players {
-        players.clone()
-    } else {
-        mgr.online_players.read().await.iter().cloned().collect()
-    };
-
-    let active_world = if is_rcon_alive {
-        Some("overworld (Warzone)".to_string())
-    } else {
-        mgr.get_active_world_name()
-    };
-
-    if is_rcon_alive && (version == "Unknown" || version.starts_with("1.21") || version.starts_with("1.20.7") || version.starts_with("1.20.8")) {
-        version = "Forge 1.20.1-47.4.20 (Warfare)".to_string();
-    }
+    let online_players = mgr.online_players.read().await.iter().cloned().collect();
+    let active_world = mgr.get_active_world_name();
+    let hardware = mgr.nexus_mesh.get_active_telemetry().await.ok();
+    let chunky_stats = mgr.rcon.get_chunky_progress().await.ok();
 
     Json(StatusResponse {
         server_running: bedrock_running,
@@ -153,19 +135,46 @@ pub async fn api_java_status(State(mgr): State<Arc<ServerManager>>) -> Json<Valu
     let rcon_players = mgr.rcon.get_players().await.ok();
     let chunky_stats = mgr.rcon.get_chunky_progress().await.ok();
     let hardware = mgr.nexus_mesh.get_active_telemetry().await.ok();
-    let is_alive = rcon_players.is_some() || chunky_stats.is_some() || mgr.java_server.is_running().await;
+    let active_node = mgr.nexus_mesh.get_active_minecraft_node().await;
+    let is_alive = rcon_players.is_some() || chunky_stats.is_some() || active_node.is_some() || mgr.java_server.is_running().await;
+
+    let address = std::env::var("JAVA_SERVER_ADDR").unwrap_or_else(|_| {
+        if let Some(ref n) = active_node {
+            format!("{}:25565", n.hostname)
+        } else if let Some(ref rcon_addr) = mgr.rcon.addr {
+            rcon_addr.split(':').next().map(|h| format!("{}:25565", h)).unwrap_or_else(|| "127.0.0.1:25565".to_string())
+        } else {
+            "remote:25565".to_string()
+        }
+    });
+
+    let mut version = "Java Dedicated Server".to_string();
+    if let Ok(ver_out) = mgr.rcon.execute("version").await {
+        let clean = ver_out.trim();
+        if !clean.is_empty() {
+            version = clean.to_string();
+        }
+    }
+
+    let edition = if version.to_lowercase().contains("forge") {
+        "forge"
+    } else if version.to_lowercase().contains("fabric") {
+        "fabric"
+    } else if version.to_lowercase().contains("paper") {
+        "paper"
+    } else {
+        "java"
+    };
 
     Json(json!({
         "running": is_alive,
-        "edition": "forge",
-        "paper_installed": true,
-        "installed_version": "Forge 1.20.1-47.4.20",
-        "eula_accepted": true,
-        "directory": "/home/rida/minecraft-server",
-        "address": "mine.faizal.uk:25565",
+        "edition": edition,
+        "installed_version": version,
+        "address": address,
         "players": rcon_players.unwrap_or_default(),
         "hardware": hardware,
         "chunky": chunky_stats,
+        "node": active_node,
     }))
 }
 
@@ -221,10 +230,28 @@ pub async fn api_java_command(
         return Ok(Json(json!({"result": output, "response": output})));
     }
 
-    mgr.java_server.send_command(&command).await.map_err(|error| {
-        (StatusCode::SERVICE_UNAVAILABLE, Json(json!({"result": error})))
-    })?;
-    Ok(Json(json!({"result": "sent"})))
+    if mgr.nexus_mesh.is_configured() {
+        if let Ok(ack) = mgr.nexus_mesh.dispatch_action("minecraft_command", vec![command.clone()]).await {
+            let output = ack.stdout.or(ack.message).unwrap_or_else(|| "Dispatched via Nexus mesh".to_string());
+            let log_line = format!("[MESH:{}] {}", Local::now().format("%H:%M:%S"), output.trim());
+            let mut logs = mgr.java_server.console_buffer.write().await;
+            logs.push_back(format!("> {}", command));
+            logs.push_back(log_line.clone());
+            let mut base_logs = mgr.console_buffer.write().await;
+            base_logs.push_back(format!("> {}", command));
+            base_logs.push_back(log_line);
+            return Ok(Json(json!({"result": output, "response": output})));
+        }
+    }
+
+    if mgr.java_server.is_running().await {
+        mgr.java_server.send_command(&command).await.map_err(|error| {
+            (StatusCode::SERVICE_UNAVAILABLE, Json(json!({"result": error})))
+        })?;
+        return Ok(Json(json!({"result": "sent"})));
+    }
+
+    Err((StatusCode::SERVICE_UNAVAILABLE, Json(json!({"result": "Remote Java server is not reachable via RCON or Nexus Mesh"}))))
 }
 
 pub async fn api_java_output(State(mgr): State<Arc<ServerManager>>) -> impl IntoResponse {
@@ -762,25 +789,45 @@ pub async fn api_command(
         return Err((StatusCode::BAD_REQUEST, Json(json!({"result": "no command"}))));
     }
 
-    if let Ok(output) = mgr.rcon.execute(&cmd).await {
-        let log_line = format!("[RCON:{}] {}", Local::now().format("%H:%M:%S"), output.trim());
-        let mut logs = mgr.console_buffer.write().await;
-        logs.push_back(format!("> {}", cmd));
-        logs.push_back(log_line.clone());
-        let mut java_logs = mgr.java_server.console_buffer.write().await;
-        java_logs.push_back(format!("> {}", cmd));
-        java_logs.push_back(log_line);
-        return Ok(Json(json!({"result": output, "response": output, "command": cmd})));
+    // 1. Bedrock local daemon
+    if mgr.is_server_running().await {
+        if mgr.send_server_command(&cmd).await {
+            let mut logs = mgr.console_buffer.write().await;
+            logs.push_back(format!("> {}", cmd));
+            return Ok(Json(json!({"result": "sent", "command": cmd})));
+        }
     }
 
-    if mgr.send_server_command(&cmd).await {
-        Ok(Json(json!({"result": "sent", "command": cmd})))
-    } else {
-        Err((
-            StatusCode::SERVICE_UNAVAILABLE,
-            Json(json!({"result": "server not running"})),
-        ))
+    // 2. RCON
+    if mgr.rcon.is_configured() {
+        if let Ok(output) = mgr.rcon.execute(&cmd).await {
+            let log_line = format!("[RCON:{}] {}", Local::now().format("%H:%M:%S"), output.trim());
+            let mut logs = mgr.console_buffer.write().await;
+            logs.push_back(format!("> {}", cmd));
+            logs.push_back(log_line.clone());
+            let mut java_logs = mgr.java_server.console_buffer.write().await;
+            java_logs.push_back(format!("> {}", cmd));
+            java_logs.push_back(log_line);
+            return Ok(Json(json!({"result": output, "response": output, "command": cmd})));
+        }
     }
+
+    // 3. Nexus Mesh tunnel
+    if mgr.nexus_mesh.is_configured() {
+        if let Ok(ack) = mgr.nexus_mesh.dispatch_action("minecraft_command", vec![cmd.clone()]).await {
+            let output = ack.stdout.or(ack.message).unwrap_or_else(|| "Dispatched via Nexus mesh".to_string());
+            let log_line = format!("[MESH:{}] {}", Local::now().format("%H:%M:%S"), output.trim());
+            let mut logs = mgr.console_buffer.write().await;
+            logs.push_back(format!("> {}", cmd));
+            logs.push_back(log_line.clone());
+            return Ok(Json(json!({"result": output, "response": output, "command": cmd})));
+        }
+    }
+
+    Err((
+        StatusCode::SERVICE_UNAVAILABLE,
+        Json(json!({"result": "No local server running and RCON/Nexus tunnel unavailable"})),
+    ))
 }
 
 pub async fn api_worlds(State(mgr): State<Arc<ServerManager>>) -> Json<WorldsResponse> {
@@ -1644,8 +1691,11 @@ pub async fn api_properties_get(State(mgr): State<Arc<ServerManager>>) -> Json<V
     }
 
     let mut props = Vec::new();
+    let mut known_keys = std::collections::HashSet::new();
+
     for mut item in schema {
         let key = &item.key;
+        known_keys.insert(key.clone());
         let val_str = current_props.get(key).cloned();
         if let Some(s) = val_str {
             if item.field_type == "bool" {
@@ -1663,6 +1713,20 @@ pub async fn api_properties_get(State(mgr): State<Arc<ServerManager>>) -> Json<V
         props.push(item);
     }
 
+    // Include all custom or unlisted properties from server.properties
+    for (k, v) in current_props {
+        if !known_keys.contains(&k) {
+            props.push(PropertySchemaItem {
+                key: k.clone(),
+                label: k.clone(),
+                field_type: "str".to_string(),
+                choices: None,
+                default: json!(""),
+                value: Some(json!(v)),
+            });
+        }
+    }
+
     Json(json!({"properties": props}))
 }
 
@@ -1670,19 +1734,48 @@ pub async fn api_properties_post(
     State(mgr): State<Arc<ServerManager>>,
     Json(payload): Json<HashMap<String, Value>>,
 ) -> Json<Value> {
-    let schema = mgr.get_properties_schema();
-    let mut out = String::new();
+    let mut current_map = HashMap::new();
+    let mut key_order = Vec::new();
 
-    for item in &schema {
-        let key = &item.key;
-        let val = payload.get(key).unwrap_or(&item.default);
+    if mgr.server_properties.exists() {
+        if let Ok(c) = fs::read_to_string(&mgr.server_properties) {
+            for line in c.lines() {
+                let trimmed = line.trim();
+                if trimmed.is_empty() || trimmed.starts_with('#') {
+                    continue;
+                }
+                if let Some((k, v)) = trimmed.split_once('=') {
+                    let k = k.trim().to_string();
+                    if !current_map.contains_key(&k) {
+                        key_order.push(k.clone());
+                    }
+                    current_map.insert(k, v.trim().to_string());
+                }
+            }
+        }
+    }
+
+    for (k, val) in &payload {
         let val_str = match val {
             Value::String(s) => s.clone(),
             Value::Bool(b) => b.to_string(),
             Value::Number(n) => n.to_string(),
             _ => val.to_string(),
         };
-        out.push_str(&format!("{}={}\n", key, val_str));
+        if !current_map.contains_key(k) {
+            key_order.push(k.clone());
+        }
+        current_map.insert(k.clone(), val_str);
+    }
+
+    let mut out = String::new();
+    for k in &key_order {
+        if let Some(v) = current_map.remove(k) {
+            out.push_str(&format!("{}={}\n", k, v));
+        }
+    }
+    for (k, v) in current_map {
+        out.push_str(&format!("{}={}\n", k, v));
     }
 
     let _ = fs::write(&mgr.server_properties, &out);
@@ -2301,6 +2394,103 @@ pub async fn api_action(
         }
         _ => Json(json!({"success": false, "error": format!("Unknown action: {}", action)})),
     }
+}
+
+pub async fn api_auth_status(State(mgr): State<Arc<ServerManager>>) -> Json<AuthStatusResponse> {
+    Json(AuthStatusResponse {
+        auth_required: true,
+        pin_configured: mgr.is_pin_configured(),
+    })
+}
+
+pub async fn api_auth_verify(
+    State(mgr): State<Arc<ServerManager>>,
+    Json(payload): Json<PinVerifyRequest>,
+) -> (StatusCode, Json<PinVerifyResponse>) {
+    if mgr.verify_pin(&payload.pin) {
+        let token = ServerManager::hash_pin(&format!("token_{}_{}", payload.pin, chrono::Utc::now().timestamp() / 86400));
+        (StatusCode::OK, Json(PinVerifyResponse {
+            success: true,
+            token: Some(token),
+            message: "Authentication successful".to_string(),
+        }))
+    } else {
+        (StatusCode::UNAUTHORIZED, Json(PinVerifyResponse {
+            success: false,
+            token: None,
+            message: "Invalid PIN".to_string(),
+        }))
+    }
+}
+
+pub async fn api_auth_change_pin(
+    State(mgr): State<Arc<ServerManager>>,
+    Json(payload): Json<PinChangeRequest>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    mgr.change_pin(&payload.current_pin, &payload.new_pin).map_err(|e| {
+        (StatusCode::BAD_REQUEST, Json(json!({"success": false, "error": e})))
+    })?;
+    Ok(Json(json!({"success": true, "message": "PIN updated successfully"})))
+}
+
+pub async fn api_capabilities(State(mgr): State<Arc<ServerManager>>) -> Json<CapabilitiesResponse> {
+    let bedrock_avail = mgr.is_bedrock_installed();
+    let bedrock_running = mgr.is_server_running().await;
+    let rcon_alive = mgr.rcon.get_players().await.is_ok() || mgr.rcon.get_chunky_progress().await.is_ok();
+    let active_node = mgr.nexus_mesh.get_active_minecraft_node().await;
+    let java_running = rcon_alive || active_node.is_some() || mgr.java_server.is_running().await;
+
+    let mut editions = Vec::new();
+    if bedrock_avail || !mgr.nexus_mesh.is_configured() {
+        editions.push("bedrock".to_string());
+    }
+    editions.push("java".to_string());
+
+    let host = std::env::var("HOST").unwrap_or_else(|_| "0.0.0.0".to_string());
+    let node_id = active_node.as_ref().map(|n| n.node_id.clone());
+    let node_hostname = active_node.as_ref().map(|n| n.hostname.clone());
+
+    let bedrock_addr = std::env::var("BEDROCK_SERVER_ADDR").unwrap_or_else(|_| {
+        format!("{}:19132", if host == "0.0.0.0" { "127.0.0.1" } else { &host })
+    });
+
+    let java_addr = std::env::var("JAVA_SERVER_ADDR").unwrap_or_else(|_| {
+        if let Some(ref n) = node_hostname {
+            format!("{}:25565", n)
+        } else if let Some(ref rcon_addr) = mgr.rcon.addr {
+            rcon_addr.split(':').next().map(|h| format!("{}:25565", h)).unwrap_or_else(|| "127.0.0.1:25565".to_string())
+        } else {
+            "remote.host:25565".to_string()
+        }
+    });
+
+    Json(CapabilitiesResponse {
+        bedrock_available: bedrock_avail,
+        bedrock_running,
+        java_remote: true,
+        java_running,
+        nexus_configured: mgr.nexus_mesh.is_configured(),
+        rcon_configured: mgr.rcon.is_configured(),
+        node_id,
+        node_hostname,
+        os: std::env::consts::OS.to_string(),
+        editions,
+        bedrock_address: bedrock_addr,
+        java_address: java_addr,
+        version_manager: "2.1.0".to_string(),
+    })
+}
+
+pub async fn api_telemetry(State(mgr): State<Arc<ServerManager>>) -> Json<Value> {
+    let hardware = mgr.nexus_mesh.get_active_telemetry().await.ok();
+    let chunky = mgr.rcon.get_chunky_progress().await.ok();
+    let node = mgr.nexus_mesh.get_active_minecraft_node().await;
+
+    Json(json!({
+        "hardware": hardware,
+        "chunky": chunky,
+        "node": node,
+    }))
 }
 
 pub async fn download_mods() -> impl IntoResponse {

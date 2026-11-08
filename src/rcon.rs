@@ -38,26 +38,33 @@ impl Default for ChunkyStats {
 }
 
 pub struct RconClient {
-    pub addr: String,
-    pub password: String,
+    pub addr: Option<String>,
+    pub password: Option<String>,
 }
 
 impl RconClient {
     pub fn new() -> Self {
-        let addr = env::var("RCON_ADDR").unwrap_or_else(|_| "127.0.0.1:25575".to_string());
-        let password = env::var("RCON_PASSWORD").unwrap_or_else(|_| "nexuswarfare123".to_string());
+        let addr = env::var("RCON_ADDR").ok().filter(|s| !s.trim().is_empty());
+        let password = env::var("RCON_PASSWORD").ok().filter(|s| !s.trim().is_empty());
         Self { addr, password }
+    }
+
+    pub fn is_configured(&self) -> bool {
+        self.addr.is_some() && self.password.is_some()
     }
 
     /// Connect, authenticate, execute a single command, and return response
     pub async fn execute(&self, cmd: &str) -> Result<String, String> {
+        let addr = self.addr.as_ref().ok_or_else(|| "RCON not configured (RCON_ADDR unset)".to_string())?;
+        let password = self.password.as_ref().ok_or_else(|| "RCON password not configured (RCON_PASSWORD unset)".to_string())?;
+
         let res = timeout(Duration::from_secs(6), async {
-            let mut stream = TcpStream::connect(&self.addr)
+            let mut stream = TcpStream::connect(addr)
                 .await
-                .map_err(|e| format!("Failed to connect to RCON at {}: {}", self.addr, e))?;
+                .map_err(|e| format!("Failed to connect to RCON at {}: {}", addr, e))?;
 
             // 1. Authenticate
-            Self::send_packet(&mut stream, 1, SERVERDATA_AUTH, &self.password).await?;
+            Self::send_packet(&mut stream, 1, SERVERDATA_AUTH, password).await?;
             let (auth_id, auth_type, _) = Self::read_packet(&mut stream).await?;
 
             if auth_id == -1 || auth_type != SERVERDATA_AUTH_RESPONSE {

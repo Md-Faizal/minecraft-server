@@ -75,8 +75,8 @@ pub struct CommandAck {
 #[derive(Debug, Clone)]
 pub struct NexusMeshClient {
     client: Client,
-    pub hub_url: String,
-    pub admin_pin: String,
+    pub hub_url: Option<String>,
+    pub admin_pin: Option<String>,
     pub target_node_id: Option<String>,
 }
 
@@ -87,9 +87,9 @@ impl NexusMeshClient {
             .build()
             .unwrap_or_default();
 
-        let hub_url = env::var("NEXUS_HUB_URL").unwrap_or_else(|_| "https://faizal.uk".to_string());
-        let admin_pin = env::var("NEXUS_ADMIN_PIN").unwrap_or_else(|_| "2004".to_string());
-        let target_node_id = env::var("NEXUS_TARGET_NODE_ID").ok();
+        let hub_url = env::var("NEXUS_HUB_URL").ok().filter(|s| !s.trim().is_empty());
+        let admin_pin = env::var("NEXUS_ADMIN_PIN").ok().filter(|s| !s.trim().is_empty());
+        let target_node_id = env::var("NEXUS_TARGET_NODE_ID").ok().filter(|s| !s.trim().is_empty());
 
         Self {
             client,
@@ -99,14 +99,22 @@ impl NexusMeshClient {
         }
     }
 
+    pub fn is_configured(&self) -> bool {
+        self.hub_url.is_some()
+    }
+
     /// Retrieve all nodes in the Nexus fleet mesh
     pub async fn get_fleet_nodes(&self) -> Result<Vec<NodeInfo>, String> {
-        let url = format!("{}/api/fleet/nodes", self.hub_url.trim_end_matches('/'));
-        let res = self
-            .client
-            .get(&url)
-            .header("X-Admin-Pin", &self.admin_pin)
-            .header("Authorization", format!("Bearer {}", self.admin_pin))
+        let hub_url = self.hub_url.as_ref().ok_or_else(|| "Nexus Hub URL is not configured (NEXUS_HUB_URL unset)".to_string())?;
+        let url = format!("{}/api/fleet/nodes", hub_url.trim_end_matches('/'));
+        let mut req = self.client.get(&url);
+
+        if let Some(pin) = &self.admin_pin {
+            req = req.header("X-Admin-Pin", pin)
+                .header("Authorization", format!("Bearer {}", pin));
+        }
+
+        let res = req
             .send()
             .await
             .map_err(|e| format!("Failed to contact Nexus Hub at {}: {}", url, e))?;
@@ -139,22 +147,13 @@ impl NexusMeshClient {
             return Some(n.clone());
         }
 
-        // 3. Fallback: match hostname or known node id dynamically
-        if let Some(n) = nodes.iter().find(|n| {
-            let h = n.hostname.to_lowercase();
-            (h.contains("zorin") || h.contains("rida") || h.contains("minecraft")) && n.status == "online"
-        }) {
-            return Some(n.clone());
-        }
-
-        // 4. Return any online non-cloud node if available
-        nodes
-            .into_iter()
-            .find(|n| n.status == "online" && n.hostname != "prometheus" && n.hostname != "container-of-souls" && n.hostname != "my-mac")
+        // 3. Fallback: Return any online node
+        nodes.into_iter().find(|n| n.status == "online")
     }
 
-    /// Dispatch a lifecycle action through the Nexus Mesh RPC
+    /// Dispatch a command or action through the Nexus Mesh RPC
     pub async fn dispatch_action(&self, action: &str, args: Vec<String>) -> Result<CommandAck, String> {
+        let hub_url = self.hub_url.as_ref().ok_or_else(|| "Nexus Hub URL not configured".to_string())?;
         let node = self
             .get_active_minecraft_node()
             .await
@@ -162,7 +161,7 @@ impl NexusMeshClient {
 
         let url = format!(
             "{}/api/fleet/nodes/{}/command",
-            self.hub_url.trim_end_matches('/'),
+            hub_url.trim_end_matches('/'),
             node.node_id
         );
 
@@ -173,11 +172,13 @@ impl NexusMeshClient {
 
         info!("Dispatching Nexus Mesh action '{}' to node {}", action, node.node_id);
 
-        let res = self
-            .client
-            .post(&url)
-            .header("X-Admin-Pin", &self.admin_pin)
-            .header("Authorization", format!("Bearer {}", self.admin_pin))
+        let mut req = self.client.post(&url);
+        if let Some(pin) = &self.admin_pin {
+            req = req.header("X-Admin-Pin", pin)
+                .header("Authorization", format!("Bearer {}", pin));
+        }
+
+        let res = req
             .json(&payload)
             .send()
             .await
@@ -208,7 +209,7 @@ impl NexusMeshClient {
         let mem_total_mb = mem.total_bytes / (1024 * 1024);
         let swap_used_mb = mem.swap_used_bytes.unwrap_or(0) / (1024 * 1024);
 
-        let mode = if mem_used_mb > 0 && mem_used_mb < 1200 {
+        let mode = if mem_used_mb > 0 && mem_used_mb < 1500 {
             "Headless Gaming Mode (Max RAM)".to_string()
         } else {
             "Desktop GUI Mode".to_string()
@@ -226,7 +227,7 @@ impl NexusMeshClient {
             swap_used_mb,
             temp_c: therm.cpu_temp_c,
             uptime_secs: tele.uptime_secs.unwrap_or(0),
+            cpu_model: cpu.model,
         })
     }
-
 }

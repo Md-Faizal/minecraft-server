@@ -4,32 +4,32 @@ services:
       context: .
       dockerfile: Dockerfile
     image: minecraft-server-manager:latest
-    container_name: minecraft-bedrock-manager
+    container_name: minecraft-server-manager
     restart: unless-stopped
-    # host networking ensures 0-overhead UDP performance & zero NAT packet queue jitter for NetherNet/Bedrock
+    # host networking ensures 0-overhead UDP performance & zero NAT packet queue jitter for Bedrock
     network_mode: host
     volumes:
-      # Persistent worlds, server.properties, backups, and Bedrock binaries
-      - /home/ubuntu/minecraft-server:/data
-      - /home/ubuntu/minecraft-deploy/templates:/app/templates:ro
-      - /home/ubuntu/minecraft-deploy/static:/app/static:ro
+      # Persistent worlds, server.properties, backups, and binaries
+      - ${MINECRAFT_DATA_DIR:-./data}:/data
+      - ./templates:/app/templates:ro
+      - ./static:/app/static:ro
     environment:
-      - PORT=5000
-      # Nginx on pro serves the public site; keep the control API loopback-only.
-      - HOST=127.0.0.1
+      - PORT=${PORT:-5000}
+      - HOST=${HOST:-0.0.0.0}
       - MINECRAFT_BASE_DIR=/data
-      # Start neither edition automatically on the memory-constrained GCP VM.
+      - ADMIN_PIN=${ADMIN_PIN:-}
       - MC_AUTO_START_BEDROCK=${MC_AUTO_START_BEDROCK:-false}
       - MC_AUTO_START_JAVA=${MC_AUTO_START_JAVA:-false}
-      - NEXUS_HUB_URL=https://faizal.uk
-      - NEXUS_ADMIN_PIN=2004
-      - RCON_ADDR=127.0.0.1:25575
-      - RCON_PASSWORD=nexuswarfare123
+      - NEXUS_HUB_URL=${NEXUS_HUB_URL:-}
+      - NEXUS_ADMIN_PIN=${NEXUS_ADMIN_PIN:-}
+      - NEXUS_TARGET_NODE_ID=${NEXUS_TARGET_NODE_ID:-}
+      - RCON_ADDR=${RCON_ADDR:-}
+      - RCON_PASSWORD=${RCON_PASSWORD:-}
+      - JAVA_SERVER_ADDR=${JAVA_SERVER_ADDR:-}
     deploy:
       resources:
         limits:
-          # Leave memory for the host OS; warn before starting both editions.
-          memory: 768M
-          cpus: '2.0'
+          memory: ${MANAGER_MEM_LIMIT:-768M}
+          cpus: '${MANAGER_CPU_LIMIT:-2.0}'
         reservations:
           memory: 256M
