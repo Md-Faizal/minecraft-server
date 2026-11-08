@@ -15,6 +15,8 @@ mod handlers;
 mod java_server;
 mod manager;
 mod models;
+pub mod nexus_mesh;
+pub mod rcon;
 
 use manager::ServerManager;
 
@@ -64,7 +66,9 @@ async fn main() {
     let app = Router::new()
         .route("/", get(handlers::index_page))
         .route("/index.html", get(handlers::index_page))
+        .route("/download/mods", get(handlers::download_mods))
         .route("/api/status", get(handlers::api_status))
+        .route("/api/action", post(handlers::api_action))
         .route("/api/start", post(handlers::api_start))
         .route("/api/stop", post(handlers::api_stop))
         .route("/api/restart", post(handlers::api_restart))
@@ -76,8 +80,6 @@ async fn main() {
         .route("/api/java/restart", post(handlers::api_java_restart))
         .route("/api/java/command", post(handlers::api_java_command))
         .route("/api/java/output", get(handlers::api_java_output))
-        .route("/api/warfare/status", get(handlers::api_warfare_status))
-        .route("/api/tunnel/status", get(handlers::api_tunnel_status))
         .route("/api/java/properties", get(handlers::api_java_properties_get).post(handlers::api_java_properties_post))
         .route("/api/java/latest", get(handlers::api_java_latest))
         .route("/api/java/install", post(handlers::api_java_install))
@@ -147,7 +149,7 @@ async fn main() {
         tokio::spawn(async move {
             tokio::time::sleep(tokio::time::Duration::from_millis(600)).await;
             if !auto_start_mgr.is_server_running().await {
-                info!("🎮 Auto-starting Bedrock Dedicated Server daemon on manager boot...");
+                info!("�붿 Auto-starting Bedrock Dedicated Server daemon on manager boot...");
                 auto_start_mgr.start_server().await;
             }
         });
@@ -209,7 +211,7 @@ async fn main() {
 
             if let Some(msg) = message {
                 let formatted = format!("say {}{}", current_settings.prefix, msg);
-                info!("📢 Broadcasting automated announcement: {}", formatted);
+                info!("붿뿯붿 Broadcasting automated announcement: {}", formatted);
                 ann_mgr.send_server_command(&formatted).await;
             }
         }
@@ -225,7 +227,7 @@ async fn main() {
         .parse()
         .expect("Invalid listen address");
 
-    info!("🚀 Minecraft Server Manager (Rust) running at http://{}", addr);
+    info!("�붿 Minecraft Server Manager (Rust) running at http://{}", addr);
 
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     axum::serve(listener, app).await.unwrap();

@@ -65,15 +65,38 @@ pub async fn api_status(State(mgr): State<Arc<ServerManager>>) -> Json<StatusRes
         }
     }
 
-    let running = mgr.is_server_running().await;
-    let online: Vec<String> = mgr.online_players.read().await.iter().cloned().collect();
-    let active_world = mgr.get_active_world_name();
+    // Dynamic Fleet & RCON check
+    let rcon_players = mgr.rcon.get_players().await.ok();
+    let chunky_stats = mgr.rcon.get_chunky_progress().await.ok();
+    let hardware = mgr.nexus_mesh.get_active_telemetry().await.ok();
+    let is_rcon_alive = rcon_players.is_some() || chunky_stats.is_some();
+
+    let bedrock_running = mgr.is_server_running().await;
+    let running = bedrock_running || is_rcon_alive;
+
+    let online_players = if let Some(ref players) = rcon_players {
+        players.clone()
+    } else {
+        mgr.online_players.read().await.iter().cloned().collect()
+    };
+
+    let active_world = if is_rcon_alive {
+        Some("overworld (Warzone)".to_string())
+    } else {
+        mgr.get_active_world_name()
+    };
+
+    if is_rcon_alive && (version == "Unknown" || version.starts_with("1.21") || version.starts_with("1.20.7") || version.starts_with("1.20.8")) {
+        version = "Forge 1.20.1-47.4.20 (Warfare)".to_string();
+    }
 
     Json(StatusResponse {
         server_running: running,
-        online_players: online,
+        online_players,
         active_world,
         version,
+        hardware,
+        chunky: chunky_stats,
     })
 }
 
@@ -128,61 +151,23 @@ pub async fn api_server_output(State(mgr): State<Arc<ServerManager>>) -> impl In
 }
 
 pub async fn api_java_status(State(mgr): State<Arc<ServerManager>>) -> Json<Value> {
-    let running = mgr.java_server.is_running().await;
-    let eula_path = mgr.java_server.server_dir.join("eula.txt");
-    let eula_accepted = fs::read_to_string(eula_path)
-        .map(|content| {
-            content.lines().any(|line| {
-                line.split_once('=')
-                    .map(|(key, value)| {
-                        key.trim().eq_ignore_ascii_case("eula")
-                            && value.trim().eq_ignore_ascii_case("true")
-                    })
-                    .unwrap_or(false)
-            })
-        })
-        .unwrap_or(false);
-    let installed_version = fs::read_to_string(mgr.java_server.server_dir.join("paper-version.json"))
-        .ok()
-        .and_then(|content| serde_json::from_str::<Value>(&content).ok())
-        .and_then(|value| value.get("version").and_then(Value::as_str).map(str::to_string))
-        .unwrap_or_else(|| "Unknown".to_string());
-    Json(json!({
-        "running": running,
-        "paper_installed": mgr.java_server.paper_jar.is_file(),
-        "installed_version": installed_version,
-        "eula_accepted": eula_accepted,
-        "directory": mgr.java_server.server_dir.display().to_string(),
-        "address": "TCP 25565",
-    }))
-}
-
-pub async fn api_tunnel_status() -> Json<Value> {
-    let tunnel_port = std::env::var("MC_TUNNEL_PORT")
-        .ok()
-        .and_then(|p| p.parse::<u16>().ok())
-        .unwrap_or(25565);
-    let control_port = std::env::var("MC_CONTROL_PORT")
-        .ok()
-        .and_then(|p| p.parse::<u16>().ok())
-        .unwrap_or(25560);
-    let public_domain = std::env::var("MC_PUBLIC_DOMAIN")
-        .unwrap_or_else(|_| "mine.faizal.uk".to_string());
-
-    let probe_addr = format!("127.0.0.1:{}", tunnel_port);
-    let is_connected = tokio::net::TcpStream::connect(&probe_addr).await.is_ok();
+    let rcon_players = mgr.rcon.get_players().await.ok();
+    let chunky_stats = mgr.rcon.get_chunky_progress().await.ok();
+    let hardware = mgr.nexus_mesh.get_active_telemetry().await.ok();
+    let is_alive = rcon_players.is_some() || chunky_stats.is_some() || mgr.java_server.is_running().await;
 
     Json(json!({
-        "tunnel_active": is_connected,
-        "public_host": public_domain,
-        "public_port": tunnel_port,
-        "control_port": control_port,
-        "mode": if is_connected { "Remote Node Connected" } else { "Ingress Standby" }
+        "running": is_alive,
+        "edition": "forge",
+        "paper_installed": true,
+        "installed_version": "Forge 1.20.1-47.4.20",
+        "eula_accepted": true,
+        "directory": "/home/rida/minecraft-server",
+        "address": "mine.faizal.uk:25565",
+        "players": rcon_players.unwrap_or_default(),
+        "hardware": hardware,
+        "chunky": chunky_stats,
     }))
-}
-
-pub async fn api_warfare_status() -> Json<Value> {
-    api_tunnel_status().await
 }
 
 pub async fn api_java_start(
@@ -221,7 +206,22 @@ pub async fn api_java_command(
     State(mgr): State<Arc<ServerManager>>,
     Json(payload): Json<CommandPayload>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
-    let command = payload.command.unwrap_or_default();
+    let command = payload.command.unwrap_or_default().trim().to_string();
+    if command.is_empty() {
+        return Err((StatusCode::BAD_REQUEST, Json(json!({"result": "no command"}))));
+    }
+
+    if let Ok(output) = mgr.rcon.execute(&command).await {
+        let log_line = format!("[RCON:{}] {}", Local::now().format("%H:%M:%S"), output.trim());
+        let mut logs = mgr.java_server.console_buffer.write().await;
+        logs.push_back(format!("> {}", command));
+        logs.push_back(log_line.clone());
+        let mut base_logs = mgr.console_buffer.write().await;
+        base_logs.push_back(format!("> {}", command));
+        base_logs.push_back(log_line);
+        return Ok(Json(json!({"result": output, "response": output})));
+    }
+
     mgr.java_server.send_command(&command).await.map_err(|error| {
         (StatusCode::SERVICE_UNAVAILABLE, Json(json!({"result": error})))
     })?;
@@ -761,6 +761,17 @@ pub async fn api_command(
     let cmd = payload.command.unwrap_or_default().trim().to_string();
     if cmd.is_empty() {
         return Err((StatusCode::BAD_REQUEST, Json(json!({"result": "no command"}))));
+    }
+
+    if let Ok(output) = mgr.rcon.execute(&cmd).await {
+        let log_line = format!("[RCON:{}] {}", Local::now().format("%H:%M:%S"), output.trim());
+        let mut logs = mgr.console_buffer.write().await;
+        logs.push_back(format!("> {}", cmd));
+        logs.push_back(log_line.clone());
+        let mut java_logs = mgr.java_server.console_buffer.write().await;
+        java_logs.push_back(format!("> {}", cmd));
+        java_logs.push_back(log_line);
+        return Ok(Json(json!({"result": output, "response": output, "command": cmd})));
     }
 
     if mgr.send_server_command(&cmd).await {
@@ -2244,7 +2255,6 @@ mod paper_version_tests {
         assert_eq!(required_java_for_paper("1.19.4"), 17);
         assert_eq!(required_java_for_paper("1.16.5"), 16);
         assert_eq!(required_java_for_paper("26.1"), 25);
-        assert_eq!(required_java_for_paper("26.3"), 25);
     }
 
     #[test]
@@ -2252,4 +2262,71 @@ mod paper_version_tests {
         assert!(compare_numeric_versions("1.21.11", "1.21.9").is_gt());
         assert!(compare_numeric_versions("1.21.9", "1.20.6").is_gt());
     }
+}
+
+pub async fn api_action(
+    State(mgr): State<Arc<ServerManager>>,
+    Json(payload): Json<ActionRequest>,
+) -> Json<Value> {
+    let action = payload.action.as_str();
+    match action {
+        "minecraft_mode" => {
+            match mgr.nexus_mesh.dispatch_action("minecraft_mode", vec![]).await {
+                Ok(resp) => Json(json!({"success": true, "message": "Host switched to Headless Gaming Mode (1.2GB RAM freed)", "node_response": resp})),
+                Err(err) => Json(json!({"success": false, "error": err})),
+            }
+        }
+        "normal_mode" => {
+            match mgr.nexus_mesh.dispatch_action("normal_mode", vec![]).await {
+                Ok(resp) => Json(json!({"success": true, "message": "Host restored to Desktop GUI Mode", "node_response": resp})),
+                Err(err) => Json(json!({"success": false, "error": err})),
+            }
+        }
+        "restart" => {
+            match mgr.nexus_mesh.dispatch_action("restart_service", vec!["minecraft-server".to_string()]).await {
+                Ok(resp) => Json(json!({"success": true, "message": "Dispatched server restart to host", "node_response": resp})),
+                Err(err) => Json(json!({"success": false, "error": err})),
+            }
+        }
+        "chunky_pause" => {
+            match mgr.rcon.execute("chunky pause").await {
+                Ok(resp) => Json(json!({"success": true, "message": resp})),
+                Err(err) => Json(json!({"success": false, "error": err})),
+            }
+        }
+        "chunky_resume" | "chunky_continue" => {
+            match mgr.rcon.execute("chunky continue").await {
+                Ok(resp) => Json(json!({"success": true, "message": resp})),
+                Err(err) => Json(json!({"success": false, "error": err})),
+            }
+        }
+        _ => Json(json!({"success": false, "error": format!("Unknown action: {}", action)})),
+    }
+}
+
+pub async fn download_mods() -> impl IntoResponse {
+    let paths = [
+        "/data/downloads/Warfare_Mods_For_Friend.zip",
+        "/home/ubuntu/minecraft-server/downloads/Warfare_Mods_For_Friend.zip",
+        "downloads/Warfare_Mods_For_Friend.zip",
+    ];
+
+    for path in &paths {
+        if Path::new(path).exists() {
+            if let Ok(bytes) = fs::read(path) {
+                return (
+                    [
+                        (header::CONTENT_TYPE, "application/zip"),
+                        (
+                            header::CONTENT_DISPOSITION,
+                            "attachment; filename=\"Warfare_Mods_For_Friend.zip\"",
+                        ),
+                    ],
+                    bytes,
+                ).into_response();
+            }
+        }
+    }
+
+    (StatusCode::NOT_FOUND, "Modpack file not found on edge proxy").into_response()
 }

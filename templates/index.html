@@ -1,20 +1,16 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <title>Minecraft Server Manager</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link
-        href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&display=swap"
-        rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
     <link rel="shortcut icon" href="/favicon.ico">
     <link rel="stylesheet" href="/static/css/style.css?v=20261021_02">
 </head>
-
 <body>
     <!-- Organic Wandering Halftone Canvas (Zentra Physics) -->
     <canvas id="zentraCanvas"></canvas>
@@ -31,13 +27,11 @@
             </div>
 
             <div class="server-context-switcher" role="group" aria-label="Choose server edition">
-                <button type="button" class="server-context-btn active" data-server-context="bedrock"
-                    onclick="switchServerContext('bedrock')">
-                    <span class="server-context-icon">◆</span> Bedrock
+                <button type="button" class="server-context-btn active" data-server-context="java" onclick="switchServerContext('java')">
+                    <span class="server-context-icon">⚔️</span> Warfare (Forge)
                 </button>
-                <button type="button" class="server-context-btn" data-server-context="java"
-                    onclick="switchServerContext('java')">
-                    <span class="server-context-icon">☕</span> Java
+                <button type="button" class="server-context-btn" data-server-context="bedrock" onclick="switchServerContext('bedrock')">
+                    <span class="server-context-icon">◆</span> Bedrock
                 </button>
             </div>
 
@@ -45,19 +39,13 @@
             <div class="tab-switcher-pill" id="tabSwitcher">
                 <div class="tab-slider-pill" id="tabSliderPill"></div>
                 <button class="nav-tab-btn active" data-tab="home" onclick="switchZentraTab('home')">Home</button>
-                <button class="nav-tab-btn" data-tab="map" data-edition="bedrock"
-                    onclick="switchZentraTab('map')">Map</button>
+                <button class="nav-tab-btn" data-tab="map" data-edition="bedrock" onclick="switchZentraTab('map')">Map</button>
                 <button class="nav-tab-btn" data-tab="console" onclick="switchZentraTab('console')">Terminal</button>
-                <button class="nav-tab-btn" data-tab="java" data-edition="java"
-                    onclick="switchZentraTab('java')">Paper</button>
-                <button class="nav-tab-btn" data-tab="worlds" data-edition="bedrock"
-                    onclick="switchZentraTab('worlds')">Worlds</button>
-                <button class="nav-tab-btn" data-tab="players" data-edition="bedrock"
-                    onclick="switchZentraTab('players')">Players</button>
-                <button class="nav-tab-btn" data-tab="addons" data-edition="bedrock"
-                    onclick="switchZentraTab('addons')">Addons</button>
-                <button class="nav-tab-btn" data-tab="properties"
-                    onclick="switchZentraTab('properties')">Properties</button>
+                <button class="nav-tab-btn" data-tab="java" data-edition="java" onclick="switchZentraTab('java')">Warzone</button>
+                <button class="nav-tab-btn" data-tab="worlds" data-edition="bedrock" onclick="switchZentraTab('worlds')">Worlds</button>
+                <button class="nav-tab-btn" data-tab="players" onclick="switchZentraTab('players')">Players</button>
+                <button class="nav-tab-btn" data-tab="addons" data-edition="bedrock" onclick="switchZentraTab('addons')">Addons</button>
+                <button class="nav-tab-btn" data-tab="properties" onclick="switchZentraTab('properties')">Properties</button>
                 <button class="nav-tab-btn" data-tab="update" onclick="switchZentraTab('update')">Update</button>
                 <button class="nav-tab-btn" data-tab="settings" onclick="switchZentraTab('settings')">Settings</button>
             </div>
@@ -74,28 +62,21 @@
 
     <div class="app-wrapper">
         <!-- Global Lifecycle Countdown Banner (Appears during restart / stop / world swap) -->
-        <div id="lifecycleCountdownBanner" data-edition="bedrock"
-            style="display:none; margin-bottom: 20px; background: linear-gradient(135deg, rgba(239, 68, 68, 0.12), rgba(245, 158, 11, 0.15)); border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 14px; padding: 14px 20px; align-items: center; justify-content: space-between; box-shadow: 0 4px 24px rgba(239, 68, 68, 0.12); flex-wrap: wrap; gap: 12px;">
+        <div id="lifecycleCountdownBanner" data-edition="bedrock" style="display:none; margin-bottom: 20px; background: linear-gradient(135deg, rgba(239, 68, 68, 0.12), rgba(245, 158, 11, 0.15)); border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 14px; padding: 14px 20px; align-items: center; justify-content: space-between; box-shadow: 0 4px 24px rgba(239, 68, 68, 0.12); flex-wrap: wrap; gap: 12px;">
             <div style="display:flex; align-items:center; gap:14px;">
                 <span style="font-size: 26px;">⏳</span>
                 <div>
                     <div style="display:flex; align-items:center; gap:8px;">
-                        <span id="lifecycleActionTitle"
-                            style="font-weight: 800; font-size: 15px; color: #ef4444; text-transform: uppercase;">Server
-                            Restart Scheduled</span>
-                        <span id="lifecycleSecondsBadge"
-                            style="background:#ef4444; color:#fff; font-weight:700; font-size:12px; padding:2px 8px; border-radius:20px;">10s
-                            remaining</span>
+                        <span id="lifecycleActionTitle" style="font-weight: 800; font-size: 15px; color: #ef4444; text-transform: uppercase;">Server Restart Scheduled</span>
+                        <span id="lifecycleSecondsBadge" style="background:#ef4444; color:#fff; font-weight:700; font-size:12px; padding:2px 8px; border-radius:20px;">10s remaining</span>
                     </div>
-                    <div id="lifecycleReasonText"
-                        style="font-size: 13px; color: var(--zentra-text); opacity: 0.85; margin-top: 2px;">
+                    <div id="lifecycleReasonText" style="font-size: 13px; color: var(--zentra-text); opacity: 0.85; margin-top: 2px;">
                         Broadcasting countdown alerts to in-game players...
                     </div>
                 </div>
             </div>
             <div style="display:flex; gap:10px; align-items:center;">
-                <button class="zentra-btn danger" style="padding: 6px 14px; font-size: 12px;"
-                    onclick="abortLifecycleCountdown()">
+                <button class="zentra-btn danger" style="padding: 6px 14px; font-size: 12px;" onclick="abortLifecycleCountdown()">
                     🛑 Cancel Abort
                 </button>
             </div>
@@ -117,52 +98,102 @@
 
             <!-- 1. HOME VIEW -->
             <section id="viewHome" class="tab-content">
-                <div class="soft-card java-overview-card" id="javaHomeCard" style="display:none;">
+                <div class="soft-card java-overview-card" id="javaHomeCard">
                     <div class="card-header-bar">
                         <div class="card-title-group">
-                            <h3>Paper Java Edition</h3>
-                            <p>Separate Java world and runtime. Bedrock files and worlds stay untouched.</p>
+                            <h3>⚔️ Nexus Warfare 1.20.1</h3>
+                            <p>Forge 1.20.1 Modern Warfare Dedicated Server &middot; Tactical TACZ Guns &middot; HBM Nuclear Tech</p>
                         </div>
-                        <span class="metric-pill neutral" id="javaHomeState">Checking...</span>
+                        <span class="metric-pill success" id="javaHomeState">ONLINE</span>
                     </div>
                     <div class="metrics-grid">
-                        <div class="stat-box">
-                            <div class="stat-label">Installed Paper</div>
-                            <div class="stat-value" id="javaHomeVersion">--</div>
+                        <div class="stat-box"><div class="stat-label">Server Version</div><div class="stat-value" id="javaHomeVersion">Forge 1.20.1</div></div>
+                        <div class="stat-box"><div class="stat-label">Active Players</div><div class="stat-value" id="javaHomePlayers">0 Online</div></div>
+                        <div class="stat-box"><div class="stat-label">Server Host IP</div><div class="stat-value" id="javaHomeAddress" style="color:var(--accent); font-family:monospace; font-weight:700;">mine.faizal.uk:25565</div></div>
+                    </div>
+                    <div style="margin-top:16px; display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
+                        <a href="/download/mods" class="zentra-btn primary" style="text-decoration:none; display:inline-flex; align-items:center; gap:8px;">
+                            <span>⬇ Download Warfare Modpack (196 MB)</span>
+                        </a>
+                        <button class="zentra-btn secondary" type="button" onclick="switchZentraTab('java')">
+                            <span>🎮 Warzone & Hardware Telemetry</span>
+                        </button>
+                        <button class="zentra-btn secondary" type="button" onclick="switchZentraTab('console')">
+                            <span>💻 Live RCON Console</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Chunky World Pre-Generation Card -->
+                <div class="soft-card" id="chunkyProgressCard" style="margin-top:16px;">
+                    <div class="card-header-bar">
+                        <div class="card-title-group">
+                            <h4>🗺️ Chunky World Pre-generation</h4>
+                            <p id="chunkySubtitle">Zero lag chunk generation running smoothly in the background</p>
                         </div>
-                        <div class="stat-box">
-                            <div class="stat-label">Players</div>
-                            <div class="stat-value" id="javaHomePlayers">Use console</div>
+                        <span class="metric-pill" id="chunkyStatusBadge">RUNNING</span>
+                    </div>
+                    <div style="margin: 12px 0 8px 0;">
+                        <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:6px; color:var(--text-subtle);">
+                            <span id="chunkyPercentLabel">0.0% Complete</span>
+                            <span id="chunkyEtaLabel">ETA: --:--</span>
                         </div>
-                        <div class="stat-box">
-                            <div class="stat-label">Java address</div>
-                            <div class="stat-value" id="javaHomeAddress">TCP 25565</div>
+                        <div style="background:rgba(255,255,255,0.06); height:10px; border-radius:5px; overflow:hidden;">
+                            <div id="chunkyProgressBar" style="background:linear-gradient(90deg, #10b981, #3b82f6); height:100%; width:0%; transition:width 0.5s ease;"></div>
                         </div>
                     </div>
-                    <button class="zentra-btn secondary" type="button" onclick="switchZentraTab('update')">Install or
-                        update Paper</button>
+                    <div class="metrics-grid" style="margin-top:12px;">
+                        <div class="stat-box"><div class="stat-label">Processed Chunks</div><div class="stat-value" id="chunkyProcessed">--</div></div>
+                        <div class="stat-box"><div class="stat-label">Rate</div><div class="stat-value" id="chunkyRate">-- cps</div></div>
+                        <div class="stat-box"><div class="stat-label">Pre-gen Control</div>
+                            <div style="display:flex; gap:6px; margin-top:4px;">
+                                <button class="zentra-btn mini secondary" onclick="chunkyAction('pause')">⏸ Pause</button>
+                                <button class="zentra-btn mini secondary" onclick="chunkyAction('resume')">▶ Continue</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Host Machine Telemetry Card -->
+                <div class="soft-card" id="hostHardwareCard" style="margin-top:16px;">
+                    <div class="card-header-bar">
+                        <div class="card-title-group">
+                            <h4>🖥️ Bare-Metal Host Telemetry</h4>
+                            <p id="hostSubtext">Zorin OS 18 &middot; Dynamic Fleet Node</p>
+                        </div>
+                        <span class="metric-pill" id="hostModeBadge">Checking...</span>
+                    </div>
+                    <div class="metrics-grid">
+                        <div class="stat-box"><div class="stat-label">CPU Load</div><div class="stat-value" id="hostCpu">--%</div></div>
+                        <div class="stat-box"><div class="stat-label">RAM Usage</div><div class="stat-value" id="hostRam">-- MB / -- MB</div></div>
+                        <div class="stat-box"><div class="stat-label">Thermals</div><div class="stat-value" id="hostTemp">-- &deg;C</div></div>
+                    </div>
+                    <div style="margin-top:14px; display:flex; gap:10px; flex-wrap:wrap;">
+                        <button class="zentra-btn secondary" type="button" onclick="dispatchHostAction('minecraft_mode')">
+                            <span>🎮 Switch to Headless Mode (Frees 1.2 GB RAM)</span>
+                        </button>
+                        <button class="zentra-btn secondary" type="button" onclick="dispatchHostAction('normal_mode')">
+                            <span>🖥️ Restore Desktop GUI</span>
+                        </button>
+                    </div>
+                </div>
+                        <div class="stat-box"><div class="stat-label">Players</div><div class="stat-value" id="javaHomePlayers">Use console</div></div>
+                        <div class="stat-box"><div class="stat-label">Java address</div><div class="stat-value" id="javaHomeAddress">TCP 25565</div></div>
+                    </div>
+                    <button class="zentra-btn secondary" type="button" onclick="switchZentraTab('update')">Install or update Paper</button>
                 </div>
 
                 <!-- Server Hero Branding Card -->
                 <div class="server-hero-card" data-edition="bedrock">
-                    <div
-                        style="height: 190px; background: url('/static/img/server_banner.jpg') center/cover no-repeat; position: relative;">
-                        <div
-                            style="position: absolute; inset: 0; background: linear-gradient(180deg, rgba(15,23,42,0.2) 0%, rgba(15,23,42,0.85) 100%);">
-                        </div>
-                        <div
-                            style="position: absolute; bottom: 16px; left: 24px; right: 24px; display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 16px;">
+                    <div style="height: 190px; background: url('/static/img/server_banner.jpg') center/cover no-repeat; position: relative;">
+                        <div style="position: absolute; inset: 0; background: linear-gradient(180deg, rgba(15,23,42,0.2) 0%, rgba(15,23,42,0.85) 100%);"></div>
+                        <div style="position: absolute; bottom: 16px; left: 24px; right: 24px; display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 16px;">
                             <div style="display: flex; align-items: center; gap: 18px;">
-                                <img src="/static/img/server_icon.jpg" alt="Server Icon"
-                                    style="width: 72px; height: 72px; border-radius: 16px; border: 2px solid rgba(255,255,255,0.3); box-shadow: 0 4px 16px rgba(0,0,0,0.4); object-fit: cover;">
+                                <img src="/static/img/server_icon.jpg" alt="Server Icon" style="width: 72px; height: 72px; border-radius: 16px; border: 2px solid rgba(255,255,255,0.3); box-shadow: 0 4px 16px rgba(0,0,0,0.4); object-fit: cover;">
                                 <div>
                                     <div style="display: flex; align-items: center; gap: 10px;">
-                                        <h2 id="heroServerName"
-                                            style="color: #ffffff; font-size: 24px; font-weight: 800; letter-spacing: -0.02em; margin: 0; text-shadow: 0 2px 4px rgba(0,0,0,0.6);">
-                                            LALALAND</h2>
-                                        <span class="status-pill-badge" id="heroOnlineBadge"
-                                            style="background: rgba(16,185,129,0.2); color: #10b981; border: 1px solid rgba(16,185,129,0.4); font-size: 11px; padding: 3px 10px;">●
-                                            ONLINE</span>
+                                        <h2 id="heroServerName" style="color: #ffffff; font-size: 24px; font-weight: 800; letter-spacing: -0.02em; margin: 0; text-shadow: 0 2px 4px rgba(0,0,0,0.6);">LALALAND</h2>
+                                        <span class="status-pill-badge" id="heroOnlineBadge" style="background: rgba(16,185,129,0.2); color: #10b981; border: 1px solid rgba(16,185,129,0.4); font-size: 11px; padding: 3px 10px;">● ONLINE</span>
                                     </div>
                                     <div style="color: rgba(255,255,255,0.75); font-size: 13px; margin-top: 4px;">
                                         Bedrock Dedicated Server 1.26.52.3 &bull; Oracle Cloud Infrastructure
@@ -170,9 +201,7 @@
                                 </div>
                             </div>
                             <div style="display: flex; gap: 10px; align-items: center;">
-                                <button class="zentra-btn secondary"
-                                    style="background: rgba(255,255,255,0.15); color: #fff; border: 1px solid rgba(255,255,255,0.25); backdrop-filter: blur(8px);"
-                                    onclick="copyToClipboard('68.233.115.138:19132', 'Server Address copied!')">
+                                <button class="zentra-btn secondary" style="background: rgba(255,255,255,0.15); color: #fff; border: 1px solid rgba(255,255,255,0.25); backdrop-filter: blur(8px);" onclick="copyToClipboard('68.233.115.138:19132', 'Server Address copied!')">
                                     📋 Copy: 68.233.115.138:19132
                                 </button>
                                 <button class="zentra-btn primary" onclick="openMotdModal()">
@@ -182,18 +211,11 @@
                         </div>
                     </div>
                     <!-- In-Game Multiplayer List Card Preview -->
-                    <div
-                        style="background: #18181b; padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; border-top: 1px solid rgba(255,255,255,0.08); flex-wrap: wrap; gap: 12px;">
+                    <div style="background: #18181b; padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; border-top: 1px solid rgba(255,255,255,0.08); flex-wrap: wrap; gap: 12px;">
                         <div style="display: flex; align-items: center; gap: 12px;">
-                            <span
-                                style="font-size: 11px; text-transform: uppercase; font-weight: 700; color: #a1a1aa; letter-spacing: 0.05em;">In-Game
-                                MOTD Preview:</span>
-                            <div id="heroMotdPreview"
-                                style="font-family: 'Minecraft', 'Courier New', monospace; font-size: 13px; color: #f4f4f5; background: #09090b; padding: 6px 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);">
-                                <span style="color:#55FFFF; font-weight:bold;">LALALAND</span> <span
-                                    style="color:#888888;">|</span> <span style="color:#FFFF55;">Survival SMP</span>
-                                <span style="color:#55FF55;">[1.26]</span> <span style="color:#FFAA00;">• NetherNet
-                                    WebRTC</span>
+                            <span style="font-size: 11px; text-transform: uppercase; font-weight: 700; color: #a1a1aa; letter-spacing: 0.05em;">In-Game MOTD Preview:</span>
+                            <div id="heroMotdPreview" style="font-family: 'Minecraft', 'Courier New', monospace; font-size: 13px; color: #f4f4f5; background: #09090b; padding: 6px 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);">
+                                <span style="color:#55FFFF; font-weight:bold;">LALALAND</span> <span style="color:#888888;">|</span> <span style="color:#FFFF55;">Survival SMP</span> <span style="color:#55FF55;">[1.26]</span> <span style="color:#FFAA00;">• NetherNet WebRTC</span>
                             </div>
                         </div>
                         <div style="display: flex; align-items: center; gap: 16px; font-size: 12px; color: #a1a1aa;">
@@ -219,8 +241,7 @@
                     </div>
                     <div class="stat-box">
                         <div class="stat-label">Transport Protocol</div>
-                        <div class="stat-value" style="font-size: 20px; color: var(--zentra-green);">NetherNet (WebRTC)
-                        </div>
+                        <div class="stat-value" style="font-size: 20px; color: var(--zentra-green);">NetherNet (WebRTC)</div>
                     </div>
                 </div>
 
@@ -235,16 +256,13 @@
                     </div>
 
                     <div class="actions-pill-grid server-process-actions">
-                        <button class="zentra-btn emerald" id="homeStartBtn" data-process-action="start"
-                            onclick="serverAction('start')">
+                        <button class="zentra-btn emerald" id="homeStartBtn" data-process-action="start" onclick="serverAction('start')">
                             <span>▶</span> Start Server
                         </button>
-                        <button class="zentra-btn danger" id="homeStopBtn" data-process-action="stop"
-                            style="display:none;" onclick="serverAction('stop')">
+                        <button class="zentra-btn danger" id="homeStopBtn" data-process-action="stop" style="display:none;" onclick="serverAction('stop')">
                             <span>⏹</span> Stop Server
                         </button>
-                        <button class="zentra-btn primary" id="homeRestartBtn" data-process-action="restart"
-                            style="display:none;" onclick="serverAction('restart')">
+                        <button class="zentra-btn primary" id="homeRestartBtn" data-process-action="restart" style="display:none;" onclick="serverAction('restart')">
                             <span>🔄</span> Restart Server
                         </button>
                     </div>
@@ -255,9 +273,7 @@
                         <p>Dispatch commands directly to standard input</p>
                     </div>
                     <div style="display: flex; gap: 10px;">
-                        <input type="text" id="homeCmdInput" class="zentra-input"
-                            placeholder="e.g. say Hello from web dashboard! or list"
-                            onkeydown="if(event.key==='Enter') sendConsoleCommand('homeCmdInput')">
+                        <input type="text" id="homeCmdInput" class="zentra-input" placeholder="e.g. say Hello from web dashboard! or list" onkeydown="if(event.key==='Enter') sendConsoleCommand('homeCmdInput')">
                         <button class="zentra-btn primary" onclick="sendConsoleCommand('homeCmdInput')">Execute</button>
                     </div>
                 </div>
@@ -270,43 +286,32 @@
                             <p>Automated periodic in-game broadcast daemon with color formatting</p>
                         </div>
                         <div style="display:flex; gap:8px;">
-                            <button class="zentra-btn secondary" type="button" onclick="broadcastNow()">⚡ Broadcast
-                                Now</button>
-                            <button class="zentra-btn emerald" type="button" onclick="saveAnnouncements()">💾 Save
-                                Announcements</button>
+                            <button class="zentra-btn secondary" type="button" onclick="broadcastNow()">⚡ Broadcast Now</button>
+                            <button class="zentra-btn emerald" type="button" onclick="saveAnnouncements()">💾 Save Announcements</button>
                         </div>
                     </div>
 
-                    <div
-                        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 16px;">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 16px;">
                         <div>
-                            <label
-                                style="font-size:12px; font-weight:700; color:var(--zentra-text); display:block; margin-bottom:6px;">Daemon
-                                Status</label>
+                            <label style="font-size:12px; font-weight:700; color:var(--zentra-text); display:block; margin-bottom:6px;">Daemon Status</label>
                             <select id="annEnabled" class="zentra-select">
                                 <option value="true">Enabled (Broadcasting)</option>
                                 <option value="false">Disabled (Paused)</option>
                             </select>
                         </div>
                         <div>
-                            <label
-                                style="font-size:12px; font-weight:700; color:var(--zentra-text); display:block; margin-bottom:6px;">Interval
-                                (Seconds)</label>
+                            <label style="font-size:12px; font-weight:700; color:var(--zentra-text); display:block; margin-bottom:6px;">Interval (Seconds)</label>
                             <input type="number" id="annInterval" class="zentra-input" value="300" min="10" step="10">
                         </div>
                         <div>
-                            <label
-                                style="font-size:12px; font-weight:700; color:var(--zentra-text); display:block; margin-bottom:6px;">Broadcast
-                                Mode</label>
+                            <label style="font-size:12px; font-weight:700; color:var(--zentra-text); display:block; margin-bottom:6px;">Broadcast Mode</label>
                             <select id="annMode" class="zentra-select">
                                 <option value="sequential">Sequential (In Order)</option>
                                 <option value="random">Randomized</option>
                             </select>
                         </div>
                         <div>
-                            <label
-                                style="font-size:12px; font-weight:700; color:var(--zentra-text); display:block; margin-bottom:6px;">Only
-                                When Players Online</label>
+                            <label style="font-size:12px; font-weight:700; color:var(--zentra-text); display:block; margin-bottom:6px;">Only When Players Online</label>
                             <select id="annOnlyOnline" class="zentra-select">
                                 <option value="true">Yes (Save Console)</option>
                                 <option value="false">No (Always Broadcast)</option>
@@ -315,18 +320,13 @@
                     </div>
 
                     <div style="margin-bottom: 14px;">
-                        <label
-                            style="font-size:12px; font-weight:700; color:var(--zentra-text); display:block; margin-bottom:6px;">Chat
-                            Prefix (Minecraft Color Codes Supported)</label>
+                        <label style="font-size:12px; font-weight:700; color:var(--zentra-text); display:block; margin-bottom:6px;">Chat Prefix (Minecraft Color Codes Supported)</label>
                         <input type="text" id="annPrefix" class="zentra-input" value="§l§e[Server]§r §b">
                     </div>
 
                     <div>
-                        <label
-                            style="font-size:12px; font-weight:700; color:var(--zentra-text); display:block; margin-bottom:6px;">Announcement
-                            Messages (One per line)</label>
-                        <textarea id="annMessages" class="zentra-textarea" rows="4"
-                            placeholder="Enter one announcement per line..."></textarea>
+                        <label style="font-size:12px; font-weight:700; color:var(--zentra-text); display:block; margin-bottom:6px;">Announcement Messages (One per line)</label>
+                        <textarea id="annMessages" class="zentra-textarea" rows="4" placeholder="Enter one announcement per line..."></textarea>
                     </div>
                 </div>
 
@@ -344,79 +344,61 @@
                         <div class="gamerule-toggle-card">
                             <div>
                                 <strong style="font-size: 13px;">Keep Inventory</strong>
-                                <p style="font-size: 11px; color: var(--zentra-muted); margin: 2px 0 0;">Save items & XP
-                                    on death</p>
+                                <p style="font-size: 11px; color: var(--zentra-muted); margin: 2px 0 0;">Save items & XP on death</p>
                             </div>
                             <div style="display:flex; gap:6px;">
-                                <button class="zentra-btn secondary" style="padding:4px 10px; font-size:11px;"
-                                    onclick="setGamerule('keepinventory', 'true')">ON</button>
-                                <button class="zentra-btn secondary" style="padding:4px 10px; font-size:11px;"
-                                    onclick="setGamerule('keepinventory', 'false')">OFF</button>
+                                <button class="zentra-btn secondary" style="padding:4px 10px; font-size:11px;" onclick="setGamerule('keepinventory', 'true')">ON</button>
+                                <button class="zentra-btn secondary" style="padding:4px 10px; font-size:11px;" onclick="setGamerule('keepinventory', 'false')">OFF</button>
                             </div>
                         </div>
                         <div class="gamerule-toggle-card">
                             <div>
                                 <strong style="font-size: 13px;">Show Coordinates</strong>
-                                <p style="font-size: 11px; color: var(--zentra-muted); margin: 2px 0 0;">XYZ display on
-                                    player HUD</p>
+                                <p style="font-size: 11px; color: var(--zentra-muted); margin: 2px 0 0;">XYZ display on player HUD</p>
                             </div>
                             <div style="display:flex; gap:6px;">
-                                <button class="zentra-btn secondary" style="padding:4px 10px; font-size:11px;"
-                                    onclick="setGamerule('showcoordinates', 'true')">ON</button>
-                                <button class="zentra-btn secondary" style="padding:4px 10px; font-size:11px;"
-                                    onclick="setGamerule('showcoordinates', 'false')">OFF</button>
+                                <button class="zentra-btn secondary" style="padding:4px 10px; font-size:11px;" onclick="setGamerule('showcoordinates', 'true')">ON</button>
+                                <button class="zentra-btn secondary" style="padding:4px 10px; font-size:11px;" onclick="setGamerule('showcoordinates', 'false')">OFF</button>
                             </div>
                         </div>
                         <div class="gamerule-toggle-card">
                             <div>
                                 <strong style="font-size: 13px;">Mob Griefing</strong>
-                                <p style="font-size: 11px; color: var(--zentra-muted); margin: 2px 0 0;">Creepers &
-                                    Ghasts break blocks</p>
+                                <p style="font-size: 11px; color: var(--zentra-muted); margin: 2px 0 0;">Creepers & Ghasts break blocks</p>
                             </div>
                             <div style="display:flex; gap:6px;">
-                                <button class="zentra-btn secondary" style="padding:4px 10px; font-size:11px;"
-                                    onclick="setGamerule('mobgriefing', 'true')">ON</button>
-                                <button class="zentra-btn secondary" style="padding:4px 10px; font-size:11px;"
-                                    onclick="setGamerule('mobgriefing', 'false')">OFF</button>
+                                <button class="zentra-btn secondary" style="padding:4px 10px; font-size:11px;" onclick="setGamerule('mobgriefing', 'true')">ON</button>
+                                <button class="zentra-btn secondary" style="padding:4px 10px; font-size:11px;" onclick="setGamerule('mobgriefing', 'false')">OFF</button>
                             </div>
                         </div>
                         <div class="gamerule-toggle-card">
                             <div>
                                 <strong style="font-size: 13px;">PvP Damage</strong>
-                                <p style="font-size: 11px; color: var(--zentra-muted); margin: 2px 0 0;">Player combat
-                                    attack damage</p>
+                                <p style="font-size: 11px; color: var(--zentra-muted); margin: 2px 0 0;">Player combat attack damage</p>
                             </div>
                             <div style="display:flex; gap:6px;">
-                                <button class="zentra-btn secondary" style="padding:4px 10px; font-size:11px;"
-                                    onclick="setGamerule('pvp', 'true')">ON</button>
-                                <button class="zentra-btn secondary" style="padding:4px 10px; font-size:11px;"
-                                    onclick="setGamerule('pvp', 'false')">OFF</button>
+                                <button class="zentra-btn secondary" style="padding:4px 10px; font-size:11px;" onclick="setGamerule('pvp', 'true')">ON</button>
+                                <button class="zentra-btn secondary" style="padding:4px 10px; font-size:11px;" onclick="setGamerule('pvp', 'false')">OFF</button>
                             </div>
                         </div>
                         <div class="gamerule-toggle-card">
                             <div>
                                 <strong style="font-size: 13px;">Daylight Cycle</strong>
-                                <p style="font-size: 11px; color: var(--zentra-muted); margin: 2px 0 0;">Sun/moon time
-                                    progression</p>
+                                <p style="font-size: 11px; color: var(--zentra-muted); margin: 2px 0 0;">Sun/moon time progression</p>
                             </div>
                             <div style="display:flex; gap:6px;">
-                                <button class="zentra-btn secondary" style="padding:4px 10px; font-size:11px;"
-                                    onclick="setGamerule('dodaylightcycle', 'true')">ON</button>
-                                <button class="zentra-btn secondary" style="padding:4px 10px; font-size:11px;"
-                                    onclick="setGamerule('dodaylightcycle', 'false')">OFF</button>
+                                <button class="zentra-btn secondary" style="padding:4px 10px; font-size:11px;" onclick="setGamerule('dodaylightcycle', 'true')">ON</button>
+                                <button class="zentra-btn secondary" style="padding:4px 10px; font-size:11px;" onclick="setGamerule('dodaylightcycle', 'false')">OFF</button>
                             </div>
                         </div>
                         <div class="gamerule-toggle-card">
                             <div>
                                 <strong style="font-size: 13px;">Weather Cycle</strong>
-                                <p style="font-size: 11px; color: var(--zentra-muted); margin: 2px 0 0;">Dynamic rain
-                                    and thunderstorms</p>
+                                <p style="font-size: 11px; color: var(--zentra-muted); margin: 2px 0 0;">Dynamic rain and thunderstorms</p>
                             </div>
                             <div style="display:flex; gap:6px;">
-                                <button class="zentra-btn secondary" style="padding:4px 10px; font-size:11px;"
-                                    onclick="setGamerule('doweathercycle', 'true')">ON</button>
-                                <button class="zentra-btn secondary" style="padding:4px 10px; font-size:11px;"
-                                    onclick="setGamerule('doweathercycle', 'false')">OFF</button>
+                                <button class="zentra-btn secondary" style="padding:4px 10px; font-size:11px;" onclick="setGamerule('doweathercycle', 'true')">ON</button>
+                                <button class="zentra-btn secondary" style="padding:4px 10px; font-size:11px;" onclick="setGamerule('doweathercycle', 'false')">OFF</button>
                             </div>
                         </div>
                     </div>
@@ -431,9 +413,7 @@
                         <div class="godseye-hud-left">
                             <div class="godseye-radar-indicator">
                                 <span class="radar-dot-live"></span>
-                                <span
-                                    style="font-weight: 800; font-size: 13px; letter-spacing: 0.05em; color: #10b981;">GOD'S
-                                    EYE RECON</span>
+                                <span style="font-weight: 800; font-size: 13px; letter-spacing: 0.05em; color: #10b981;">GOD'S EYE RECON</span>
                             </div>
                             <div class="godseye-badge">
                                 <span>🌍 World:</span> <strong id="mapWorldName">Unicorn</strong>
@@ -449,28 +429,20 @@
                         <div class="godseye-hud-center">
                             <div class="godseye-coords-display">
                                 <span style="color:var(--zentra-muted);">CURSOR:</span>
-                                <span id="mapCursorCoords"
-                                    style="font-family:'Fira Code',monospace; font-weight:700; color:#38bdf8;">X: 0
-                                    &bull; Z: 0</span>
+                                <span id="mapCursorCoords" style="font-family:'Fira Code',monospace; font-weight:700; color:#38bdf8;">X: 0 &bull; Z: 0</span>
                                 <span style="color:rgba(255,255,255,0.25);">|</span>
-                                <span id="mapCursorChunk"
-                                    style="font-family:'Fira Code',monospace; font-size:11px; color:#94a3b8;">Chunk: 0,
-                                    0</span>
+                                <span id="mapCursorChunk" style="font-family:'Fira Code',monospace; font-size:11px; color:#94a3b8;">Chunk: 0, 0</span>
                             </div>
                         </div>
 
                         <div class="godseye-hud-right">
-                            <button class="zentra-btn secondary" style="padding: 5px 10px; font-size: 11px;"
-                                onclick="centerMapOnSpawn()" title="Center Camera on World Spawn">
+                            <button class="zentra-btn secondary" style="padding: 5px 10px; font-size: 11px;" onclick="centerMapOnSpawn()" title="Center Camera on World Spawn">
                                 🎯 Spawn (0,0)
                             </button>
-                            <button class="zentra-btn secondary" id="btnFollowPlayer"
-                                style="padding: 5px 10px; font-size: 11px;" onclick="toggleFollowPlayer()"
-                                title="Lock Camera onto Selected Player">
+                            <button class="zentra-btn secondary" id="btnFollowPlayer" style="padding: 5px 10px; font-size: 11px;" onclick="toggleFollowPlayer()" title="Lock Camera onto Selected Player">
                                 👁️ Follow: OFF
                             </button>
-                            <button class="zentra-btn primary" style="padding: 5px 10px; font-size: 11px;"
-                                onclick="openAddWaypointModal()">
+                            <button class="zentra-btn primary" style="padding: 5px 10px; font-size: 11px;" onclick="openAddWaypointModal()">
                                 📍 + Add Waypoint
                             </button>
                         </div>
@@ -516,12 +488,9 @@
                                 <button class="canvas-ctrl-btn" onclick="zoomMap(0.8)" title="Zoom Out">-</button>
                                 <button class="canvas-ctrl-btn" onclick="resetMapZoom()" title="Reset Zoom">⟲</button>
                                 <div class="canvas-ctrl-divider"></div>
-                                <button class="canvas-ctrl-btn active" id="ctrlGridToggle"
-                                    onclick="toggleMapLayer('grid')" title="Toggle 16x16 Chunk Grid">#</button>
-                                <button class="canvas-ctrl-btn active" id="ctrlRingsToggle"
-                                    onclick="toggleMapLayer('rings')" title="Toggle Distance Rings">◎</button>
-                                <button class="canvas-ctrl-btn active" id="ctrlRadarToggle"
-                                    onclick="toggleMapLayer('radar')" title="Toggle Radar Sweep">📡</button>
+                                <button class="canvas-ctrl-btn active" id="ctrlGridToggle" onclick="toggleMapLayer('grid')" title="Toggle 16x16 Chunk Grid">#</button>
+                                <button class="canvas-ctrl-btn active" id="ctrlRingsToggle" onclick="toggleMapLayer('rings')" title="Toggle Distance Rings">◎</button>
+                                <button class="canvas-ctrl-btn active" id="ctrlRadarToggle" onclick="toggleMapLayer('radar')" title="Toggle Radar Sweep">📡</button>
                             </div>
 
                             <!-- Real-time Compass Rose / Cardinal Indicator -->
@@ -536,10 +505,8 @@
                             <!-- 1. Real-Time Online Players Radar Deck -->
                             <div class="tactical-deck-card">
                                 <div class="deck-header">
-                                    <span style="font-weight: 700; font-size: 13px;">👥 LIVE OPERATORS (<span
-                                            id="mapPlayerCount">0</span>)</span>
-                                    <span class="status-pill-badge"
-                                        style="font-size:10px; padding:2px 8px;">TRACKING</span>
+                                    <span style="font-weight: 700; font-size: 13px;">👥 LIVE OPERATORS (<span id="mapPlayerCount">0</span>)</span>
+                                    <span class="status-pill-badge" style="font-size:10px; padding:2px 8px;">TRACKING</span>
                                 </div>
                                 <div id="mapPlayersList" class="deck-player-list">
                                     <div class="deck-empty-state">No players currently connected.</div>
@@ -550,8 +517,7 @@
                             <div class="tactical-deck-card" style="margin-top: 14px;">
                                 <div class="deck-header">
                                     <span style="font-weight: 700; font-size: 13px;">📍 WAYPOINTS &amp; BASES</span>
-                                    <button class="zentra-btn secondary" style="padding:2px 8px; font-size:10px;"
-                                        onclick="openAddWaypointModal()">+ ADD</button>
+                                    <button class="zentra-btn secondary" style="padding:2px 8px; font-size:10px;" onclick="openAddWaypointModal()">+ ADD</button>
                                 </div>
                                 <div id="mapWaypointsList" class="deck-waypoint-list">
                                     <!-- Waypoints injected dynamically -->
@@ -564,22 +530,15 @@
                                     <span style="font-weight: 700; font-size: 13px;">☀️ ATMOSPHERE CONTROL</span>
                                 </div>
                                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap:6px; margin-top:8px;">
-                                    <button class="zentra-btn secondary" style="padding:6px; font-size:11px;"
-                                        onclick="triggerWorldAtmosphere('time', 'day')">🌅 Day</button>
-                                    <button class="zentra-btn secondary" style="padding:6px; font-size:11px;"
-                                        onclick="triggerWorldAtmosphere('time', 'noon')">☀️ Noon</button>
-                                    <button class="zentra-btn secondary" style="padding:6px; font-size:11px;"
-                                        onclick="triggerWorldAtmosphere('time', 'sunset')">🌇 Sunset</button>
-                                    <button class="zentra-btn secondary" style="padding:6px; font-size:11px;"
-                                        onclick="triggerWorldAtmosphere('time', 'midnight')">🌙 Night</button>
+                                    <button class="zentra-btn secondary" style="padding:6px; font-size:11px;" onclick="triggerWorldAtmosphere('time', 'day')">🌅 Day</button>
+                                    <button class="zentra-btn secondary" style="padding:6px; font-size:11px;" onclick="triggerWorldAtmosphere('time', 'noon')">☀️ Noon</button>
+                                    <button class="zentra-btn secondary" style="padding:6px; font-size:11px;" onclick="triggerWorldAtmosphere('time', 'sunset')">🌇 Sunset</button>
+                                    <button class="zentra-btn secondary" style="padding:6px; font-size:11px;" onclick="triggerWorldAtmosphere('time', 'midnight')">🌙 Night</button>
                                 </div>
                                 <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:6px; margin-top:8px;">
-                                    <button class="zentra-btn secondary" style="padding:6px; font-size:11px;"
-                                        onclick="triggerWorldAtmosphere('weather', 'clear')">☀️ Clear</button>
-                                    <button class="zentra-btn secondary" style="padding:6px; font-size:11px;"
-                                        onclick="triggerWorldAtmosphere('weather', 'rain')">🌧️ Rain</button>
-                                    <button class="zentra-btn secondary" style="padding:6px; font-size:11px;"
-                                        onclick="triggerWorldAtmosphere('weather', 'thunder')">⛈️ Thunder</button>
+                                    <button class="zentra-btn secondary" style="padding:6px; font-size:11px;" onclick="triggerWorldAtmosphere('weather', 'clear')">☀️ Clear</button>
+                                    <button class="zentra-btn secondary" style="padding:6px; font-size:11px;" onclick="triggerWorldAtmosphere('weather', 'rain')">🌧️ Rain</button>
+                                    <button class="zentra-btn secondary" style="padding:6px; font-size:11px;" onclick="triggerWorldAtmosphere('weather', 'thunder')">⛈️ Thunder</button>
                                 </div>
                             </div>
                         </div>
@@ -603,8 +562,7 @@
                             <span style="font-size: 11px; color:#6e7681;" id="termLineCount">0 lines</span>
                         </div>
                         <div class="terminal-controls">
-                            <button class="term-btn active" id="termScrollLockBtn" onclick="toggleScrollLock()"
-                                title="Auto-scroll to latest output">
+                            <button class="term-btn active" id="termScrollLockBtn" onclick="toggleScrollLock()" title="Auto-scroll to latest output">
                                 <span>⬇</span> Auto-scroll: ON
                             </button>
                             <button class="term-btn" onclick="clearTerminalView()" title="Clear screen buffer">
@@ -622,19 +580,15 @@
                     <!-- Search & Filter Chips Bar -->
                     <div class="terminal-subbar">
                         <div class="terminal-chips">
-                            <button class="chip-btn active" data-filter="all"
-                                onclick="setConsoleFilter('all')">All</button>
+                            <button class="chip-btn active" data-filter="all" onclick="setConsoleFilter('all')">All</button>
                             <button class="chip-btn" data-filter="info" onclick="setConsoleFilter('info')">INFO</button>
                             <button class="chip-btn" data-filter="warn" onclick="setConsoleFilter('warn')">WARN</button>
-                            <button class="chip-btn" data-filter="error"
-                                onclick="setConsoleFilter('error')">ERROR</button>
-                            <button class="chip-btn" data-filter="player"
-                                onclick="setConsoleFilter('player')">Players</button>
+                            <button class="chip-btn" data-filter="error" onclick="setConsoleFilter('error')">ERROR</button>
+                            <button class="chip-btn" data-filter="player" onclick="setConsoleFilter('player')">Players</button>
                         </div>
                         <div class="term-search-box">
                             <span style="color:#6e7681; font-size:12px;">🔍</span>
-                            <input type="text" id="termSearchInput" placeholder="Filter logs..."
-                                oninput="handleLogSearch(this.value)">
+                            <input type="text" id="termSearchInput" placeholder="Filter logs..." oninput="handleLogSearch(this.value)">
                         </div>
                     </div>
 
@@ -652,143 +606,74 @@
                         <span style="font-size:11px; color:#6e7681; margin-right:4px;">Quick Actions:</span>
                         <button class="quick-cmd-btn" onclick="quickSendCommand('list')">list</button>
                         <button class="quick-cmd-btn" onclick="quickSendCommand('save-all')">save-all</button>
-                        <button class="quick-cmd-btn" onclick="quickSendCommand('whitelist reload')">whitelist
-                            reload</button>
+                        <button class="quick-cmd-btn" onclick="quickSendCommand('whitelist reload')">whitelist reload</button>
                         <button class="quick-cmd-btn" onclick="quickSendCommand('time set day')">time set day</button>
-                        <button class="quick-cmd-btn" onclick="quickSendCommand('time set night')">time set
-                            night</button>
+                        <button class="quick-cmd-btn" onclick="quickSendCommand('time set night')">time set night</button>
                         <button class="quick-cmd-btn" onclick="quickSendCommand('weather clear')">weather clear</button>
-                        <button class="quick-cmd-btn" data-edition="bedrock"
-                            onclick="quickSendCommand('gamerule showcoordinates true')">coords on</button>
-                        <button class="quick-cmd-btn" data-edition="bedrock"
-                            onclick="quickSendCommand('toggledownfall')">toggle rain</button>
-                        <button class="quick-cmd-btn" data-edition="java"
-                            onclick="quickSendCommand('whitelist list')">whitelist list</button>
-                        <button class="quick-cmd-btn" data-edition="java"
-                            onclick="quickSendCommand('gamerule keepInventory true')">keep inventory</button>
+                        <button class="quick-cmd-btn" data-edition="bedrock" onclick="quickSendCommand('gamerule showcoordinates true')">coords on</button>
+                        <button class="quick-cmd-btn" data-edition="bedrock" onclick="quickSendCommand('toggledownfall')">toggle rain</button>
+                        <button class="quick-cmd-btn" data-edition="java" onclick="quickSendCommand('whitelist list')">whitelist list</button>
+                        <button class="quick-cmd-btn" data-edition="java" onclick="quickSendCommand('gamerule keepInventory true')">keep inventory</button>
                     </div>
 
                     <!-- Interactive Command Input with Arrow History & Autocomplete -->
                     <div class="terminal-input-bar">
                         <div class="autocomplete-box" id="autocompleteBox"></div>
                         <span class="term-prompt-sym" id="terminalPrompt">server&gt;</span>
-                        <input type="text" id="terminalCmdInput" class="term-input"
-                            placeholder="Type a server command..." autocomplete="off" spellcheck="false">
+                        <input type="text" id="terminalCmdInput" class="term-input" placeholder="Type a server command..." autocomplete="off" spellcheck="false">
                         <button class="term-send-btn" onclick="sendConsoleCommand('terminalCmdInput')">Send ↵</button>
                     </div>
                 </div>
             </section>
 
             <section id="viewJava" class="tab-content" style="display:none;">
-                <!-- NEXUS FLEET REVERSE TUNNEL GATEWAY -->
-                <div class="soft-card" style="border-left: 4px solid var(--zentra-indigo, #6366f1); margin-bottom: 24px;">
+                <div class="soft-card">
                     <div class="card-header-bar" style="flex-wrap:wrap; gap:12px;">
                         <div class="card-title-group">
-                            <h3 style="display:flex; align-items:center; gap:8px;">
-                                <span style="color:#6366f1;">🌐</span> Fleet Reverse Tunnel Gateway
-                            </h3>
-                            <p>Low-latency reverse TCP gateway routing public player traffic from this cloud ingress node to your designated remote or bare-metal server node.</p>
+                            <h3>Paper server setup</h3>
+                            <p>Install or update the newest stable Paper build compatible with the Java runtime on this manager.</p>
                         </div>
-                        <span class="metric-pill" id="tunnelGatewayPill" style="background:rgba(99,102,241,0.15); color:#818cf8;">Checking Gateway...</span>
+                        <span class="metric-pill" id="javaServerStatus">Checking...</span>
                     </div>
 
                     <div class="metrics-grid">
-                        <div class="stat-box">
-                            <div class="stat-label">Public Ingress Address</div>
-                            <div class="stat-value" id="tunnelPublicAddr" style="font-size:1.1rem; color:#10b981;">Checking...</div>
-                        </div>
-                        <div class="stat-box">
-                            <div class="stat-label">Control Link Port</div>
-                            <div class="stat-value" id="tunnelControlPort" style="font-size:1.1rem;">TCP 25560</div>
-                        </div>
-                        <div class="stat-box">
-                            <div class="stat-label">Tunnel Engine</div>
-                            <div class="stat-value" style="font-size:1.1rem;">Nexus CLI (<code>nexus tunnel</code>)</div>
-                        </div>
-                        <div class="stat-box">
-                            <div class="stat-label">Ingress Mode</div>
-                            <div class="stat-value" id="tunnelModeLabel" style="font-size:1.1rem;">Standby</div>
-                        </div>
+                        <div class="stat-box"><div class="stat-label">Installed Paper</div><div class="stat-value" id="javaPaperStatus">Not installed</div></div>
+                        <div class="stat-box"><div class="stat-label">Latest compatible Paper</div><div class="stat-value" id="javaLatestVersion">Checking...</div></div>
+                        <div class="stat-box"><div class="stat-label">Server address</div><div class="stat-value">TCP 25565</div></div>
                     </div>
 
-                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-top:16px;">
-                        <span style="color:var(--zentra-muted); font-size:0.85rem;">Managed via <code>nexus tunnel listen</code> on this node and <code>nexus tunnel connect</code> on the target server.</span>
-                        <button class="zentra-btn secondary" type="button" onclick="pollTunnelStatus()">Check Tunnel Link</button>
+                    <div class="setup-path-row">
+                        <div><span class="stat-label">Java server folder</span><code id="javaServerDirectory">Loading...</code></div>
+                        <div><span class="stat-label">Previous jar backups</span><code id="javaBackupDirectory">Loading...</code></div>
+                    </div>
+
+                    <div class="paper-install-notice">
+                        <strong>Before installing</strong>
+                        <p>Paper will be downloaded from PaperMC, checksum-verified, then installed. Existing server jar files are backed up automatically. If Paper is running, it will be stopped cleanly and restarted after the update.</p>
+                        <p>The manager detects its Java runtime and offers the newest compatible stable Paper version. Java 21 supports current 1.20–1.21 releases; newer Minecraft releases may require Java 25 or later.</p>
+                    </div>
+
+                    <label class="eula-confirm-row">
+                        <input type="checkbox" id="paperEulaConfirm">
+                        <span>I have read and agree to the <a href="https://aka.ms/MinecraftEULA" target="_blank" rel="noopener noreferrer">Minecraft EULA</a>.</span>
+                    </label>
+
+                    <div class="paper-update-actions">
+                        <button class="zentra-btn emerald" type="button" id="paperInstallButton" onclick="installOrUpdatePaper()">Install latest Paper</button>
+                        <button class="zentra-btn secondary" type="button" onclick="loadJavaServer(); loadLatestPaper(); pollPaperUpdateStatus()">Refresh status</button>
+                    </div>
+
+                    <div class="update-progress-card" id="paperUpdateProgress" style="display:none;">
+                        <div class="update-progress-labels"><span id="paperUpdateMessage">Checking...</span><span id="paperUpdatePercent">0%</span></div>
+                        <div class="update-progress-track"><div id="paperUpdateBar" class="update-progress-fill"></div></div>
+                        <p id="paperUpdateError" class="update-error"></p>
+                    </div>
+
+                    <div class="setup-path-row">
+                        <div><span class="stat-label">EULA agreement</span><strong id="javaEulaStatus">Not yet recorded</strong></div>
+                        <div><span class="stat-label">Other edition status</span><strong id="javaBedrockStatus">Checking...</strong></div>
                     </div>
                 </div>
-
-                    <div class="soft-card">
-                        <div class="card-header-bar" style="flex-wrap:wrap; gap:12px;">
-                            <div class="card-title-group">
-                                <h3>Paper server setup</h3>
-                                <p>Install or update the newest stable Paper build compatible with the Java runtime on
-                                    this manager.</p>
-                            </div>
-                            <span class="metric-pill" id="javaServerStatus">Checking...</span>
-                        </div>
-
-                        <div class="metrics-grid">
-                            <div class="stat-box">
-                                <div class="stat-label">Installed Paper</div>
-                                <div class="stat-value" id="javaPaperStatus">Not installed</div>
-                            </div>
-                            <div class="stat-box">
-                                <div class="stat-label">Latest compatible Paper</div>
-                                <div class="stat-value" id="javaLatestVersion">Checking...</div>
-                            </div>
-                            <div class="stat-box">
-                                <div class="stat-label">Server address</div>
-                                <div class="stat-value">TCP 25565</div>
-                            </div>
-                        </div>
-
-                        <div class="setup-path-row">
-                            <div><span class="stat-label">Java server folder</span><code
-                                    id="javaServerDirectory">Loading...</code></div>
-                            <div><span class="stat-label">Previous jar backups</span><code
-                                    id="javaBackupDirectory">Loading...</code></div>
-                        </div>
-
-                        <div class="paper-install-notice">
-                            <strong>Before installing</strong>
-                            <p>Paper will be downloaded from PaperMC, checksum-verified, then installed. Existing server
-                                jar files are backed up automatically. If Paper is running, it will be stopped cleanly
-                                and restarted after the update.</p>
-                            <p>The manager detects its Java runtime and offers the newest compatible stable Paper
-                                version. Java 25 is required for Minecraft 26.x. Back up your Java world before
-                                upgrading Paper across Minecraft versions.</p>
-                        </div>
-
-                        <label class="eula-confirm-row">
-                            <input type="checkbox" id="paperEulaConfirm">
-                            <span>I have read and agree to the <a href="https://aka.ms/MinecraftEULA" target="_blank"
-                                    rel="noopener noreferrer">Minecraft EULA</a>.</span>
-                        </label>
-
-                        <div class="paper-update-actions">
-                            <button class="zentra-btn emerald" type="button" id="paperInstallButton"
-                                onclick="installOrUpdatePaper()">Install latest Paper</button>
-                            <button class="zentra-btn secondary" type="button"
-                                onclick="loadJavaServer(); loadLatestPaper(); pollPaperUpdateStatus()">Refresh
-                                status</button>
-                        </div>
-
-                        <div class="update-progress-card" id="paperUpdateProgress" style="display:none;">
-                            <div class="update-progress-labels"><span id="paperUpdateMessage">Checking...</span><span
-                                    id="paperUpdatePercent">0%</span></div>
-                            <div class="update-progress-track">
-                                <div id="paperUpdateBar" class="update-progress-fill"></div>
-                            </div>
-                            <p id="paperUpdateError" class="update-error"></p>
-                        </div>
-
-                        <div class="setup-path-row">
-                            <div><span class="stat-label">EULA agreement</span><strong id="javaEulaStatus">Not yet
-                                    recorded</strong></div>
-                            <div><span class="stat-label">Other edition status</span><strong
-                                    id="javaBedrockStatus">Checking...</strong></div>
-                        </div>
-                    </div>
             </section>
 
             <!-- 3. WORLDS VIEW -->
@@ -800,10 +685,8 @@
                             <p>Manage, switch active levels, create or backup worlds</p>
                         </div>
                         <div style="display: flex; gap: 8px;">
-                            <button class="zentra-btn secondary" onclick="openModal('createWorldModal')">+ Create
-                                World</button>
-                            <button class="zentra-btn primary" onclick="openModal('uploadWorldModal')">↑ Upload
-                                .mcworld</button>
+                            <button class="zentra-btn secondary" onclick="openModal('createWorldModal')">+ Create World</button>
+                            <button class="zentra-btn primary" onclick="openModal('uploadWorldModal')">↑ Upload .mcworld</button>
                         </div>
                     </div>
 
@@ -821,9 +704,7 @@
                                 </tr>
                             </thead>
                             <tbody id="worldsTableBody">
-                                <tr>
-                                    <td colspan="7" style="text-align:center;">Loading worlds...</td>
-                                </tr>
+                                <tr><td colspan="7" style="text-align:center;">Loading worlds...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -837,8 +718,7 @@
                         </div>
                     </div>
                     <div id="backupsListContainer">
-                        <p style="color:var(--zentra-muted); font-size:13px;">Select a world above or view backups
-                            below.</p>
+                        <p style="color:var(--zentra-muted); font-size:13px;">Select a world above or view backups below.</p>
                     </div>
                 </div>
             </section>
@@ -855,27 +735,18 @@
                             </div>
                             <p>Dispatch in-game operator commands directly to the active world</p>
                         </div>
-                        <button class="zentra-btn secondary" id="btnToggleCheats" onclick="toggleCheats()"
-                            style="padding:4px 12px; font-size:12px;">⚡ Toggle Cheats</button>
+                        <button class="zentra-btn secondary" id="btnToggleCheats" onclick="toggleCheats()" style="padding:4px 12px; font-size:12px;">⚡ Toggle Cheats</button>
                     </div>
                     <div class="actions-pill-grid" style="margin-bottom: 14px;">
-                        <button class="zentra-btn secondary" onclick="sendPlayerCommand('time set day')">☀️ Time:
-                            Day</button>
-                        <button class="zentra-btn secondary" onclick="sendPlayerCommand('time set night')">🌙 Time:
-                            Night</button>
-                        <button class="zentra-btn secondary" onclick="sendPlayerCommand('weather clear')">⛅ Weather:
-                            Clear</button>
-                        <button class="zentra-btn secondary" onclick="sendPlayerCommand('gamemode creative @a')">🎮
-                            Creative All</button>
-                        <button class="zentra-btn secondary" onclick="sendPlayerCommand('gamemode survival @a')">⚔️
-                            Survival All</button>
+                        <button class="zentra-btn secondary" onclick="sendPlayerCommand('time set day')">☀️ Time: Day</button>
+                        <button class="zentra-btn secondary" onclick="sendPlayerCommand('time set night')">🌙 Time: Night</button>
+                        <button class="zentra-btn secondary" onclick="sendPlayerCommand('weather clear')">⛅ Weather: Clear</button>
+                        <button class="zentra-btn secondary" onclick="sendPlayerCommand('gamemode creative @a')">🎮 Creative All</button>
+                        <button class="zentra-btn secondary" onclick="sendPlayerCommand('gamemode survival @a')">⚔️ Survival All</button>
                     </div>
                     <div style="display:flex; gap:8px;">
-                        <input type="text" id="customCheatCmd" class="zentra-input"
-                            placeholder="Custom cheat command (e.g. give @a diamond 64)"
-                            onkeydown="if(event.key==='Enter') executeCustomCheat()">
-                        <button class="zentra-btn emerald" onclick="executeCustomCheat()"
-                            style="white-space:nowrap;">Run Command</button>
+                        <input type="text" id="customCheatCmd" class="zentra-input" placeholder="Custom cheat command (e.g. give @a diamond 64)" onkeydown="if(event.key==='Enter') executeCustomCheat()">
+                        <button class="zentra-btn emerald" onclick="executeCustomCheat()" style="white-space:nowrap;">Run Command</button>
                     </div>
                 </div>
 
@@ -885,47 +756,36 @@
                         <div class="card-title-group">
                             <div style="display:flex; align-items:center; gap:8px;">
                                 <h3>📢 In-Game Broadcaster &amp; Screen Titles</h3>
-                                <span class="metric-pill"
-                                    style="background:rgba(56,189,248,0.1); border-color:rgba(56,189,248,0.3); color:#0284c7;">●
-                                    Live Comms</span>
+                                <span class="metric-pill" style="background:rgba(56,189,248,0.1); border-color:rgba(56,189,248,0.3); color:#0284c7;">● Live Comms</span>
                             </div>
-                            <p>Dispatch chat messages, giant cinematic title banners, or actionbar toasts directly to
-                                online players</p>
+                            <p>Dispatch chat messages, giant cinematic title banners, or actionbar toasts directly to online players</p>
                         </div>
                     </div>
 
                     <div class="broadcast-control-deck">
                         <!-- Channel & Target Controls Row -->
-                        <div
-                            style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:14px; margin-bottom:16px;">
+                        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:14px; margin-bottom:16px;">
                             <div class="zentra-input-group">
-                                <label
-                                    style="font-weight:700; font-size:12px; margin-bottom:6px; display:flex; align-items:center; gap:6px;">
+                                <label style="font-weight:700; font-size:12px; margin-bottom:6px; display:flex; align-items:center; gap:6px;">
                                     <span>📡 Broadcast Channel:</span>
                                 </label>
                                 <div class="broadcast-type-pills">
-                                    <button type="button" class="bc-type-btn active" data-type="chat"
-                                        onclick="setBroadcastType('chat')">💬 Chat (say)</button>
-                                    <button type="button" class="bc-type-btn" data-type="title"
-                                        onclick="setBroadcastType('title')">🎬 Title Banner</button>
-                                    <button type="button" class="bc-type-btn" data-type="actionbar"
-                                        onclick="setBroadcastType('actionbar')">⚡ Actionbar</button>
-                                    <button type="button" class="bc-type-btn" data-type="whisper"
-                                        onclick="setBroadcastType('whisper')">🤫 Whisper</button>
+                                    <button type="button" class="bc-type-btn active" data-type="chat" onclick="setBroadcastType('chat')">💬 Chat (say)</button>
+                                    <button type="button" class="bc-type-btn" data-type="title" onclick="setBroadcastType('title')">🎬 Title Banner</button>
+                                    <button type="button" class="bc-type-btn" data-type="actionbar" onclick="setBroadcastType('actionbar')">⚡ Actionbar</button>
+                                    <button type="button" class="bc-type-btn" data-type="whisper" onclick="setBroadcastType('whisper')">🤫 Whisper</button>
                                 </div>
                             </div>
 
                             <div class="zentra-input-group">
-                                <label style="font-weight:700; font-size:12px; margin-bottom:6px;">🎯 Target Audience /
-                                    Player:</label>
+                                <label style="font-weight:700; font-size:12px; margin-bottom:6px;">🎯 Target Audience / Player:</label>
                                 <select id="bcTargetPlayer" class="zentra-input" style="height:38px;">
                                     <option value="@a">👥 @a - All Players</option>
                                 </select>
                             </div>
 
                             <div class="zentra-input-group">
-                                <label style="font-weight:700; font-size:12px; margin-bottom:6px;">🔊 Sound Cue
-                                    Effect:</label>
+                                <label style="font-weight:700; font-size:12px; margin-bottom:6px;">🔊 Sound Cue Effect:</label>
                                 <select id="bcSoundEffect" class="zentra-input" style="height:38px;">
                                     <option value="none">🔕 None (Silent)</option>
                                     <option value="levelup">🆙 Level Up Chime</option>
@@ -939,61 +799,38 @@
 
                         <!-- Message Inputs & Quick Color Palette -->
                         <div class="zentra-input-group" style="margin-bottom:12px;">
-                            <div
-                                style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; flex-wrap:wrap; gap:8px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; flex-wrap:wrap; gap:8px;">
                                 <label style="font-weight:700; font-size:12px;">Broadcast Message:</label>
                                 <div class="mc-color-palette" title="Click to insert Minecraft color formatting code">
-                                    <span
-                                        style="font-size:11px; color:var(--zentra-muted); margin-right:4px;">Colors:</span>
-                                    <button type="button" class="mc-color-chip" style="background:#55FF55; color:#000;"
-                                        onclick="insertColorCode('§a')">§a</button>
-                                    <button type="button" class="mc-color-chip" style="background:#55FFFF; color:#000;"
-                                        onclick="insertColorCode('§b')">§b</button>
-                                    <button type="button" class="mc-color-chip" style="background:#FF5555; color:#fff;"
-                                        onclick="insertColorCode('§c')">§c</button>
-                                    <button type="button" class="mc-color-chip" style="background:#FFFF55; color:#000;"
-                                        onclick="insertColorCode('§e')">§e</button>
-                                    <button type="button" class="mc-color-chip" style="background:#FF55FF; color:#000;"
-                                        onclick="insertColorCode('§d')">§d</button>
-                                    <button type="button" class="mc-color-chip" style="background:#FFAA00; color:#000;"
-                                        onclick="insertColorCode('§6')">§6</button>
-                                    <button type="button" class="mc-color-chip"
-                                        style="background:#FFFFFF; color:#000; border:1px solid #ccc;"
-                                        onclick="insertColorCode('§f')">§f</button>
-                                    <button type="button" class="mc-color-chip" style="background:#333; color:#fff;"
-                                        onclick="insertColorCode('§l')">§l Bold</button>
+                                    <span style="font-size:11px; color:var(--zentra-muted); margin-right:4px;">Colors:</span>
+                                    <button type="button" class="mc-color-chip" style="background:#55FF55; color:#000;" onclick="insertColorCode('§a')">§a</button>
+                                    <button type="button" class="mc-color-chip" style="background:#55FFFF; color:#000;" onclick="insertColorCode('§b')">§b</button>
+                                    <button type="button" class="mc-color-chip" style="background:#FF5555; color:#fff;" onclick="insertColorCode('§c')">§c</button>
+                                    <button type="button" class="mc-color-chip" style="background:#FFFF55; color:#000;" onclick="insertColorCode('§e')">§e</button>
+                                    <button type="button" class="mc-color-chip" style="background:#FF55FF; color:#000;" onclick="insertColorCode('§d')">§d</button>
+                                    <button type="button" class="mc-color-chip" style="background:#FFAA00; color:#000;" onclick="insertColorCode('§6')">§6</button>
+                                    <button type="button" class="mc-color-chip" style="background:#FFFFFF; color:#000; border:1px solid #ccc;" onclick="insertColorCode('§f')">§f</button>
+                                    <button type="button" class="mc-color-chip" style="background:#333; color:#fff;" onclick="insertColorCode('§l')">§l Bold</button>
                                 </div>
                             </div>
-                            <input type="text" id="bcMessageInput" class="zentra-input"
-                                placeholder="e.g. §aWelcome to the server! Event starting in 5 minutes!"
-                                oninput="updateBroadcastPreview()"
-                                onkeydown="if(event.key==='Enter') dispatchCustomBroadcast()">
+                            <input type="text" id="bcMessageInput" class="zentra-input" placeholder="e.g. §aWelcome to the server! Event starting in 5 minutes!" oninput="updateBroadcastPreview()" onkeydown="if(event.key==='Enter') dispatchCustomBroadcast()">
                         </div>
 
                         <!-- Subtitle Input (Visible for Title mode) -->
                         <div id="bcSubtitleGroup" class="zentra-input-group" style="display:none; margin-bottom:12px;">
-                            <label style="font-weight:700; font-size:12px; margin-bottom:6px;">Screen Banner Subtitle
-                                (Optional):</label>
-                            <input type="text" id="bcSubtitleInput" class="zentra-input"
-                                placeholder="e.g. §eGet your weapons ready!" oninput="updateBroadcastPreview()">
+                            <label style="font-weight:700; font-size:12px; margin-bottom:6px;">Screen Banner Subtitle (Optional):</label>
+                            <input type="text" id="bcSubtitleInput" class="zentra-input" placeholder="e.g. §eGet your weapons ready!" oninput="updateBroadcastPreview()">
                         </div>
 
                         <!-- Quick Announcement Presets -->
                         <div style="margin-bottom:16px;">
-                            <span
-                                style="font-size:11px; font-weight:700; color:var(--zentra-muted); text-transform:uppercase; letter-spacing:0.04em;">Quick
-                                Presets:</span>
+                            <span style="font-size:11px; font-weight:700; color:var(--zentra-muted); text-transform:uppercase; letter-spacing:0.04em;">Quick Presets:</span>
                             <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:6px;">
-                                <button type="button" class="preset-chip" onclick="applyBroadcastPreset('welcome')">👋
-                                    Welcome Players</button>
-                                <button type="button" class="preset-chip" onclick="applyBroadcastPreset('restart')">⚠️
-                                    5m Restart Warning</button>
-                                <button type="button" class="preset-chip" onclick="applyBroadcastPreset('pvp')">⚔️ PvP
-                                    Arena Event</button>
-                                <button type="button" class="preset-chip" onclick="applyBroadcastPreset('night')">🌙
-                                    Night Caution</button>
-                                <button type="button" class="preset-chip" onclick="applyBroadcastPreset('rules')">📜
-                                    Follow Server Rules</button>
+                                <button type="button" class="preset-chip" onclick="applyBroadcastPreset('welcome')">👋 Welcome Players</button>
+                                <button type="button" class="preset-chip" onclick="applyBroadcastPreset('restart')">⚠️ 5m Restart Warning</button>
+                                <button type="button" class="preset-chip" onclick="applyBroadcastPreset('pvp')">⚔️ PvP Arena Event</button>
+                                <button type="button" class="preset-chip" onclick="applyBroadcastPreset('night')">🌙 Night Caution</button>
+                                <button type="button" class="preset-chip" onclick="applyBroadcastPreset('rules')">📜 Follow Server Rules</button>
                             </div>
                         </div>
 
@@ -1009,8 +846,7 @@
                                     <div id="previewSubTitle" class="mc-subtitle-text">Subtitle text here</div>
                                 </div>
                                 <div id="previewChatDisplay" class="mc-preview-chat">
-                                    <div id="previewChatLine"><span style="color:#FFAA00;">[Server]</span> <span
-                                            id="previewChatMsg">Welcome to the server!</span></div>
+                                    <div id="previewChatLine"><span style="color:#FFAA00;">[Server]</span> <span id="previewChatMsg">Welcome to the server!</span></div>
                                 </div>
                                 <div id="previewActionbarDisplay" class="mc-preview-actionbar" style="display:none;">
                                     <span id="previewActionbarMsg">Actionbar toast notification</span>
@@ -1020,9 +856,7 @@
 
                         <!-- Dispatch Button -->
                         <div style="display:flex; justify-content:flex-end; margin-top:14px;">
-                            <button type="button" class="zentra-btn emerald"
-                                style="padding:10px 24px; font-size:14px; font-weight:700; display:flex; align-items:center; gap:8px;"
-                                onclick="dispatchCustomBroadcast()">
+                            <button type="button" class="zentra-btn emerald" style="padding:10px 24px; font-size:14px; font-weight:700; display:flex; align-items:center; gap:8px;" onclick="dispatchCustomBroadcast()">
                                 <span>🚀 Dispatch Broadcast to In-Game</span>
                             </button>
                         </div>
@@ -1035,18 +869,13 @@
                         <div class="card-title-group">
                             <div style="display:flex; align-items:center; gap:8px;">
                                 <h3>🎮 Game Master Arsenal &amp; Player Controls</h3>
-                                <span class="metric-pill"
-                                    style="background:rgba(245,158,11,0.12); border-color:rgba(245,158,11,0.3); color:#b45309;">⚔️
-                                    Operator Deck</span>
+                                <span class="metric-pill" style="background:rgba(245,158,11,0.12); border-color:rgba(245,158,11,0.3); color:#b45309;">⚔️ Operator Deck</span>
                             </div>
                             <p>Give/remove items, edit experience levels, and cast god-mode spells and trolls</p>
                         </div>
                         <div style="display:flex; align-items:center; gap:8px;">
-                            <label style="font-size:12px; font-weight:700; color:var(--zentra-foreground);">Target
-                                Player:</label>
-                            <select id="gmTargetPlayer" class="zentra-input"
-                                style="height:34px; padding:4px 10px; font-weight:600; min-width:160px;"
-                                onchange="syncGmTarget(this.value)">
+                            <label style="font-size:12px; font-weight:700; color:var(--zentra-foreground);">Target Player:</label>
+                            <select id="gmTargetPlayer" class="zentra-input" style="height:34px; padding:4px 10px; font-weight:600; min-width:160px;" onchange="syncGmTarget(this.value)">
                                 <option value="@a">👥 @a - All Players</option>
                             </select>
                         </div>
@@ -1058,8 +887,7 @@
                             <span style="font-weight:700; font-size:13px; display:flex; align-items:center; gap:6px;">
                                 <span>✨ Experience &amp; Level Scrubber</span>
                             </span>
-                            <span style="font-size:11px; color:var(--zentra-muted);">Instant Level &amp; XP
-                                Modification</span>
+                            <span style="font-size:11px; color:var(--zentra-muted);">Instant Level &amp; XP Modification</span>
                         </div>
 
                         <!-- Authentic Minecraft XP Bar & Level Badge -->
@@ -1073,32 +901,17 @@
                         <!-- Scrubber Slider & Quick Buttons -->
                         <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-top:12px;">
                             <div style="display:flex; align-items:center; gap:8px; flex:1; min-width:240px;">
-                                <label
-                                    style="font-size:12px; font-weight:600; color:var(--zentra-muted); white-space:nowrap;">Set
-                                    Level:</label>
-                                <input type="range" id="gmLevelSlider" min="0" max="100" value="30" class="mc-slider"
-                                    oninput="updateGmLevelInput(this.value)">
-                                <input type="number" id="gmLevelInput" min="0" max="10000" value="30"
-                                    class="zentra-input"
-                                    style="width:70px; padding:4px 8px; text-align:center; font-family:var(--font-mono); font-weight:700;"
-                                    oninput="updateGmLevelSlider(this.value)">
-                                <button type="button" class="zentra-btn emerald"
-                                    style="padding:6px 12px; font-size:12px;" onclick="applyGmLevel()">Apply</button>
+                                <label style="font-size:12px; font-weight:600; color:var(--zentra-muted); white-space:nowrap;">Set Level:</label>
+                                <input type="range" id="gmLevelSlider" min="0" max="100" value="30" class="mc-slider" oninput="updateGmLevelInput(this.value)">
+                                <input type="number" id="gmLevelInput" min="0" max="10000" value="30" class="zentra-input" style="width:70px; padding:4px 8px; text-align:center; font-family:var(--font-mono); font-weight:700;" oninput="updateGmLevelSlider(this.value)">
+                                <button type="button" class="zentra-btn emerald" style="padding:6px 12px; font-size:12px;" onclick="applyGmLevel()">Apply</button>
                             </div>
                             <div style="display:flex; gap:6px; flex-wrap:wrap;">
-                                <button type="button" class="zentra-btn secondary"
-                                    style="padding:6px 10px; font-size:11px;" onclick="addGmXp(1)">+1 Lvl</button>
-                                <button type="button" class="zentra-btn secondary"
-                                    style="padding:6px 10px; font-size:11px;" onclick="addGmXp(5)">+5 Lvl</button>
-                                <button type="button" class="zentra-btn secondary"
-                                    style="padding:6px 10px; font-size:11px; border-color:#10b981; color:#059669;"
-                                    onclick="setGmLevelDirect(30)">⭐ Lvl 30 (Max Enchant)</button>
-                                <button type="button" class="zentra-btn secondary"
-                                    style="padding:6px 10px; font-size:11px; border-color:#f59e0b; color:#d97706;"
-                                    onclick="setGmLevelDirect(100)">👑 Lvl 100</button>
-                                <button type="button" class="zentra-btn danger"
-                                    style="padding:6px 10px; font-size:11px;" onclick="setGmLevelDirect(0)">💀 Reset
-                                    (0)</button>
+                                <button type="button" class="zentra-btn secondary" style="padding:6px 10px; font-size:11px;" onclick="addGmXp(1)">+1 Lvl</button>
+                                <button type="button" class="zentra-btn secondary" style="padding:6px 10px; font-size:11px;" onclick="addGmXp(5)">+5 Lvl</button>
+                                <button type="button" class="zentra-btn secondary" style="padding:6px 10px; font-size:11px; border-color:#10b981; color:#059669;" onclick="setGmLevelDirect(30)">⭐ Lvl 30 (Max Enchant)</button>
+                                <button type="button" class="zentra-btn secondary" style="padding:6px 10px; font-size:11px; border-color:#f59e0b; color:#d97706;" onclick="setGmLevelDirect(100)">👑 Lvl 100</button>
+                                <button type="button" class="zentra-btn danger" style="padding:6px 10px; font-size:11px;" onclick="setGmLevelDirect(0)">💀 Reset (0)</button>
                             </div>
                         </div>
                     </div>
@@ -1111,12 +924,9 @@
                             </span>
                             <div style="display:flex; align-items:center; gap:6px;">
                                 <span style="font-size:11px; color:var(--zentra-muted);">Stack Amount:</span>
-                                <button type="button" class="amount-pill-btn active" data-amt="1"
-                                    onclick="setItemDispenseAmount(1, this)">1x</button>
-                                <button type="button" class="amount-pill-btn" data-amt="16"
-                                    onclick="setItemDispenseAmount(16, this)">16x</button>
-                                <button type="button" class="amount-pill-btn" data-amt="64"
-                                    onclick="setItemDispenseAmount(64, this)">64x</button>
+                                <button type="button" class="amount-pill-btn active" data-amt="1" onclick="setItemDispenseAmount(1, this)">1x</button>
+                                <button type="button" class="amount-pill-btn" data-amt="16" onclick="setItemDispenseAmount(16, this)">16x</button>
+                                <button type="button" class="amount-pill-btn" data-amt="64" onclick="setItemDispenseAmount(64, this)">64x</button>
                             </div>
                         </div>
 
@@ -1126,25 +936,14 @@
                         </div>
 
                         <!-- Custom Item ID Dispenser Bar & Clear All -->
-                        <div
-                            style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:14px; padding-top:12px; border-top:1px solid var(--zentra-border);">
+                        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:14px; padding-top:12px; border-top:1px solid var(--zentra-border);">
                             <div style="display:flex; gap:8px; flex:1; min-width:260px; align-items:center;">
-                                <input type="text" id="gmCustomItemId" class="zentra-input"
-                                    placeholder="Custom item ID (e.g. mace, breeze_rod, shield, beacon)"
-                                    style="padding:6px 10px; font-size:12px;">
-                                <input type="number" id="gmCustomItemAmt" min="1" max="64" value="1"
-                                    class="zentra-input"
-                                    style="width:65px; padding:6px 8px; font-size:12px; text-align:center;">
-                                <button type="button" class="zentra-btn emerald"
-                                    style="padding:6px 14px; font-size:12px; white-space:nowrap;"
-                                    onclick="dispenseCustomItem('give')">+ Give</button>
-                                <button type="button" class="zentra-btn secondary"
-                                    style="padding:6px 10px; font-size:12px; white-space:nowrap;"
-                                    onclick="dispenseCustomItem('clear')">- Clear</button>
+                                <input type="text" id="gmCustomItemId" class="zentra-input" placeholder="Custom item ID (e.g. mace, breeze_rod, shield, beacon)" style="padding:6px 10px; font-size:12px;">
+                                <input type="number" id="gmCustomItemAmt" min="1" max="64" value="1" class="zentra-input" style="width:65px; padding:6px 8px; font-size:12px; text-align:center;">
+                                <button type="button" class="zentra-btn emerald" style="padding:6px 14px; font-size:12px; white-space:nowrap;" onclick="dispenseCustomItem('give')">+ Give</button>
+                                <button type="button" class="zentra-btn secondary" style="padding:6px 10px; font-size:12px; white-space:nowrap;" onclick="dispenseCustomItem('clear')">- Clear</button>
                             </div>
-                            <button type="button" class="zentra-btn danger"
-                                style="padding:6px 14px; font-size:12px; white-space:nowrap;"
-                                onclick="clearPlayerInventoryConfirm()">
+                            <button type="button" class="zentra-btn danger" style="padding:6px 14px; font-size:12px; white-space:nowrap;" onclick="clearPlayerInventoryConfirm()">
                                 🗑️ Clear Entire Inventory
                             </button>
                         </div>
@@ -1251,9 +1050,7 @@
                                 </tr>
                             </thead>
                             <tbody id="playersTableBody">
-                                <tr>
-                                    <td colspan="7" style="text-align:center;">Loading players...</td>
-                                </tr>
+                                <tr><td colspan="7" style="text-align:center;">Loading players...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -1269,24 +1066,19 @@
                         <button class="zentra-btn secondary" onclick="loadAllowlist()">↻ Reload Allowlist</button>
                     </div>
 
-                    <form onsubmit="submitAddToAllowlist(event)"
-                        style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom: 16px;">
+                    <form onsubmit="submitAddToAllowlist(event)" style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom: 16px;">
                         <div class="zentra-input-group" style="flex: 1; min-width: 180px;">
                             <label>Gamertag / Player Name</label>
-                            <input type="text" id="allowlistNewName" class="zentra-input" placeholder="e.g. Steve"
-                                required>
+                            <input type="text" id="allowlistNewName" class="zentra-input" placeholder="e.g. Steve" required>
                         </div>
                         <div class="zentra-input-group" style="flex: 1; min-width: 180px;">
                             <label>XUID (Optional)</label>
-                            <input type="text" id="allowlistNewXuid" class="zentra-input"
-                                placeholder="e.g. 253327482910">
+                            <input type="text" id="allowlistNewXuid" class="zentra-input" placeholder="e.g. 253327482910">
                         </div>
-                        <label
-                            style="display:flex; align-items:center; gap:6px; font-size:12px; margin-bottom:10px; cursor:pointer;">
+                        <label style="display:flex; align-items:center; gap:6px; font-size:12px; margin-bottom:10px; cursor:pointer;">
                             <input type="checkbox" id="allowlistIgnoreLimit"> Ignore Player Limit
                         </label>
-                        <button type="submit" class="zentra-btn emerald" style="margin-bottom:4px;">+ Add to
-                            Allowlist</button>
+                        <button type="submit" class="zentra-btn emerald" style="margin-bottom:4px;">+ Add to Allowlist</button>
                     </form>
 
                     <div class="zentra-table-wrap">
@@ -1300,10 +1092,7 @@
                                 </tr>
                             </thead>
                             <tbody id="allowlistTableBody">
-                                <tr>
-                                    <td colspan="4" style="text-align:center; color:var(--zentra-muted);">Loading
-                                        allowlist...</td>
-                                </tr>
+                                <tr><td colspan="4" style="text-align:center; color:var(--zentra-muted);">Loading allowlist...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -1318,21 +1107,17 @@
                             <h3>Behavior &amp; Resource Packs</h3>
                             <p>Addons installed on the dedicated server</p>
                         </div>
-                        <button class="zentra-btn primary" onclick="openModal('uploadAddonModal')">↑ Upload Pack
-                            (.mcpack)</button>
+                        <button class="zentra-btn primary" onclick="openModal('uploadAddonModal')">↑ Upload Pack (.mcpack)</button>
                     </div>
 
-                    <div
-                        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; margin-bottom: 20px;">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; margin-bottom: 20px;">
                         <div>
                             <h4 style="font-size:14px; font-weight:700; margin-bottom:10px;">Behavior Packs</h4>
-                            <div id="behaviorPacksContainer" style="display:flex; flex-direction:column; gap:8px;">
-                            </div>
+                            <div id="behaviorPacksContainer" style="display:flex; flex-direction:column; gap:8px;"></div>
                         </div>
                         <div>
                             <h4 style="font-size:14px; font-weight:700; margin-bottom:10px;">Resource Packs</h4>
-                            <div id="resourcePacksContainer" style="display:flex; flex-direction:column; gap:8px;">
-                            </div>
+                            <div id="resourcePacksContainer" style="display:flex; flex-direction:column; gap:8px;"></div>
                         </div>
                     </div>
 
@@ -1351,18 +1136,13 @@
                             <p id="propertiesPageDescription">Common settings for the selected server edition.</p>
                         </div>
                         <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-                            <input type="text" id="propSearchInput" class="zentra-input"
-                                placeholder="🔍 Search properties..." oninput="filterProperties(this.value)"
-                                style="width: 200px; padding: 7px 12px; font-size: 12px;">
-                            <button class="zentra-btn secondary" type="button" onclick="loadProperties()"
-                                title="Reload from server">↻ Reload</button>
-                            <button class="zentra-btn emerald" type="button" onclick="saveProperties()">💾 Save
-                                Properties</button>
+                            <input type="text" id="propSearchInput" class="zentra-input" placeholder="🔍 Search properties..." oninput="filterProperties(this.value)" style="width: 200px; padding: 7px 12px; font-size: 12px;">
+                            <button class="zentra-btn secondary" type="button" onclick="loadProperties()" title="Reload from server">↻ Reload</button>
+                            <button class="zentra-btn emerald" type="button" onclick="saveProperties()">💾 Save Properties</button>
                         </div>
                     </div>
 
-                    <form id="propertiesForm"
-                        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+                    <form id="propertiesForm" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
                         <p style="color:var(--zentra-muted);">Loading properties schema...</p>
                     </form>
                 </div>
@@ -1381,36 +1161,28 @@
                     <div class="metrics-grid">
                         <div class="stat-box">
                             <div class="stat-label">Installed BDS Version</div>
-                            <div class="stat-value" id="updateCurrentVer" style="color:var(--zentra-accent);">Loading...
-                            </div>
+                            <div class="stat-value" id="updateCurrentVer" style="color:var(--zentra-accent);">Loading...</div>
                         </div>
                         <div class="stat-box">
                             <div class="stat-label">Latest Available BDS Version</div>
-                            <div class="stat-value" id="updateLatestVer" style="color:var(--zentra-green);">Loading...
-                            </div>
+                            <div class="stat-value" id="updateLatestVer" style="color:var(--zentra-green);">Loading...</div>
                         </div>
                     </div>
 
                     <div style="margin-top: 20px;">
-                        <button class="zentra-btn primary" id="triggerUpdateBtn" onclick="triggerServerUpdate()"
-                            style="width: 100%; padding: 14px;">
+                        <button class="zentra-btn primary" id="triggerUpdateBtn" onclick="triggerServerUpdate()" style="width: 100%; padding: 14px;">
                             Install Latest Bedrock Server Update
                         </button>
                     </div>
 
                     <!-- Progress Step Cards -->
-                    <div id="updateProgressCard"
-                        style="display:none; margin-top: 24px; padding: 16px; background:#f9f9f8; border-radius:14px; border:1px solid var(--zentra-border);">
+                    <div id="updateProgressCard" style="display:none; margin-top: 24px; padding: 16px; background:#f9f9f8; border-radius:14px; border:1px solid var(--zentra-border);">
                         <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
-                            <span id="updateStatusMsg" style="font-weight:600; font-size:13px;">Preparing
-                                update...</span>
+                            <span id="updateStatusMsg" style="font-weight:600; font-size:13px;">Preparing update...</span>
                             <span id="updatePercent" style="font-weight:700; font-size:13px;">0%</span>
                         </div>
-                        <div
-                            style="width:100%; height:8px; background:rgba(17,17,17,0.08); border-radius:4px; overflow:hidden;">
-                            <div id="updateProgressBar"
-                                style="width:0%; height:100%; background:var(--zentra-green); transition: width 0.3s ease;">
-                            </div>
+                        <div style="width:100%; height:8px; background:rgba(17,17,17,0.08); border-radius:4px; overflow:hidden;">
+                            <div id="updateProgressBar" style="width:0%; height:100%; background:var(--zentra-green); transition: width 0.3s ease;"></div>
                         </div>
                     </div>
                 </div>
@@ -1418,16 +1190,12 @@
                     <div class="card-header-bar">
                         <div class="card-title-group">
                             <h3>Paper installation &amp; updates</h3>
-                            <p>Install the latest stable Paper build with one click. Existing jars are backed up before
-                                replacement.</p>
+                            <p>Install the latest stable Paper build with one click. Existing jars are backed up before replacement.</p>
                         </div>
                         <span class="metric-pill" id="javaUpdateSummary">Checking Paper...</span>
                     </div>
-                    <p style="color:var(--zentra-muted); margin-bottom:16px;">The manager detects its Java runtime and
-                        checks for the newest compatible stable Paper build. Downloads are verified against PaperMC's
-                        published SHA-256 checksum; update controls are also available on the Java Server page.</p>
-                    <button class="zentra-btn emerald" type="button" onclick="switchZentraTab('java')">Open Paper
-                        setup</button>
+                    <p style="color:var(--zentra-muted); margin-bottom:16px;">The manager detects its Java runtime and checks for the newest compatible stable Paper build. Downloads are verified against PaperMC's published SHA-256 checksum; update controls are also available on the Java Server page.</p>
+                    <button class="zentra-btn emerald" type="button" onclick="switchZentraTab('java')">Open Paper setup</button>
                 </div>
             </section>
 
@@ -1444,8 +1212,7 @@
 
                     <div class="zentra-input-group">
                         <label>Console Polling Frequency (ms)</label>
-                        <input type="number" id="settingPollInterval" class="zentra-input" value="2000" min="500"
-                            max="10000">
+                        <input type="number" id="settingPollInterval" class="zentra-input" value="2000" min="500" max="10000">
                     </div>
                     <div class="zentra-input-group">
                         <label>Auto-Scroll Logs by Default</label>
@@ -1468,10 +1235,9 @@
                     <h3>Create New World</h3>
                     <p>Configure and initialize a production-grade Bedrock world</p>
                 </div>
-                <button class="zentra-btn secondary" onclick="closeModal('createWorldModal')"
-                    style="padding:4px 10px;">✕</button>
+                <button class="zentra-btn secondary" onclick="closeModal('createWorldModal')" style="padding:4px 10px;">✕</button>
             </div>
-
+            
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 10px;">
                 <div class="zentra-input-group" style="grid-column: span 2;">
                     <label>World Folder Name *</label>
@@ -1481,9 +1247,7 @@
                 <div class="zentra-input-group" style="grid-column: span 2;">
                     <label style="display:flex; justify-content:space-between;">
                         <span>World Seed (Optional)</span>
-                        <a href="javascript:void(0)" onclick="generateRandomSeed()"
-                            style="color:var(--zentra-green); text-decoration:none; font-size:11px; font-weight:600;">🎲
-                            Randomize Seed</a>
+                        <a href="javascript:void(0)" onclick="generateRandomSeed()" style="color:var(--zentra-green); text-decoration:none; font-size:11px; font-weight:600;">🎲 Randomize Seed</a>
                     </label>
                     <input type="text" id="newWorldSeed" class="zentra-input" placeholder="e.g. 8493581080190741344">
                 </div>
@@ -1524,8 +1288,7 @@
                 </div>
             </div>
 
-            <div
-                style="margin-top: 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; background: rgba(0,0,0,0.02); padding: 12px; border-radius: var(--radius-card); border: 1px solid var(--zentra-border);">
+            <div style="margin-top: 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; background: rgba(0,0,0,0.02); padding: 12px; border-radius: var(--radius-card); border: 1px solid var(--zentra-border);">
                 <label style="display:flex; align-items:center; gap:8px; font-size:12px; cursor:pointer;">
                     <input type="checkbox" id="newWorldCheats">
                     <span>Allow Cheats</span>
@@ -1538,8 +1301,7 @@
                     <input type="checkbox" id="newWorldPvp" checked>
                     <span>Enable PvP</span>
                 </label>
-                <label
-                    style="display:flex; align-items:center; gap:8px; font-size:12px; cursor:pointer; color: var(--zentra-green); font-weight:600;">
+                <label style="display:flex; align-items:center; gap:8px; font-size:12px; cursor:pointer; color: var(--zentra-green); font-weight:600;">
                     <input type="checkbox" id="newWorldActivateNow" checked>
                     <span>Activate &amp; Launch Now</span>
                 </label>
@@ -1560,8 +1322,7 @@
                     <h3>Upload World Archive</h3>
                     <p>Import .mcworld or .zip (must contain level.dat)</p>
                 </div>
-                <button class="zentra-btn secondary" onclick="closeModal('uploadWorldModal')"
-                    style="padding:4px 10px;">✕</button>
+                <button class="zentra-btn secondary" onclick="closeModal('uploadWorldModal')" style="padding:4px 10px;">✕</button>
             </div>
             <div class="zentra-input-group">
                 <label>Select World File</label>
@@ -1582,8 +1343,7 @@
                     <h3>Upload Minecraft Addon</h3>
                     <p>Import .mcpack or .zip addon pack</p>
                 </div>
-                <button class="zentra-btn secondary" onclick="closeModal('uploadAddonModal')"
-                    style="padding:4px 10px;">✕</button>
+                <button class="zentra-btn secondary" onclick="closeModal('uploadAddonModal')" style="padding:4px 10px;">✕</button>
             </div>
             <div class="zentra-input-group">
                 <label>Select Pack File</label>
@@ -1604,227 +1364,155 @@
                     <h3 id="historyModalPlayerName">Player Session History</h3>
                     <p id="historyModalTotalTime">Loading records...</p>
                 </div>
-                <button class="zentra-btn secondary" onclick="closeModal('playerHistoryModal')"
-                    style="padding:4px 10px;">✕</button>
+                <button class="zentra-btn secondary" onclick="closeModal('playerHistoryModal')" style="padding:4px 10px;">✕</button>
             </div>
             <div class="zentra-table-wrap" style="max-height: 380px; overflow-y: auto;">
                 <table class="zentra-table">
                     <thead>
-                        <tr>
-                            <th>Start Timestamp</th>
-                            <th>End Timestamp</th>
-                            <th>World</th>
-                        </tr>
+                        <tr><th>Start Timestamp</th><th>End Timestamp</th><th>World</th></tr>
                     </thead>
                     <tbody id="historyTableBody">
-                        <tr>
-                            <td colspan="3" style="text-align:center;">Loading session entries...</td>
-                        </tr>
+                        <tr><td colspan="3" style="text-align:center;">Loading session entries...</td></tr>
                     </tbody>
                 </table>
-                <!-- Customize MOTD Modal -->
-                <div class="zentra-modal-backdrop" id="motdModal">
-                    <div class="zentra-modal" style="max-width: 580px;">
-                        <div class="card-header-bar">
-                            <div class="card-title-group">
-                                <h3>✨ Server MOTD & Branding</h3>
-                                <p>Customize the server title and multiplayer list appearance</p>
-                            </div>
-                            <button class="zentra-btn secondary" onclick="closeModal('motdModal')"
-                                style="padding:4px 10px;">✕</button>
-                        </div>
-                        <div style="margin-top: 14px;">
-                            <label
-                                style="font-size:12px; font-weight:700; color:var(--zentra-text); display:block; margin-bottom:6px;">Server
-                                MOTD (Name in Server List)</label>
-                            <input type="text" id="motdInput" class="zentra-input"
-                                placeholder="e.g. §b§lLALALAND§r §8| §eSurvival SMP"
-                                oninput="updateMotdModalPreview(this.value)">
+    <!-- Customize MOTD Modal -->
+    <div class="zentra-modal-backdrop" id="motdModal">
+        <div class="zentra-modal" style="max-width: 580px;">
+            <div class="card-header-bar">
+                <div class="card-title-group">
+                    <h3>✨ Server MOTD & Branding</h3>
+                    <p>Customize the server title and multiplayer list appearance</p>
+                </div>
+                <button class="zentra-btn secondary" onclick="closeModal('motdModal')" style="padding:4px 10px;">✕</button>
+            </div>
+            <div style="margin-top: 14px;">
+                <label style="font-size:12px; font-weight:700; color:var(--zentra-text); display:block; margin-bottom:6px;">Server MOTD (Name in Server List)</label>
+                <input type="text" id="motdInput" class="zentra-input" placeholder="e.g. §b§lLALALAND§r §8| §eSurvival SMP" oninput="updateMotdModalPreview(this.value)">
 
-                            <!-- Color Palette Insert Buttons -->
-                            <div style="margin-top: 12px;">
-                                <span
-                                    style="font-size:11px; color:var(--zentra-muted); display:block; margin-bottom:6px;">Click
-                                    color code to insert:</span>
-                                <div style="display: flex; gap: 6px; flex-wrap: wrap;">
-                                    <button type="button" class="motd-palette-btn"
-                                        style="background:#55FFFF; color:#000;" onclick="insertMotdCode('§b')">§b
-                                        Cyan</button>
-                                    <button type="button" class="motd-palette-btn"
-                                        style="background:#55FF55; color:#000;" onclick="insertMotdCode('§a')">§a
-                                        Green</button>
-                                    <button type="button" class="motd-palette-btn"
-                                        style="background:#FFFF55; color:#000;" onclick="insertMotdCode('§e')">§e
-                                        Yellow</button>
-                                    <button type="button" class="motd-palette-btn"
-                                        style="background:#FFAA00; color:#000;" onclick="insertMotdCode('§6')">§6
-                                        Gold</button>
-                                    <button type="button" class="motd-palette-btn"
-                                        style="background:#FF5555; color:#fff;" onclick="insertMotdCode('§c')">§c
-                                        Red</button>
-                                    <button type="button" class="motd-palette-btn"
-                                        style="background:#FF55FF; color:#000;" onclick="insertMotdCode('§d')">§d
-                                        Pink</button>
-                                    <button type="button" class="motd-palette-btn"
-                                        style="background:#AA00AA; color:#fff;" onclick="insertMotdCode('§5')">§5
-                                        Purple</button>
-                                    <button type="button" class="motd-palette-btn"
-                                        style="background:#FFFFFF; color:#000;" onclick="insertMotdCode('§f')">§f
-                                        White</button>
-                                    <button type="button" class="motd-palette-btn"
-                                        style="background:#555555; color:#fff;" onclick="insertMotdCode('§8')">§8
-                                        Gray</button>
-                                    <button type="button" class="motd-palette-btn"
-                                        style="background:#111827; color:#fff; font-weight:bold;"
-                                        onclick="insertMotdCode('§l')">§l Bold</button>
-                                    <button type="button" class="motd-palette-btn"
-                                        style="background:#e5e7eb; color:#000;" onclick="insertMotdCode('§r')">§r
-                                        Reset</button>
-                                </div>
-                            </div>
-
-                            <!-- Live Preview Box -->
-                            <div style="margin-top: 16px;">
-                                <span
-                                    style="font-size:11px; color:var(--zentra-muted); display:block; margin-bottom:6px;">Live
-                                    In-Game Preview:</span>
-                                <div id="motdLiveModalPreview"
-                                    style="font-family: 'Minecraft', 'Courier New', monospace; font-size: 14px; background: #09090b; padding: 12px 16px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); min-height: 44px; display:flex; align-items:center;">
-                                </div>
-                            </div>
-
-                            <div
-                                style="display:flex; justify-content:space-between; margin-top:20px; align-items:center; flex-wrap:wrap; gap:10px;">
-                                <button class="zentra-btn secondary" type="button"
-                                    onclick="autoGenerateMotdTemplate()">🎲 Auto-Generate Template</button>
-                                <div style="display:flex; gap:10px;">
-                                    <button class="zentra-btn secondary" type="button"
-                                        onclick="closeModal('motdModal')">Cancel</button>
-                                    <button class="zentra-btn emerald" type="button" onclick="saveMotdSettings()">💾
-                                        Save & Apply MOTD</button>
-                                </div>
-                            </div>
-                        </div>
+                <!-- Color Palette Insert Buttons -->
+                <div style="margin-top: 12px;">
+                    <span style="font-size:11px; color:var(--zentra-muted); display:block; margin-bottom:6px;">Click color code to insert:</span>
+                    <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                        <button type="button" class="motd-palette-btn" style="background:#55FFFF; color:#000;" onclick="insertMotdCode('§b')">§b Cyan</button>
+                        <button type="button" class="motd-palette-btn" style="background:#55FF55; color:#000;" onclick="insertMotdCode('§a')">§a Green</button>
+                        <button type="button" class="motd-palette-btn" style="background:#FFFF55; color:#000;" onclick="insertMotdCode('§e')">§e Yellow</button>
+                        <button type="button" class="motd-palette-btn" style="background:#FFAA00; color:#000;" onclick="insertMotdCode('§6')">§6 Gold</button>
+                        <button type="button" class="motd-palette-btn" style="background:#FF5555; color:#fff;" onclick="insertMotdCode('§c')">§c Red</button>
+                        <button type="button" class="motd-palette-btn" style="background:#FF55FF; color:#000;" onclick="insertMotdCode('§d')">§d Pink</button>
+                        <button type="button" class="motd-palette-btn" style="background:#AA00AA; color:#fff;" onclick="insertMotdCode('§5')">§5 Purple</button>
+                        <button type="button" class="motd-palette-btn" style="background:#FFFFFF; color:#000;" onclick="insertMotdCode('§f')">§f White</button>
+                        <button type="button" class="motd-palette-btn" style="background:#555555; color:#fff;" onclick="insertMotdCode('§8')">§8 Gray</button>
+                        <button type="button" class="motd-palette-btn" style="background:#111827; color:#fff; font-weight:bold;" onclick="insertMotdCode('§l')">§l Bold</button>
+                        <button type="button" class="motd-palette-btn" style="background:#e5e7eb; color:#000;" onclick="insertMotdCode('§r')">§r Reset</button>
                     </div>
                 </div>
 
-                <!-- Lifecycle Action Modal (Countdown options for stop, restart, world switch) -->
-                <div class="zentra-modal-backdrop" id="lifecycleModal">
-                    <div class="zentra-modal" style="max-width: 500px;">
-                        <div class="card-header-bar">
-                            <div class="card-title-group">
-                                <h3 id="lifecycleModalTitle">Schedule Server Action</h3>
-                                <p id="lifecycleModalDesc">Broadcasts automated countdown warnings to in-game players
-                                </p>
-                            </div>
-                            <button class="zentra-btn secondary" onclick="closeModal('lifecycleModal')"
-                                style="padding:4px 10px;">✕</button>
-                        </div>
-                        <div style="margin-top: 14px;">
-                            <div style="margin-bottom: 14px;">
-                                <label
-                                    style="font-size:12px; font-weight:700; color:var(--zentra-text); display:block; margin-bottom:6px;">Warning
-                                    Countdown Timer</label>
-                                <select id="lifecycleTimerSelect" class="zentra-select">
-                                    <option value="10">⏱ 10 Seconds (Recommended)</option>
-                                    <option value="5">⏱ 5 Seconds (Quick)</option>
-                                    <option value="30">⏱ 30 Seconds (Maintenance Notice)</option>
-                                    <option value="60">⏱ 60 Seconds (Full Warning)</option>
-                                    <option value="0">⚡ Instant (0s - Immediate)</option>
-                                </select>
-                            </div>
-
-                            <div style="margin-bottom: 14px;">
-                                <label
-                                    style="font-size:12px; font-weight:700; color:var(--zentra-text); display:block; margin-bottom:6px;">Reason
-                                    (Broadcasted In-Game)</label>
-                                <input type="text" id="lifecycleReasonInput" class="zentra-input"
-                                    value="Applying updates and maintenance">
-                            </div>
-
-                            <input type="hidden" id="lifecycleActionType" value="restart">
-                            <input type="hidden" id="lifecycleTargetWorld" value="">
-
-                            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
-                                <button class="zentra-btn secondary" type="button"
-                                    onclick="closeModal('lifecycleModal')">Cancel</button>
-                                <button class="zentra-btn primary" id="lifecycleConfirmBtn" type="button"
-                                    onclick="confirmLifecycleAction()">
-                                    🚀 Confirm &amp; Broadcast
-                                </button>
-                            </div>
-                        </div>
+                <!-- Live Preview Box -->
+                <div style="margin-top: 16px;">
+                    <span style="font-size:11px; color:var(--zentra-muted); display:block; margin-bottom:6px;">Live In-Game Preview:</span>
+                    <div id="motdLiveModalPreview" style="font-family: 'Minecraft', 'Courier New', monospace; font-size: 14px; background: #09090b; padding: 12px 16px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); min-height: 44px; display:flex; align-items:center;">
                     </div>
-                    <!-- Add Tactical Waypoint Modal -->
-                    <div class="zentra-modal-backdrop" id="addWaypointModal">
-                        <div class="zentra-modal" style="max-width: 440px;">
-                            <div class="card-header-bar">
-                                <div class="card-title-group">
-                                    <h3>📍 New Tactical Waypoint</h3>
-                                    <p>Mark an important base, portal, or landmark on God's Eye</p>
-                                </div>
-                                <button class="zentra-btn secondary" onclick="closeModal('addWaypointModal')"
-                                    style="padding:4px 10px;">✕</button>
-                            </div>
-                            <div style="margin-top: 14px;">
-                                <label
-                                    style="font-size:12px; font-weight:700; color:var(--zentra-text); display:block; margin-bottom:6px;">Waypoint
-                                    Name</label>
-                                <input type="text" id="wpNameInput" class="zentra-input"
-                                    placeholder="e.g. Castle Base, Nether Portal, Mob Farm">
+                </div>
 
-                                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top: 12px;">
-                                    <div>
-                                        <label
-                                            style="font-size:11px; font-weight:700; color:var(--zentra-muted); display:block; margin-bottom:4px;">X
-                                            Coordinate</label>
-                                        <input type="number" id="wpXInput" class="zentra-input" value="0">
-                                    </div>
-                                    <div>
-                                        <label
-                                            style="font-size:11px; font-weight:700; color:var(--zentra-muted); display:block; margin-bottom:4px;">Z
-                                            Coordinate</label>
-                                        <input type="number" id="wpZInput" class="zentra-input" value="0">
-                                    </div>
-                                </div>
-
-                                <div style="margin-top: 12px;">
-                                    <label
-                                        style="font-size:11px; font-weight:700; color:var(--zentra-muted); display:block; margin-bottom:6px;">Pin
-                                        Icon</label>
-                                    <div style="display:flex; gap:8px;" id="wpIconGroup">
-                                        <button type="button" class="wp-icon-choice-btn active"
-                                            onclick="selectWaypointIcon('📍', this)">📍</button>
-                                        <button type="button" class="wp-icon-choice-btn"
-                                            onclick="selectWaypointIcon('🏰', this)">🏰</button>
-                                        <button type="button" class="wp-icon-choice-btn"
-                                            onclick="selectWaypointIcon('🔮', this)">🔮</button>
-                                        <button type="button" class="wp-icon-choice-btn"
-                                            onclick="selectWaypointIcon('💎', this)">💎</button>
-                                        <button type="button" class="wp-icon-choice-btn"
-                                            onclick="selectWaypointIcon('⚔️', this)">⚔️</button>
-                                        <button type="button" class="wp-icon-choice-btn"
-                                            onclick="selectWaypointIcon('🏠', this)">🏠</button>
-                                        <button type="button" class="wp-icon-choice-btn"
-                                            onclick="selectWaypointIcon('💀', this)">💀</button>
-                                    </div>
-                                    <input type="hidden" id="wpSelectedIcon" value="📍">
-                                </div>
-
-                                <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
-                                    <button class="zentra-btn secondary" type="button"
-                                        onclick="closeModal('addWaypointModal')">Cancel</button>
-                                    <button class="zentra-btn emerald" type="button" onclick="saveNewWaypoint()">💾 Save
-                                        Waypoint</button>
-                                </div>
-                            </div>
-                        </div>
+                <div style="display:flex; justify-content:space-between; margin-top:20px; align-items:center; flex-wrap:wrap; gap:10px;">
+                    <button class="zentra-btn secondary" type="button" onclick="autoGenerateMotdTemplate()">🎲 Auto-Generate Template</button>
+                    <div style="display:flex; gap:10px;">
+                        <button class="zentra-btn secondary" type="button" onclick="closeModal('motdModal')">Cancel</button>
+                        <button class="zentra-btn emerald" type="button" onclick="saveMotdSettings()">💾 Save & Apply MOTD</button>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
-                    <!-- Toast Container -->
-                    <div id="toastContainer"></div>
+    <!-- Lifecycle Action Modal (Countdown options for stop, restart, world switch) -->
+    <div class="zentra-modal-backdrop" id="lifecycleModal">
+        <div class="zentra-modal" style="max-width: 500px;">
+            <div class="card-header-bar">
+                <div class="card-title-group">
+                    <h3 id="lifecycleModalTitle">Schedule Server Action</h3>
+                    <p id="lifecycleModalDesc">Broadcasts automated countdown warnings to in-game players</p>
+                </div>
+                <button class="zentra-btn secondary" onclick="closeModal('lifecycleModal')" style="padding:4px 10px;">✕</button>
+            </div>
+            <div style="margin-top: 14px;">
+                <div style="margin-bottom: 14px;">
+                    <label style="font-size:12px; font-weight:700; color:var(--zentra-text); display:block; margin-bottom:6px;">Warning Countdown Timer</label>
+                    <select id="lifecycleTimerSelect" class="zentra-select">
+                        <option value="10">⏱ 10 Seconds (Recommended)</option>
+                        <option value="5">⏱ 5 Seconds (Quick)</option>
+                        <option value="30">⏱ 30 Seconds (Maintenance Notice)</option>
+                        <option value="60">⏱ 60 Seconds (Full Warning)</option>
+                        <option value="0">⚡ Instant (0s - Immediate)</option>
+                    </select>
+                </div>
 
-                    <script src="/static/js/app.js?v=20261021_02"></script>
+                <div style="margin-bottom: 14px;">
+                    <label style="font-size:12px; font-weight:700; color:var(--zentra-text); display:block; margin-bottom:6px;">Reason (Broadcasted In-Game)</label>
+                    <input type="text" id="lifecycleReasonInput" class="zentra-input" value="Applying updates and maintenance">
+                </div>
+
+                <input type="hidden" id="lifecycleActionType" value="restart">
+                <input type="hidden" id="lifecycleTargetWorld" value="">
+
+                <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+                    <button class="zentra-btn secondary" type="button" onclick="closeModal('lifecycleModal')">Cancel</button>
+                    <button class="zentra-btn primary" id="lifecycleConfirmBtn" type="button" onclick="confirmLifecycleAction()">
+                        🚀 Confirm &amp; Broadcast
+                    </button>
+                </div>
+            </div>
+        </div>
+    <!-- Add Tactical Waypoint Modal -->
+    <div class="zentra-modal-backdrop" id="addWaypointModal">
+        <div class="zentra-modal" style="max-width: 440px;">
+            <div class="card-header-bar">
+                <div class="card-title-group">
+                    <h3>📍 New Tactical Waypoint</h3>
+                    <p>Mark an important base, portal, or landmark on God's Eye</p>
+                </div>
+                <button class="zentra-btn secondary" onclick="closeModal('addWaypointModal')" style="padding:4px 10px;">✕</button>
+            </div>
+            <div style="margin-top: 14px;">
+                <label style="font-size:12px; font-weight:700; color:var(--zentra-text); display:block; margin-bottom:6px;">Waypoint Name</label>
+                <input type="text" id="wpNameInput" class="zentra-input" placeholder="e.g. Castle Base, Nether Portal, Mob Farm">
+
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top: 12px;">
+                    <div>
+                        <label style="font-size:11px; font-weight:700; color:var(--zentra-muted); display:block; margin-bottom:4px;">X Coordinate</label>
+                        <input type="number" id="wpXInput" class="zentra-input" value="0">
+                    </div>
+                    <div>
+                        <label style="font-size:11px; font-weight:700; color:var(--zentra-muted); display:block; margin-bottom:4px;">Z Coordinate</label>
+                        <input type="number" id="wpZInput" class="zentra-input" value="0">
+                    </div>
+                </div>
+
+                <div style="margin-top: 12px;">
+                    <label style="font-size:11px; font-weight:700; color:var(--zentra-muted); display:block; margin-bottom:6px;">Pin Icon</label>
+                    <div style="display:flex; gap:8px;" id="wpIconGroup">
+                        <button type="button" class="wp-icon-choice-btn active" onclick="selectWaypointIcon('📍', this)">📍</button>
+                        <button type="button" class="wp-icon-choice-btn" onclick="selectWaypointIcon('🏰', this)">🏰</button>
+                        <button type="button" class="wp-icon-choice-btn" onclick="selectWaypointIcon('🔮', this)">🔮</button>
+                        <button type="button" class="wp-icon-choice-btn" onclick="selectWaypointIcon('💎', this)">💎</button>
+                        <button type="button" class="wp-icon-choice-btn" onclick="selectWaypointIcon('⚔️', this)">⚔️</button>
+                        <button type="button" class="wp-icon-choice-btn" onclick="selectWaypointIcon('🏠', this)">🏠</button>
+                        <button type="button" class="wp-icon-choice-btn" onclick="selectWaypointIcon('💀', this)">💀</button>
+                    </div>
+                    <input type="hidden" id="wpSelectedIcon" value="📍">
+                </div>
+
+                <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+                    <button class="zentra-btn secondary" type="button" onclick="closeModal('addWaypointModal')">Cancel</button>
+                    <button class="zentra-btn emerald" type="button" onclick="saveNewWaypoint()">💾 Save Waypoint</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toastContainer"></div>
+
+    <script src="/static/js/app.js?v=20261021_02"></script>
 </body>
-
 </html>

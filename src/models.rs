@@ -19,12 +19,45 @@ impl Default for UpdateState {
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HardwareTelemetryResponse {
+    pub hostname: String,
+    pub os_label: String,
+    pub mode: String,
+    pub cpu_pct: f64,
+    pub cpu_cores: usize,
+    pub memory_used_mb: u64,
+    pub memory_total_mb: u64,
+    pub memory_pct: f64,
+    pub swap_used_mb: u64,
+    pub temp_c: Option<f32>,
+    pub uptime_secs: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StatusResponse {
     pub server_running: bool,
     pub online_players: Vec<String>,
     pub active_world: Option<String>,
     pub version: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hardware: Option<HardwareTelemetryResponse>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub chunky: Option<crate::rcon::ChunkyStats>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Deserialize)]
+pub struct CommandRequest {
+    pub command: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ActionRequest {
+    pub action: String,
+    #[serde(default)]
+    #[allow(dead_code)]
+    pub args: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -189,9 +222,8 @@ fn default_announcement_prefix() -> String { "§l§e[Server]§r §b".to_string()
 fn default_announcement_mode() -> String { "sequential".to_string() }
 fn default_messages() -> Vec<String> {
     vec![
-        "Welcome to the server! Explore, build, and have fun!".to_string(),
-        "Remember to respect other players and keep your builds safe.".to_string(),
-        "Check your world stats and controls on the Bedrock Manager dashboard!".to_string(),
+        "Welcome to Nexus Warfare! Equip your weapons and hold the perimeter.".to_string(),
+        "Report bugs and coordinates in chat or on the operations deck.".to_string(),
     ]
 }
 
@@ -262,7 +294,7 @@ pub struct MapDataResponse {
 
 #[derive(Debug, Deserialize)]
 pub struct MapActionRequest {
-    pub action: String, // "teleport", "lightning", "tnt", "set_spawn", "summon", "weather", "time"
+    pub action: String,
     #[serde(default)]
     pub player: Option<String>,
     #[serde(default)]
@@ -299,13 +331,13 @@ fn default_waypoint_color() -> String { "#10b981".to_string() }
 pub struct CustomBroadcastRequest {
     pub message: String,
     #[serde(default = "default_broadcast_type")]
-    pub broadcast_type: String, // "chat", "title", "actionbar", "whisper"
+    pub broadcast_type: String,
     #[serde(default)]
     pub target_player: Option<String>,
     #[serde(default)]
     pub subtitle: Option<String>,
     #[serde(default)]
-    pub sound: Option<String>, // "levelup", "orb", "thunder", "totem", "explode"
+    pub sound: Option<String>,
 }
 
 fn default_broadcast_type() -> String { "chat".to_string() }
@@ -313,7 +345,7 @@ fn default_broadcast_type() -> String { "chat".to_string() }
 #[derive(Debug, Deserialize)]
 pub struct GameMasterActionRequest {
     pub player: String,
-    pub action: String, // "give", "clear_item", "clear_all", "set_level", "add_xp", "effect", "clear_effects", "smite", "launch", "heal", "godmode", "troll_freeze", "fireworks"
+    pub action: String,
     #[serde(default)]
     pub item: Option<String>,
     #[serde(default = "default_amount_one")]
@@ -331,4 +363,3 @@ pub struct GameMasterActionRequest {
 fn default_amount_one() -> i32 { 1 }
 fn default_duration() -> i32 { 30 }
 fn default_amplifier() -> i32 { 1 }
-

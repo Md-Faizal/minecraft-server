@@ -17,6 +17,8 @@ use tracing::{error, info};
 
 use crate::models::*;
 use crate::java_server::JavaServerManager;
+use crate::rcon::RconClient;
+use crate::nexus_mesh::NexusMeshClient;
 
 pub struct ServerManager {
     pub base_dir: PathBuf,
@@ -28,6 +30,8 @@ pub struct ServerManager {
     pub behavior_packs_dir: PathBuf,
     pub data_dir: PathBuf,
     pub java_server: Arc<JavaServerManager>,
+    pub rcon: Arc<RconClient>,
+    pub nexus_mesh: Arc<NexusMeshClient>,
 
     child_process: Arc<Mutex<Option<Child>>>,
     stdin_tx: Arc<Mutex<Option<mpsc::UnboundedSender<String>>>>,
@@ -53,6 +57,8 @@ impl ServerManager {
         let behavior_packs_dir = base_dir.join("behavior_packs");
         let data_dir = base_dir.join("data");
         let java_server = JavaServerManager::new(base_dir.join("java"));
+        let rcon = Arc::new(RconClient::new());
+        let nexus_mesh = Arc::new(NexusMeshClient::new());
 
         let _ = fs::create_dir_all(&worlds_dir);
         let _ = fs::create_dir_all(&backup_dir);
@@ -165,6 +171,8 @@ impl ServerManager {
             behavior_packs_dir,
             data_dir,
             java_server,
+            rcon,
+            nexus_mesh,
             child_process: Arc::new(Mutex::new(None)),
             stdin_tx: Arc::new(Mutex::new(None)),
             console_buffer: Arc::new(RwLock::new(VecDeque::with_capacity(250))),
@@ -212,7 +220,16 @@ impl ServerManager {
             }
         }
 
-        self.is_running.load(Ordering::SeqCst)
+        if self.is_running.load(Ordering::SeqCst) {
+            return true;
+        }
+
+        // Check if Forge server RCON is responsive
+        if self.rcon.get_chunky_progress().await.is_ok() {
+            return true;
+        }
+
+        false
     }
 
     pub async fn start_server(self: &Arc<Self>) -> bool {

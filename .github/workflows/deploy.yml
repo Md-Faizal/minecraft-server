@@ -130,5 +130,5 @@ jobs:
 
           TARGET_DIR="/home/ubuntu/minecraft-deploy"
           ssh production "mkdir -p '$TARGET_DIR'"
-          rsync -av --partial docker-compose.yml deploy/deploy-manager-image.sh minecraft-manager-image.tar.gz production:"$TARGET_DIR/"
+          rsync -av --partial docker-compose.yml templates static deploy/deploy-manager-image.sh minecraft-manager-image.tar.gz production:"$TARGET_DIR/"
           ssh production "chmod +x '$TARGET_DIR/deploy-manager-image.sh' && bash '$TARGET_DIR/deploy-manager-image.sh' '$TARGET_DIR/minecraft-manager-image.tar.gz'"

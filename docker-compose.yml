@@ -11,6 +11,8 @@ services:
     volumes:
       # Persistent worlds, server.properties, backups, and Bedrock binaries
       - /home/ubuntu/minecraft-server:/data
+      - /home/ubuntu/minecraft-deploy/templates:/app/templates:ro
+      - /home/ubuntu/minecraft-deploy/static:/app/static:ro
     environment:
       - PORT=5000
       # Nginx on pro serves the public site; keep the control API loopback-only.
@@ -19,6 +21,10 @@ services:
       # Start neither edition automatically on the memory-constrained GCP VM.
       - MC_AUTO_START_BEDROCK=${MC_AUTO_START_BEDROCK:-false}
       - MC_AUTO_START_JAVA=${MC_AUTO_START_JAVA:-false}
+      - NEXUS_HUB_URL=https://faizal.uk
+      - NEXUS_ADMIN_PIN=2004
+      - RCON_ADDR=127.0.0.1:25575
+      - RCON_PASSWORD=nexuswarfare123
     deploy:
       resources:
         limits:
