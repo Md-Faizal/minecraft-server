@@ -1198,18 +1198,43 @@ impl ServerManager {
                 }
             }
         }
-        let env_pin = std::env::var("ADMIN_PIN").unwrap_or_else(|_| "0000".to_string());
-        Self::hash_pin(&env_pin)
+        if let Ok(env_pin) = std::env::var("ADMIN_PIN") {
+            let trimmed = env_pin.trim();
+            if !trimmed.is_empty() {
+                return Self::hash_pin(trimmed);
+            }
+        }
+        if let Ok(nexus_pin) = std::env::var("NEXUS_ADMIN_PIN") {
+            let trimmed = nexus_pin.trim();
+            if !trimmed.is_empty() {
+                return Self::hash_pin(trimmed);
+            }
+        }
+        Self::hash_pin("0000")
     }
 
     pub fn is_pin_configured(&self) -> bool {
-        self.data_dir.join("auth_pin.json").exists() || std::env::var("ADMIN_PIN").is_ok()
+        self.data_dir.join("auth_pin.json").exists() || std::env::var("ADMIN_PIN").is_ok() || std::env::var("NEXUS_ADMIN_PIN").is_ok()
     }
 
     pub fn verify_pin(&self, pin: &str) -> bool {
         let clean = pin.trim();
         let expected = self.get_auth_pin_hash();
-        Self::hash_pin(clean) == expected
+        if Self::hash_pin(clean) == expected {
+            return true;
+        }
+        // If no custom pin was saved to disk, also accept NEXUS_ADMIN_PIN or default 0000
+        if !self.data_dir.join("auth_pin.json").exists() {
+            if let Ok(npin) = std::env::var("NEXUS_ADMIN_PIN") {
+                if !npin.trim().is_empty() && clean == npin.trim() {
+                    return true;
+                }
+            }
+            if clean == "0000" {
+                return true;
+            }
+        }
+        false
     }
 
     pub fn change_pin(&self, current: &str, new_pin: &str) -> Result<(), String> {

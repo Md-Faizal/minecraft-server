@@ -42,16 +42,20 @@ async function bootstrapApp() {
             if (auth.pin_configured) {
                 const cachedPin = localStorage.getItem('mc_auth_pin');
                 if (cachedPin) {
-                    const verifyRes = await fetch('/api/auth/verify', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ pin: cachedPin })
-                    });
-                    const verifyData = await verifyRes.json();
-                    if (verifyData.authenticated) {
-                        isAuthenticated = true;
-                    } else {
-                        localStorage.removeItem('mc_auth_pin');
+                    try {
+                        const verifyRes = await fetch('/api/auth/verify', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ pin: cachedPin })
+                        });
+                        const verifyData = await verifyRes.json();
+                        if (verifyRes.ok && (verifyData.authenticated || verifyData.success)) {
+                            isAuthenticated = true;
+                        } else {
+                            localStorage.removeItem('mc_auth_pin');
+                            showPinModal();
+                        }
+                    } catch (e) {
                         showPinModal();
                     }
                 } else {
@@ -134,7 +138,7 @@ async function submitPin() {
             body: JSON.stringify({ pin })
         });
         const data = await res.json();
-        if (data.authenticated) {
+        if (res.ok && (data.authenticated || data.success)) {
             isAuthenticated = true;
             if (document.getElementById('chkRememberPin')?.checked) {
                 localStorage.setItem('mc_auth_pin', pin);
@@ -145,7 +149,7 @@ async function submitPin() {
             refreshAllData();
         } else {
             if (errBox) {
-                errBox.textContent = 'Incorrect PIN. Access denied.';
+                errBox.textContent = data.message || 'Incorrect PIN. Access denied.';
                 errBox.style.display = 'block';
             }
             ['pinD1', 'pinD2', 'pinD3', 'pinD4'].forEach(id => {
@@ -440,10 +444,18 @@ function updateGlobalStatus(state, text) {
    ========================================================================= */
 async function fetchLogs() {
     try {
+        let logs = [];
         const res = await fetch('/api/logs');
-        if (!res.ok) return;
-        const data = await res.json();
-        const logs = data.logs || [];
+        if (res.ok) {
+            const data = await res.json();
+            logs = data.logs || [];
+        } else {
+            const altRes = await fetch('/api/server_output');
+            if (altRes.ok) {
+                const text = await altRes.text();
+                logs = text.split('\n').filter(Boolean);
+            }
+        }
         if (logs.length > 0) {
             consoleLogs = logs;
             renderConsoleLogs();

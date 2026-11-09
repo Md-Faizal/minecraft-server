@@ -50,6 +50,7 @@ pub struct PinVerifyRequest {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PinVerifyResponse {
     pub success: bool,
+    pub authenticated: bool,
     pub token: Option<String>,
     pub message: String,
 }

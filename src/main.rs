@@ -74,6 +74,7 @@ async fn main() {
         .route("/api/stop", post(handlers::api_stop))
         .route("/api/restart", post(handlers::api_restart))
         .route("/api/server_output", get(handlers::api_server_output))
+        .route("/api/logs", get(handlers::api_logs))
         .route("/api/command", post(handlers::api_command))
         .route("/api/java/status", get(handlers::api_java_status))
         .route("/api/java/start", post(handlers::api_java_start))

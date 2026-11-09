@@ -131,6 +131,12 @@ pub async fn api_server_output(State(mgr): State<Arc<ServerManager>>) -> impl In
     ([(header::CONTENT_TYPE, "text/plain; charset=utf-8")], text)
 }
 
+pub async fn api_logs(State(mgr): State<Arc<ServerManager>>) -> Json<Value> {
+    let logs = mgr.console_buffer.read().await;
+    let list: Vec<String> = logs.iter().cloned().collect();
+    Json(json!({ "logs": list }))
+}
+
 pub async fn api_java_status(State(mgr): State<Arc<ServerManager>>) -> Json<Value> {
     let rcon_players = mgr.rcon.get_players().await.ok();
     let chunky_stats = mgr.rcon.get_chunky_progress().await.ok();
@@ -2411,12 +2417,14 @@ pub async fn api_auth_verify(
         let token = ServerManager::hash_pin(&format!("token_{}_{}", payload.pin, chrono::Utc::now().timestamp() / 86400));
         (StatusCode::OK, Json(PinVerifyResponse {
             success: true,
+            authenticated: true,
             token: Some(token),
             message: "Authentication successful".to_string(),
         }))
     } else {
         (StatusCode::UNAUTHORIZED, Json(PinVerifyResponse {
             success: false,
+            authenticated: false,
             token: None,
             message: "Invalid PIN".to_string(),
         }))
