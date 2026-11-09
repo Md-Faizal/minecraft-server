@@ -182,12 +182,39 @@ impl ServerManager {
     }
 
     pub async fn start_server(self: &Arc<Self>) -> bool {
+        self.start_server_with_result().await.is_ok()
+    }
+
+    pub async fn start_server_with_result(self: &Arc<Self>) -> Result<(), String> {
         if self.is_server_running().await {
             info!("Start requested but server is already running");
-            return false;
+            return Err("Server is already running.".to_string());
         }
 
-        info!("Starting Bedrock Dedicated Server...");
+        if !self.server_path.is_file() {
+            let msg = format!(
+                "Bedrock server binary not found at '{}'. Please install or update Bedrock Dedicated Server from the Software & Updates tab.",
+                self.server_path.display()
+            );
+            error!("{}", msg);
+            let mut buf = self.console_buffer.write().await;
+            buf.push_back(format!("[ERROR] {}", msg));
+            return Err(msg);
+        }
+
+        #[cfg(target_os = "linux")]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            if let Ok(meta) = fs::metadata(&self.server_path) {
+                let mut perms = meta.permissions();
+                if perms.mode() & 0o111 == 0 {
+                    perms.set_mode(0o755);
+                    let _ = fs::set_permissions(&self.server_path, perms);
+                }
+            }
+        }
+
+        info!("Starting Bedrock Dedicated Server at {:?}...", self.server_path);
         if let Some(active) = self.get_active_world_name() {
             let profile = self.get_world_profile(&active);
             self.sync_world_profile_to_server_properties(&profile);
@@ -201,16 +228,29 @@ impl ServerManager {
 
         #[cfg(target_os = "linux")]
         {
-            cmd.env("LD_LIBRARY_PATH", &self.base_dir);
+            cmd.env("LD_LIBRARY_PATH", format!("{}:.", self.base_dir.display()));
         }
 
         let mut child = match cmd.spawn() {
             Ok(c) => c,
             Err(e) => {
-                error!("Failed to spawn bedrock_server: {}", e);
-                return false;
+                let msg = format!("Failed to spawn bedrock_server binary: {}", e);
+                error!("{}", msg);
+                let mut buf = self.console_buffer.write().await;
+                buf.push_back(format!("[ERROR] {}", msg));
+                return Err(msg);
             }
         };
+
+        // Early exit detection
+        tokio::time::sleep(Duration::from_millis(250)).await;
+        if let Ok(Some(status)) = child.try_wait() {
+            let msg = format!("Bedrock server process exited immediately (exit code: {})", status);
+            error!("{}", msg);
+            let mut buf = self.console_buffer.write().await;
+            buf.push_back(format!("[FATAL] {}", msg));
+            return Err(msg);
+        }
 
         let stdin = child.stdin.take();
         let (tx, mut rx) = mpsc::unbounded_channel::<String>();
@@ -306,7 +346,7 @@ impl ServerManager {
             }
         });
 
-        true
+        Ok(())
     }
 
     pub async fn stop_server(&self) -> bool {

@@ -117,7 +117,8 @@
             <button type="button" class="tab-btn" data-tab="worlds" onclick="showTab('worlds')">Worlds & Backups</button>
             <button type="button" class="tab-btn" data-tab="players" onclick="showTab('players')">Players</button>
             <button type="button" class="tab-btn" data-tab="map" onclick="showTab('map')">Tactical Map</button>
-            <button type="button" class="tab-btn" data-tab="addons" onclick="showTab('addons')">Addons</button>
+            <button type="button" class="tab-btn" data-tab="addons" onclick="showTab('addons')">Mods &amp; Addons</button>
+            <button type="button" class="tab-btn" data-tab="update" onclick="showTab('update')">Software &amp; Updates</button>
             <button type="button" class="tab-btn" data-tab="settings" onclick="showTab('settings')">Settings</button>
         </nav>
 
@@ -376,22 +377,182 @@
             </div>
         </section>
 
-        <!-- TAB 7: ADDONS -->
+        <!-- TAB 7: MODS & ADDONS (EDITION-AWARE) -->
         <section id="tabAddons" class="tab-content">
             <div class="card">
                 <div class="card-header">
                     <div>
-                        <h3>Addons & Resource Packs</h3>
-                        <p>Manage behavior and resource packs</p>
+                        <h3 id="addonsHeaderTitle">Mods &amp; Addons Manager</h3>
+                        <p id="addonsHeaderSubtitle">Manage server modifications, behavior packs, and resource packs</p>
+                    </div>
+                    <div class="card-actions">
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="loadAddons()">🔄 Refresh</button>
+                        <button type="button" class="btn btn-primary btn-sm" id="btnUploadAddon" onclick="openAddonModal()">+ Add New</button>
                     </div>
                 </div>
                 <div id="addonsList" class="addons-grid">
-                    <div class="loading-spinner">Loading addons...</div>
+                    <div class="loading-spinner">Loading mods &amp; addons...</div>
                 </div>
             </div>
         </section>
 
-        <!-- TAB 8: SETTINGS -->
+        <!-- TAB 8: SOFTWARE & UPDATES (EDITION-AWARE) -->
+        <section id="tabUpdate" class="tab-content">
+            <!-- Bedrock Updater Card -->
+            <div class="card" id="cardUpdateBedrock">
+                <div class="card-header">
+                    <div>
+                        <h3>Bedrock Dedicated Server Installer &amp; Updater</h3>
+                        <p>1-Click binary installer with automatic world preservation &amp; permission setup</p>
+                    </div>
+                    <span class="badge online">Local Engine</span>
+                </div>
+
+                <div class="stats-row" style="margin-bottom: 20px;">
+                    <div class="stat-card">
+                        <div class="stat-label">Installed BDS Version</div>
+                        <div class="stat-value" id="bdsInstalledVer">Loading...</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Available Stable Build</div>
+                        <div class="stat-value" id="bdsLatestStableVer" style="color:#10b981;">Loading...</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Available Preview Build</div>
+                        <div class="stat-value" id="bdsLatestPreviewVer" style="color:#3b82f6;">Loading...</div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Release Channel:</label>
+                    <div class="chips-row">
+                        <label class="chip-label"><input type="radio" name="bdsChannel" value="stable" checked onchange="onBdsChannelChange()"> <span>Official Stable</span></label>
+                        <label class="chip-label"><input type="radio" name="bdsChannel" value="preview" onchange="onBdsChannelChange()"> <span>Official Preview (Beta)</span></label>
+                        <label class="chip-label"><input type="radio" name="bdsChannel" value="custom" onchange="onBdsChannelChange()"> <span>Custom BDS ZIP URL</span></label>
+                    </div>
+                </div>
+
+                <div class="form-group" id="bdsCustomUrlGroup" style="display:none;">
+                    <label>Custom BDS Download URL (.zip):</label>
+                    <input type="text" id="bdsCustomUrl" class="input-sm" placeholder="https://minecraft.azureedge.net/bin-linux/bedrock-server-...">
+                </div>
+
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="bdsBackupBefore" checked>
+                        <span>Automatically create backup of worlds before updating</span>
+                    </label>
+                    <label class="checkbox-label" style="margin-top: 6px;">
+                        <input type="checkbox" id="bdsPreserveConfigs" checked disabled>
+                        <span>Preserve worlds/, server.properties, allowlist.json, and permissions.json (Always On)</span>
+                    </label>
+                </div>
+
+                <div style="margin-top: 20px;">
+                    <button type="button" class="btn btn-primary" id="btnTriggerBedrockUpdate" onclick="triggerBedrockUpdate()" style="width:100%; padding: 12px;">
+                        🚀 Install / Update Bedrock Server
+                    </button>
+                </div>
+            </div>
+
+            <!-- Java Installer Card -->
+            <div class="card" id="cardUpdateJava">
+                <div class="card-header">
+                    <div>
+                        <h3>Remote Java Engine &amp; Flavor Hub</h3>
+                        <p>Remotely install, switch flavors, and deploy updates via the Nexus CLI tunnel</p>
+                    </div>
+                    <span class="badge online" id="javaInstallerNodeBadge">Nexus Mesh Remote</span>
+                </div>
+
+                <div class="form-group">
+                    <label>Server Engine Flavor:</label>
+                    <div class="chips-row">
+                        <label class="chip-label"><input type="radio" name="javaFlavor" value="paper" checked onchange="onJavaFlavorChange()"> <span>PaperMC (Recommended)</span></label>
+                        <label class="chip-label"><input type="radio" name="javaFlavor" value="purpur" onchange="onJavaFlavorChange()"> <span>PurpurMC</span></label>
+                        <label class="chip-label"><input type="radio" name="javaFlavor" value="vanilla" onchange="onJavaFlavorChange()"> <span>Mojang Vanilla</span></label>
+                        <label class="chip-label"><input type="radio" name="javaFlavor" value="fabric" onchange="onJavaFlavorChange()"> <span>Fabric</span></label>
+                        <label class="chip-label"><input type="radio" name="javaFlavor" value="custom" onchange="onJavaFlavorChange()"> <span>Custom JAR URL</span></label>
+                    </div>
+                </div>
+
+                <div class="form-row-2">
+                    <div class="form-group" id="javaVersionGroup">
+                        <label>Minecraft Version:</label>
+                        <select id="javaVersionSelect" class="select-sm" onchange="onJavaVersionSelect()"></select>
+                    </div>
+                    <div class="form-group" id="javaBuildGroup">
+                        <label>Build:</label>
+                        <input type="text" id="javaBuildInput" class="input-sm" value="latest" placeholder="latest">
+                    </div>
+                </div>
+
+                <div class="form-group" id="javaCustomUrlGroup" style="display:none;">
+                    <label>Custom JAR Download URL:</label>
+                    <input type="text" id="javaCustomUrl" class="input-sm" placeholder="https://example.com/forge-server.jar">
+                </div>
+
+                <div class="form-row-2">
+                    <div class="form-group">
+                        <label>Max Heap (-Xmx):</label>
+                        <select id="javaJvmXmx" class="select-sm">
+                            <option value="2G">2 GB RAM</option>
+                            <option value="4G" selected>4 GB RAM (Recommended)</option>
+                            <option value="6G">6 GB RAM</option>
+                            <option value="8G">8 GB RAM</option>
+                            <option value="12G">12 GB RAM</option>
+                            <option value="16G">16 GB RAM</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Min Heap (-Xms):</label>
+                        <select id="javaJvmXms" class="select-sm">
+                            <option value="512M">512 MB</option>
+                            <option value="1G" selected>1 GB</option>
+                            <option value="2G">2 GB</option>
+                            <option value="4G">4 GB</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-top: 10px;">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="javaEulaAgree" checked>
+                        <span>I have read and agree to the <a href="https://aka.ms/MinecraftEULA" target="_blank" style="color:var(--accent);">Minecraft EULA</a></span>
+                    </label>
+                </div>
+
+                <div style="margin-top: 20px;">
+                    <button type="button" class="btn btn-primary" id="btnTriggerJavaInstall" onclick="triggerJavaEngineInstall()" style="width:100%; padding: 12px;">
+                        🚀 Remote Deploy Engine via Nexus CLI
+                    </button>
+                </div>
+            </div>
+
+            <!-- Unified Real-Time Progress Card -->
+            <div class="card" id="updateProgressCard" style="display:none; margin-top:20px;">
+                <div class="card-header">
+                    <div>
+                        <h4 id="updateProgressTitle">Installation in Progress</h4>
+                        <p id="updateProgressSubtitle">Executing engine deployment...</p>
+                    </div>
+                    <span class="badge online" id="updateProgressBadge">0%</span>
+                </div>
+                <div class="progress-bar-wrap" style="height:8px; margin: 12px 0;">
+                    <div class="progress-bar" id="updateProgressBar" style="width: 0%;"></div>
+                </div>
+                <div id="updateProgressSteps" class="steps-tracker">
+                    <span class="step-badge" id="step1">1. Backup</span>
+                    <span class="step-badge" id="step2">2. Download</span>
+                    <span class="step-badge" id="step3">3. Extract</span>
+                    <span class="step-badge" id="step4">4. Configure</span>
+                    <span class="step-badge" id="step5">5. Online</span>
+                </div>
+                <p id="updateProgressMsg" class="prop-desc" style="margin-top: 10px;">Preparing package...</p>
+            </div>
+        </section>
+
+        <!-- TAB 9: SETTINGS -->
         <section id="tabSettings" class="tab-content">
             <div class="card">
                 <div class="card-header">
@@ -452,6 +613,42 @@
         </div>
     </div>
 
-    <script src="/static/js/app.js?v=20261109_02"></script>
+    <!-- Addon / Mod Modal Dialog -->
+    <div id="addonModal" class="modal-overlay" style="display:none;">
+        <div class="modal-card">
+            <h3 id="modalAddonTitle">Add New Modification</h3>
+            <p id="modalAddonDesc">Upload an addon pack or install a mod remotely.</p>
+            
+            <!-- Bedrock Upload View -->
+            <div id="modalBedrockUpload">
+                <div class="form-group">
+                    <label>Select Addon Package (.mcpack, .zip):</label>
+                    <input type="file" id="addonFileInput" accept=".mcpack,.zip" class="input-sm">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeAddonModal()">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="submitAddonUpload()">Upload &amp; Install Pack</button>
+                </div>
+            </div>
+
+            <!-- Java Mod Install View -->
+            <div id="modalJavaInstall" style="display:none;">
+                <div class="form-group">
+                    <label>Mod Download URL (.jar):</label>
+                    <input type="text" id="javaModUrl" class="input-sm" placeholder="https://cdn.modrinth.com/data/.../mod.jar">
+                </div>
+                <div class="form-group">
+                    <label>Custom Filename (optional):</label>
+                    <input type="text" id="javaModFilename" class="input-sm" placeholder="e.g. jei-1.20.1.jar">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeAddonModal()">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="submitJavaModInstall()">Install Mod via Nexus CLI</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/app.js?v=20261109_03"></script>
 </body>
 </html>

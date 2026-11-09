@@ -231,4 +231,113 @@ impl NexusMeshClient {
             node_os: Some(node.os),
         })
     }
+
+    /// Extract structured telemetry for the Bedrock server host from the Nexus Portfolio Admin Backend
+    pub async fn get_bedrock_telemetry(&self) -> Result<crate::models::HardwareTelemetryResponse, String> {
+        let hub_url = self.hub_url.as_ref().ok_or_else(|| "Nexus Hub URL is not configured (NEXUS_HUB_URL unset)".to_string())?;
+        let url = format!("{}/api/fleet/telemetry/bedrock", hub_url.trim_end_matches('/'));
+        let mut req = self.client.get(&url);
+
+        if let Some(pin) = &self.admin_pin {
+            req = req.header("X-Admin-Pin", pin)
+                .header("Authorization", format!("Bearer {}", pin));
+        }
+
+        let res = req.send().await.map_err(|e| format!("Failed to contact Nexus Hub at {}: {}", url, e))?;
+        if !res.status().is_success() {
+            return Err(format!("Nexus Hub returned HTTP status {}", res.status()));
+        }
+
+        let val: serde_json::Value = res.json().await.map_err(|e| format!("Failed to parse Bedrock telemetry: {e}"))?;
+        let cpu_pct = val.get("cpu_pct").and_then(|v| v.as_f64()).unwrap_or(0.0);
+        let cpu_cores = val.get("cpu_cores").and_then(|v| v.as_u64()).unwrap_or(2) as usize;
+        let mem_used_mb = val.get("memory_used_mb").and_then(|v| v.as_u64()).unwrap_or(0);
+        let mem_total_mb = val.get("memory_total_mb").and_then(|v| v.as_u64()).unwrap_or(1024);
+        let mem_pct = val.get("memory_pct").and_then(|v| v.as_f64()).unwrap_or(0.0);
+        let uptime_secs = val.get("uptime_secs").and_then(|v| v.as_u64()).unwrap_or(0);
+        let temp_c = val.get("temp_c").and_then(|v| v.as_f64()).map(|f| f as f32);
+        let hostname = val.get("hostname").and_then(|v| v.as_str()).unwrap_or("prometheus").to_string();
+        let os_label = val.get("os_label").and_then(|v| v.as_str()).unwrap_or("Linux (GCP)").to_string();
+
+        Ok(crate::models::HardwareTelemetryResponse {
+            hostname,
+            os_label,
+            mode: "GCP Native Instance".to_string(),
+            cpu_pct,
+            cpu_cores,
+            memory_used_mb: mem_used_mb,
+            memory_total_mb: mem_total_mb,
+            memory_pct: mem_pct,
+            swap_used_mb: 0,
+            temp_c,
+            uptime_secs,
+            cpu_model: Some("GCP Virtual CPU".to_string()),
+            node_os: Some("linux".to_string()),
+        })
+    }
+
+    /// Query mods installed on the remote Java PC via Nexus Mesh
+    pub async fn get_java_mods(&self) -> Result<Vec<serde_json::Value>, String> {
+        let ack = self.dispatch_action("minecraft_mods_list", vec![]).await?;
+        if let Some(stdout) = ack.stdout {
+            if let Ok(list) = serde_json::from_str::<Vec<serde_json::Value>>(&stdout) {
+                return Ok(list);
+            }
+        }
+        Ok(Vec::new())
+    }
+
+    /// Toggle a Java mod on the remote PC via Nexus Mesh
+    pub async fn toggle_java_mod(&self, mod_name: &str) -> Result<String, String> {
+        let ack = self.dispatch_action("minecraft_mod_toggle", vec![mod_name.to_string()]).await?;
+        if ack.success {
+            Ok(ack.stdout.or(ack.message).unwrap_or_else(|| "Mod toggled successfully".to_string()))
+        } else {
+            Err(ack.stderr.or(ack.message).unwrap_or_else(|| "Failed to toggle mod".to_string()))
+        }
+    }
+
+    /// Delete a Java mod on the remote PC via Nexus Mesh
+    pub async fn delete_java_mod(&self, mod_name: &str) -> Result<String, String> {
+        let ack = self.dispatch_action("minecraft_mod_delete", vec![mod_name.to_string()]).await?;
+        if ack.success {
+            Ok(ack.stdout.or(ack.message).unwrap_or_else(|| "Mod deleted successfully".to_string()))
+        } else {
+            Err(ack.stderr.or(ack.message).unwrap_or_else(|| "Failed to delete mod".to_string()))
+        }
+    }
+
+    /// Install a Java mod from URL on the remote PC via Nexus Mesh
+    pub async fn install_java_mod(&self, url: &str, name: Option<&str>) -> Result<String, String> {
+        let ack = self.dispatch_action("minecraft_mod_install", vec![url.to_string(), name.unwrap_or_default().to_string()]).await?;
+        if ack.success {
+            Ok(ack.stdout.or(ack.message).unwrap_or_else(|| "Mod installed successfully".to_string()))
+        } else {
+            Err(ack.stderr.or(ack.message).unwrap_or_else(|| "Failed to install mod".to_string()))
+        }
+    }
+
+    /// Install or update Java engine flavor on the remote PC via Nexus Mesh
+    pub async fn install_java_flavor(
+        &self,
+        flavor: &str,
+        version: &str,
+        build: Option<&str>,
+        download_url: Option<&str>,
+        jvm_heap: Option<&str>,
+    ) -> Result<String, String> {
+        let args = vec![
+            flavor.to_string(),
+            version.to_string(),
+            build.unwrap_or_default().to_string(),
+            download_url.unwrap_or_default().to_string(),
+            jvm_heap.unwrap_or_default().to_string(),
+        ];
+        let ack = self.dispatch_action("minecraft_install", args).await?;
+        if ack.success {
+            Ok(ack.stdout.or(ack.message).unwrap_or_else(|| "Java engine installed successfully".to_string()))
+        } else {
+            Err(ack.stderr.or(ack.message).unwrap_or_else(|| "Failed to install Java engine".to_string()))
+        }
+    }
 }

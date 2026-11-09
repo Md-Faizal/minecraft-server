@@ -68,7 +68,10 @@ pub async fn api_status(State(mgr): State<Arc<ServerManager>>) -> Json<StatusRes
     let bedrock_running = mgr.is_server_running().await;
     let online_players = mgr.online_players.read().await.iter().cloned().collect();
     let active_world = mgr.get_active_world_name();
-    let hardware = mgr.nexus_mesh.get_active_telemetry().await.ok();
+    let hardware = match mgr.nexus_mesh.get_bedrock_telemetry().await {
+        Ok(h) => Some(h),
+        Err(_) => mgr.nexus_mesh.get_active_telemetry().await.ok(),
+    };
     let chunky_stats = mgr.rcon.get_chunky_progress().await.ok();
 
     Json(StatusResponse {
@@ -81,11 +84,26 @@ pub async fn api_status(State(mgr): State<Arc<ServerManager>>) -> Json<StatusRes
     })
 }
 
-pub async fn api_start(State(mgr): State<Arc<ServerManager>>) -> Json<Value> {
-    if mgr.start_server().await {
-        Json(json!({"result": "starting"}))
-    } else {
-        Json(json!({"result": "already running"}))
+pub async fn api_start(State(mgr): State<Arc<ServerManager>>) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    match mgr.start_server_with_result().await {
+        Ok(()) => Ok(Json(json!({
+            "success": true,
+            "result": "starting",
+            "message": "Bedrock Dedicated Server starting."
+        }))),
+        Err(err) => {
+            let status = if err.contains("already running") {
+                StatusCode::CONFLICT
+            } else {
+                StatusCode::BAD_REQUEST
+            };
+            Err((status, Json(json!({
+                "success": false,
+                "result": "failed",
+                "error": &err,
+                "message": &err
+            }))))
+        }
     }
 }
 
@@ -2527,16 +2545,307 @@ pub async fn api_capabilities(State(mgr): State<Arc<ServerManager>>) -> Json<Cap
     })
 }
 
-pub async fn api_telemetry(State(mgr): State<Arc<ServerManager>>) -> Json<Value> {
-    let hardware = mgr.nexus_mesh.get_active_telemetry().await.ok();
+#[derive(Deserialize, Default)]
+pub struct TelemetryQuery {
+    pub edition: Option<String>,
+}
+
+pub async fn api_telemetry(
+    State(mgr): State<Arc<ServerManager>>,
+    Query(query): Query<TelemetryQuery>,
+) -> Json<Value> {
+    let edition = query.edition.unwrap_or_else(|| "bedrock".to_string()).to_lowercase();
     let chunky = mgr.rcon.get_chunky_progress().await.ok();
     let node = mgr.nexus_mesh.get_active_minecraft_node().await;
 
+    let hardware = if edition == "bedrock" {
+        match mgr.nexus_mesh.get_bedrock_telemetry().await {
+            Ok(h) => Some(h),
+            Err(_) => mgr.nexus_mesh.get_active_telemetry().await.ok(),
+        }
+    } else {
+        mgr.nexus_mesh.get_active_telemetry().await.ok()
+    };
+
+    let (cpu_usage, cpu_cores, mem_used, mem_total, mem_pct, uptime, temp, model, hostname, os_label) = if let Some(ref h) = hardware {
+        (
+            h.cpu_pct,
+            h.cpu_cores,
+            h.memory_used_mb,
+            h.memory_total_mb,
+            h.memory_pct,
+            h.uptime_secs,
+            h.temp_c,
+            h.cpu_model.clone().unwrap_or_else(|| format!("{} Cores", h.cpu_cores)),
+            h.hostname.clone(),
+            h.os_label.clone(),
+        )
+    } else {
+        (0.0, 2, 0, 1024, 0.0, 0, None, "Host CPU".to_string(), "Host".to_string(), "Linux".to_string())
+    };
+
     Json(json!({
+        "edition": edition,
+        "cpu_usage_pct": cpu_usage,
+        "cpu_pct": cpu_usage,
+        "cpu_cores": cpu_cores,
+        "cpu_model": model,
+        "memory_used_mb": mem_used,
+        "memory_total_mb": mem_total,
+        "memory_pct": mem_pct,
+        "uptime_seconds": uptime,
+        "uptime_secs": uptime,
+        "cpu_temp_c": temp,
+        "temp_c": temp,
+        "hostname": hostname,
+        "os_label": os_label,
         "hardware": hardware,
         "chunky": chunky,
         "node": node,
     }))
+}
+
+#[derive(Deserialize)]
+pub struct DeleteAddonPayload {
+    pub folder: String,
+}
+
+pub async fn api_delete_addon(
+    State(mgr): State<Arc<ServerManager>>,
+    Json(payload): Json<DeleteAddonPayload>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    let folder = payload.folder.trim();
+    if folder.is_empty() || folder.contains("..") || folder.contains('/') || folder.contains('\\') {
+        return Err((StatusCode::BAD_REQUEST, Json(json!({"result": "Invalid addon folder name."}))));
+    }
+
+    let b_path = mgr.behavior_packs_dir.join(folder);
+    let r_path = mgr.resource_packs_dir.join(folder);
+
+    let mut removed = false;
+    if b_path.exists() {
+        let _ = fs::remove_dir_all(&b_path);
+        removed = true;
+    }
+    if r_path.exists() {
+        let _ = fs::remove_dir_all(&r_path);
+        removed = true;
+    }
+
+    if removed {
+        Ok(Json(json!({"result": format!("Addon '{}' removed successfully.", folder)})))
+    } else {
+        Err((StatusCode::NOT_FOUND, Json(json!({"result": format!("Addon '{}' not found.", folder)}))))
+    }
+}
+
+pub async fn api_java_mods_get(State(mgr): State<Arc<ServerManager>>) -> Json<Value> {
+    if mgr.nexus_mesh.is_configured() {
+        match mgr.nexus_mesh.get_java_mods().await {
+            Ok(mods) => return Json(json!({ "mods": mods, "source": "remote_nexus" })),
+            Err(e) => return Json(json!({ "mods": [], "error": e, "source": "remote_nexus" })),
+        }
+    }
+    let local_mods_dir = mgr.java_server.server_dir.join("mods");
+    let mut mods = Vec::new();
+    if let Ok(entries) = fs::read_dir(&local_mods_dir) {
+        for entry in entries.flatten() {
+            let fname = entry.file_name().to_string_lossy().to_string();
+            let is_jar = fname.ends_with(".jar");
+            let is_disabled = fname.ends_with(".jar.disabled");
+            if is_jar || is_disabled {
+                let meta = entry.metadata().ok();
+                let size_bytes = meta.as_ref().map(|m| m.len()).unwrap_or(0);
+                let size_formatted = if size_bytes > 1024 * 1024 {
+                    format!("{:.1} MB", size_bytes as f64 / 1_048_576.0)
+                } else {
+                    format!("{:.1} KB", size_bytes as f64 / 1024.0)
+                };
+                let clean_name = if is_disabled {
+                    fname.trim_end_matches(".disabled").trim_end_matches(".jar").to_string()
+                } else {
+                    fname.trim_end_matches(".jar").to_string()
+                };
+                mods.push(json!({
+                    "name": clean_name,
+                    "filename": fname,
+                    "enabled": is_jar,
+                    "size_bytes": size_bytes,
+                    "size_formatted": size_formatted
+                }));
+            }
+        }
+    }
+    Json(json!({ "mods": mods, "source": "local" }))
+}
+
+#[derive(Deserialize)]
+pub struct JavaModActionPayload {
+    pub name: String,
+}
+
+pub async fn api_java_mod_toggle(
+    State(mgr): State<Arc<ServerManager>>,
+    Json(payload): Json<JavaModActionPayload>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    if mgr.nexus_mesh.is_configured() {
+        match mgr.nexus_mesh.toggle_java_mod(&payload.name).await {
+            Ok(msg) => return Ok(Json(json!({ "result": msg, "message": msg }))),
+            Err(e) => return Err((StatusCode::SERVICE_UNAVAILABLE, Json(json!({ "result": e, "error": e })))),
+        }
+    }
+    Err((StatusCode::SERVICE_UNAVAILABLE, Json(json!({ "result": "Remote Nexus Mesh not connected." }))))
+}
+
+pub async fn api_java_mod_delete(
+    State(mgr): State<Arc<ServerManager>>,
+    Json(payload): Json<JavaModActionPayload>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    if mgr.nexus_mesh.is_configured() {
+        match mgr.nexus_mesh.delete_java_mod(&payload.name).await {
+            Ok(msg) => return Ok(Json(json!({ "result": msg, "message": msg }))),
+            Err(e) => return Err((StatusCode::SERVICE_UNAVAILABLE, Json(json!({ "result": e, "error": e })))),
+        }
+    }
+    Err((StatusCode::SERVICE_UNAVAILABLE, Json(json!({ "result": "Remote Nexus Mesh not connected." }))))
+}
+
+#[derive(Deserialize)]
+pub struct JavaModInstallPayload {
+    pub url: String,
+    pub name: Option<String>,
+}
+
+pub async fn api_java_mod_install(
+    State(mgr): State<Arc<ServerManager>>,
+    Json(payload): Json<JavaModInstallPayload>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    if mgr.nexus_mesh.is_configured() {
+        match mgr.nexus_mesh.install_java_mod(&payload.url, payload.name.as_deref()).await {
+            Ok(msg) => return Ok(Json(json!({ "result": msg, "message": msg }))),
+            Err(e) => return Err((StatusCode::SERVICE_UNAVAILABLE, Json(json!({ "result": e, "error": e })))),
+        }
+    }
+    Err((StatusCode::SERVICE_UNAVAILABLE, Json(json!({ "result": "Remote Nexus Mesh not connected." }))))
+}
+
+#[derive(Deserialize)]
+pub struct JavaInstallerPayload {
+    pub flavor: String,
+    pub version: String,
+    pub build: Option<String>,
+    pub download_url: Option<String>,
+    pub jvm_heap: Option<String>,
+    pub eula_accepted: Option<bool>,
+}
+
+pub async fn api_java_installer_install(
+    State(mgr): State<Arc<ServerManager>>,
+    Json(payload): Json<JavaInstallerPayload>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    if payload.eula_accepted != Some(true) {
+        return Err((StatusCode::BAD_REQUEST, Json(json!({"result": "Please accept the Minecraft EULA before proceeding."}))));
+    }
+
+    if mgr.nexus_mesh.is_configured() {
+        match mgr.nexus_mesh.install_java_flavor(
+            &payload.flavor,
+            &payload.version,
+            payload.build.as_deref(),
+            payload.download_url.as_deref(),
+            payload.jvm_heap.as_deref(),
+        ).await {
+            Ok(msg) => return Ok(Json(json!({ "result": msg, "message": msg }))),
+            Err(e) => return Err((StatusCode::SERVICE_UNAVAILABLE, Json(json!({ "result": e, "error": e })))),
+        }
+    }
+
+    Err((StatusCode::SERVICE_UNAVAILABLE, Json(json!({ "result": "Remote Nexus Mesh not connected." }))))
+}
+
+#[derive(Deserialize)]
+pub struct InstallerVersionsQuery {
+    pub edition: Option<String>,
+    pub flavor: Option<String>,
+}
+
+pub async fn api_installer_versions(
+    Query(query): Query<InstallerVersionsQuery>,
+) -> Json<Value> {
+    let edition = query.edition.unwrap_or_else(|| "bedrock".to_string()).to_lowercase();
+    let flavor = query.flavor.unwrap_or_else(|| "paper".to_string()).to_lowercase();
+
+    if edition == "bedrock" {
+        let client = reqwest::Client::builder().timeout(Duration::from_secs(4)).build().unwrap_or_default();
+        let mut stable_ver = "1.21.51.02".to_string();
+        let mut preview_ver = "1.21.60.21".to_string();
+
+        if let Ok(res) = client.get("https://raw.githubusercontent.com/kittizz/bedrock-server-downloads/main/bedrock-server-downloads.json").send().await {
+            if let Ok(data) = res.json::<Value>().await {
+                if let Some(linux) = data.get("linux") {
+                    if let Some(s) = linux.get("stable").and_then(|v| v.get("version")).and_then(|v| v.as_str()) {
+                        stable_ver = s.to_string();
+                    }
+                    if let Some(p) = linux.get("preview").and_then(|v| v.get("version")).and_then(|v| v.as_str()) {
+                        preview_ver = p.to_string();
+                    }
+                }
+            }
+        }
+
+        return Json(json!({
+            "edition": "bedrock",
+            "channels": [
+                { "id": "stable", "name": "Official Stable Release", "version": stable_ver, "recommended": true },
+                { "id": "preview", "name": "Official Preview / Beta", "version": preview_ver, "recommended": false },
+                { "id": "custom", "name": "Custom Download URL", "version": "Custom", "recommended": false }
+            ]
+        }));
+    }
+
+    let client = reqwest::Client::builder().timeout(Duration::from_secs(5)).build().unwrap_or_default();
+    match flavor.as_str() {
+        "paper" => {
+            if let Ok(res) = client.get("https://api.papermc.io/v2/projects/paper").send().await {
+                if let Ok(json) = res.json::<Value>().await {
+                    if let Some(versions) = json.get("versions").and_then(|v| v.as_array()) {
+                        let list: Vec<String> = versions.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).rev().collect();
+                        return Json(json!({ "flavor": "paper", "versions": list }));
+                    }
+                }
+            }
+            Json(json!({ "flavor": "paper", "versions": ["1.21.4", "1.21.3", "1.21.1", "1.20.4", "1.20.2", "1.20.1"] }))
+        }
+        "purpur" => {
+            if let Ok(res) = client.get("https://api.purpurmc.org/v2/purpur").send().await {
+                if let Ok(json) = res.json::<Value>().await {
+                    if let Some(versions) = json.get("versions").and_then(|v| v.as_array()) {
+                        let list: Vec<String> = versions.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).rev().collect();
+                        return Json(json!({ "flavor": "purpur", "versions": list }));
+                    }
+                }
+            }
+            Json(json!({ "flavor": "purpur", "versions": ["1.21.4", "1.21.3", "1.21.1", "1.20.4", "1.20.1"] }))
+        }
+        "vanilla" => {
+            if let Ok(res) = client.get("https://piston-meta.mojang.com/mc/game/version_manifest_v2.json").send().await {
+                if let Ok(json) = res.json::<Value>().await {
+                    if let Some(versions) = json.get("versions").and_then(|v| v.as_array()) {
+                        let list: Vec<String> = versions.iter()
+                            .filter(|v| v.get("type").and_then(|t| t.as_str()) == Some("release"))
+                            .filter_map(|v| v.get("id").and_then(|id| id.as_str().map(|s| s.to_string())))
+                            .take(20)
+                            .collect();
+                        return Json(json!({ "flavor": "vanilla", "versions": list }));
+                    }
+                }
+            }
+            Json(json!({ "flavor": "vanilla", "versions": ["1.21.4", "1.21.3", "1.21.1", "1.20.4", "1.20.1"] }))
+        }
+        _ => {
+            Json(json!({ "flavor": flavor, "versions": ["1.21.4", "1.21.1", "1.20.1"] }))
+        }
+    }
 }
 
 pub async fn download_mods() -> impl IntoResponse {

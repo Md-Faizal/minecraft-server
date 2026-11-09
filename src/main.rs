@@ -108,6 +108,13 @@ async fn main() {
         .route("/api/addons", get(handlers::api_get_addons))
         .route("/api/addons/apply", post(handlers::api_apply_addons))
         .route("/api/addons/upload", post(handlers::api_upload_addon))
+        .route("/api/addons/delete", post(handlers::api_delete_addon))
+        .route("/api/java/mods", get(handlers::api_java_mods_get))
+        .route("/api/java/mods/toggle", post(handlers::api_java_mod_toggle))
+        .route("/api/java/mods/delete", post(handlers::api_java_mod_delete))
+        .route("/api/java/mods/install", post(handlers::api_java_mod_install))
+        .route("/api/java/installer/install", post(handlers::api_java_installer_install))
+        .route("/api/installer/versions", get(handlers::api_installer_versions))
         .route("/api/worlds/upload", post(handlers::api_upload_world))
         .route(
             "/api/properties",
