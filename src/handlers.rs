@@ -187,6 +187,16 @@ pub async fn api_java_status(State(mgr): State<Arc<ServerManager>>) -> Json<Valu
 pub async fn api_java_start(
     State(mgr): State<Arc<ServerManager>>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    if mgr.nexus_mesh.is_configured() {
+        let node = mgr.nexus_mesh.get_active_minecraft_node().await;
+        if node.is_none() {
+            return Err((StatusCode::SERVICE_UNAVAILABLE, Json(json!({"result": "No compatible remote PC is currently online in the Nexus Fleet to control Java."}))));
+        }
+        match mgr.nexus_mesh.dispatch_action("restart_service", vec!["minecraft-server".to_string()]).await {
+            Ok(ack) => return Ok(Json(json!({"result": ack.stdout.or(ack.message).unwrap_or_else(|| "Remote Java server started via Nexus Mesh".to_string())}))),
+            Err(e) => return Err((StatusCode::SERVICE_UNAVAILABLE, Json(json!({"result": format!("Nexus dispatch failed: {e}")})))),
+        }
+    }
     mgr.java_server.start().await.map_err(|error| {
         let status = if error.contains("already running") {
             StatusCode::CONFLICT
@@ -195,25 +205,48 @@ pub async fn api_java_start(
         };
         (status, Json(json!({"result": error})))
     })?;
-    Ok(Json(json!({"result": "Paper is starting."})))
+    Ok(Json(json!({"result": "Java server is starting."})))
 }
 
 pub async fn api_java_stop(
     State(mgr): State<Arc<ServerManager>>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    if mgr.nexus_mesh.is_configured() {
+        let node = mgr.nexus_mesh.get_active_minecraft_node().await;
+        if node.is_none() {
+            return Err((StatusCode::SERVICE_UNAVAILABLE, Json(json!({"result": "No compatible remote PC is currently online in the Nexus Fleet to control Java."}))));
+        }
+        if mgr.rcon.is_configured() {
+            let _ = mgr.rcon.execute("stop").await;
+        }
+        match mgr.nexus_mesh.dispatch_action("minecraft_command", vec!["stop".to_string()]).await {
+            Ok(ack) => return Ok(Json(json!({"result": ack.stdout.or(ack.message).unwrap_or_else(|| "Remote Java server stopped via Nexus Mesh".to_string())}))),
+            Err(e) => return Err((StatusCode::SERVICE_UNAVAILABLE, Json(json!({"result": format!("Nexus dispatch failed: {e}")})))),
+        }
+    }
     mgr.java_server.stop().await.map_err(|error| {
         (StatusCode::CONFLICT, Json(json!({"result": error})))
     })?;
-    Ok(Json(json!({"result": "Paper stopped."})))
+    Ok(Json(json!({"result": "Java server stopped."})))
 }
 
 pub async fn api_java_restart(
     State(mgr): State<Arc<ServerManager>>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    if mgr.nexus_mesh.is_configured() {
+        let node = mgr.nexus_mesh.get_active_minecraft_node().await;
+        if node.is_none() {
+            return Err((StatusCode::SERVICE_UNAVAILABLE, Json(json!({"result": "No compatible remote PC is currently online in the Nexus Fleet to control Java."}))));
+        }
+        match mgr.nexus_mesh.dispatch_action("restart_service", vec!["minecraft-server".to_string()]).await {
+            Ok(ack) => return Ok(Json(json!({"result": ack.stdout.or(ack.message).unwrap_or_else(|| "Remote Java server restarted via Nexus Mesh".to_string())}))),
+            Err(e) => return Err((StatusCode::SERVICE_UNAVAILABLE, Json(json!({"result": format!("Nexus dispatch failed: {e}")})))),
+        }
+    }
     mgr.java_server.restart().await.map_err(|error| {
         (StatusCode::SERVICE_UNAVAILABLE, Json(json!({"result": error})))
     })?;
-    Ok(Json(json!({"result": "Paper restarted."})))
+    Ok(Json(json!({"result": "Java server restarted."})))
 }
 
 pub async fn api_java_command(
@@ -2447,6 +2480,8 @@ pub async fn api_capabilities(State(mgr): State<Arc<ServerManager>>) -> Json<Cap
     let rcon_alive = mgr.rcon.get_players().await.is_ok() || mgr.rcon.get_chunky_progress().await.is_ok();
     let active_node = mgr.nexus_mesh.get_active_minecraft_node().await;
     let java_running = rcon_alive || active_node.is_some() || mgr.java_server.is_running().await;
+    let java_node_available = (active_node.as_ref().map(|n| n.status == "online").unwrap_or(false)) || rcon_alive;
+    let java_node_os = active_node.as_ref().map(|n| n.os.to_lowercase());
 
     let mut editions = Vec::new();
     if bedrock_avail || !mgr.nexus_mesh.is_configured() {
@@ -2477,6 +2512,9 @@ pub async fn api_capabilities(State(mgr): State<Arc<ServerManager>>) -> Json<Cap
         bedrock_running,
         java_remote: true,
         java_running,
+        java_node_available,
+        java_node_os,
+        java_node_hostname: node_hostname.clone(),
         nexus_configured: mgr.nexus_mesh.is_configured(),
         rcon_configured: mgr.rcon.is_configured(),
         node_id,

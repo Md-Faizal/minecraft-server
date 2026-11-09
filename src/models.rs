@@ -34,6 +34,8 @@ pub struct HardwareTelemetryResponse {
     pub uptime_secs: u64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cpu_model: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub node_os: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -67,6 +69,9 @@ pub struct CapabilitiesResponse {
     pub bedrock_running: bool,
     pub java_remote: bool,
     pub java_running: bool,
+    pub java_node_available: bool,
+    pub java_node_os: Option<String>,
+    pub java_node_hostname: Option<String>,
     pub nexus_configured: bool,
     pub rcon_configured: bool,
     pub node_id: Option<String>,

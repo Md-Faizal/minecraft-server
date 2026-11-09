@@ -4,7 +4,8 @@
  */
 
 // Global Application State
-let activeEdition = localStorage.getItem('mc_edition') || 'java';
+let activeEdition = localStorage.getItem('mc_edition') || 'bedrock';
+if (activeEdition !== 'bedrock' && activeEdition !== 'java') activeEdition = 'bedrock';
 let activeTab = 'home';
 let capabilities = null;
 let isAuthenticated = false;
@@ -180,32 +181,88 @@ function lockConsole() {
    2. EDITION & TAB CONTROLS
    ========================================================================= */
 function setEdition(edition, save = true) {
+    if (edition !== 'bedrock' && edition !== 'java') {
+        edition = 'bedrock';
+    }
     activeEdition = edition;
     if (save) localStorage.setItem('mc_edition', edition);
 
-    ['btnEditionBedrock', 'btnEditionJava', 'btnEditionAll'].forEach(id => {
-        document.getElementById(id)?.classList.remove('active');
-    });
+    const btnBedrock = document.getElementById('btnEditionBedrock');
+    const btnJava = document.getElementById('btnEditionJava');
+    if (btnBedrock) btnBedrock.classList.toggle('active', edition === 'bedrock');
+    if (btnJava) btnJava.classList.toggle('active', edition === 'java');
 
     const cardJava = document.getElementById('cardJava');
     const cardBedrock = document.getElementById('cardBedrock');
     const tag = document.getElementById('consoleTargetTag');
 
     if (edition === 'bedrock') {
-        document.getElementById('btnEditionBedrock')?.classList.add('active');
         if (cardJava) cardJava.style.display = 'none';
         if (cardBedrock) cardBedrock.style.display = 'block';
         if (tag) tag.textContent = 'Target: Bedrock Dedicated Server';
-    } else if (edition === 'java') {
-        document.getElementById('btnEditionJava')?.classList.add('active');
+    } else {
         if (cardJava) cardJava.style.display = 'block';
         if (cardBedrock) cardBedrock.style.display = 'none';
         if (tag) tag.textContent = 'Target: Java Edition (RCON / Nexus Tunnel)';
+    }
+
+    updateHostModeVisibility();
+    updateJavaControls();
+
+    if (activeTab === 'properties') {
+        loadProperties();
+    } else if (activeTab === 'worlds') {
+        loadWorlds();
+    }
+}
+
+function updateHostModeVisibility() {
+    const hostModeBox = document.getElementById('hudModeContainer');
+    if (!hostModeBox) return;
+
+    // Remote Host Mode is strictly scoped to Java on remote Linux PCs running via Nexus services
+    const isJava = activeEdition === 'java';
+    const isLinux = capabilities && capabilities.java_node_os && capabilities.java_node_os.toLowerCase().includes('linux');
+    const isNodeReady = capabilities && capabilities.java_node_available;
+
+    if (isJava && isLinux && isNodeReady) {
+        hostModeBox.style.display = 'flex';
     } else {
-        document.getElementById('btnEditionAll')?.classList.add('active');
-        if (cardJava) cardJava.style.display = 'block';
-        if (cardBedrock) cardBedrock.style.display = 'block';
-        if (tag) tag.textContent = 'Target: Dual Fleet (Java & Bedrock)';
+        hostModeBox.style.display = 'none';
+    }
+}
+
+function updateJavaControls() {
+    const notice = document.getElementById('javaNoNodeNotice');
+    const btnStart = document.getElementById('btnJavaStart');
+    const btnStop = document.getElementById('btnJavaStop');
+
+    const nodeAvailable = capabilities && capabilities.java_node_available;
+
+    if (!nodeAvailable) {
+        if (notice) notice.style.display = 'flex';
+        if (btnStart) {
+            btnStart.disabled = true;
+            btnStart.style.opacity = '0.5';
+            btnStart.title = 'No compatible remote PC is online in Nexus network';
+        }
+        if (btnStop) {
+            btnStop.disabled = true;
+            btnStop.style.opacity = '0.5';
+            btnStop.title = 'No compatible remote PC is online in Nexus network';
+        }
+    } else {
+        if (notice) notice.style.display = 'none';
+        if (btnStart) {
+            btnStart.disabled = false;
+            btnStart.style.opacity = '1';
+            btnStart.title = '';
+        }
+        if (btnStop) {
+            btnStop.disabled = false;
+            btnStop.style.opacity = '1';
+            btnStop.title = '';
+        }
     }
 }
 
@@ -317,6 +374,9 @@ async function fetchTelemetry() {
         }
         document.getElementById('btnModeGame')?.classList.toggle('active', isGameMode);
         document.getElementById('btnModeDesktop')?.classList.toggle('active', !isGameMode);
+
+        updateHostModeVisibility();
+        updateJavaControls();
 
         // Active node tag in navbar
         const nodeBadge = document.getElementById('activeNodeBadge');
@@ -519,6 +579,11 @@ async function sendConsoleCommand(e) {
     const cmd = input.value.trim();
     if (!cmd) return;
 
+    if (activeEdition === 'java' && capabilities && !capabilities.java_node_available) {
+        alert('Cannot send command: No compatible remote PC is currently online in the Nexus Fleet.');
+        return;
+    }
+
     // Save history
     commandHistory.push(cmd);
     if (commandHistory.length > 50) commandHistory.shift();
@@ -633,13 +698,24 @@ async function controlChunky(action) {
 async function loadProperties() {
     const container = document.getElementById('propertiesList');
     if (!container) return;
+    const ep = activeEdition === 'java' ? '/api/java/properties' : '/api/properties';
     try {
-        const res = await fetch('/api/properties');
-        if (!res.ok) throw new Error('Failed to load properties');
-        propertiesData = await res.json();
+        const res = await fetch(ep);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const json = await res.json();
+        if (Array.isArray(json)) {
+            propertiesData = json;
+        } else if (typeof json === 'object') {
+            propertiesData = Object.entries(json).map(([k, v]) => ({
+                key: k,
+                value: String(v),
+                known: true,
+                category: 'gameplay'
+            }));
+        }
         renderPropertiesList();
     } catch (err) {
-        container.innerHTML = `<div class="console-line error">Could not load properties: ${err}</div>`;
+        container.innerHTML = `<div class="console-line error">Could not load ${activeEdition} properties: ${err}</div>`;
     }
 }
 
@@ -701,17 +777,18 @@ async function saveProperties() {
         if (k) updateObj[k] = input.value.trim();
     });
 
+    const ep = activeEdition === 'java' ? '/api/java/properties' : '/api/properties';
     try {
-        const res = await fetch('/api/properties', {
+        const res = await fetch(ep, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(updateObj)
         });
         const data = await res.json();
-        alert(data.message || 'Properties saved successfully. Restart the server to apply changes.');
+        alert(data.message || `${activeEdition.toUpperCase()} properties saved successfully. Restart the server to apply changes.`);
         loadProperties();
     } catch (err) {
-        alert('Failed to save properties.');
+        alert(`Failed to save ${activeEdition} properties.`);
     }
 }
 

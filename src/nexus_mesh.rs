@@ -217,7 +217,7 @@ impl NexusMeshClient {
 
         Ok(crate::models::HardwareTelemetryResponse {
             hostname: node.hostname,
-            os_label: tele.os_label.unwrap_or(node.os),
+            os_label: tele.os_label.unwrap_or_else(|| node.os.clone()),
             mode,
             cpu_pct: cpu.usage_pct,
             cpu_cores: cpu.logical_cores,
@@ -228,6 +228,7 @@ impl NexusMeshClient {
             temp_c: therm.cpu_temp_c,
             uptime_secs: tele.uptime_secs.unwrap_or(0),
             cpu_model: cpu.model,
+            node_os: Some(node.os),
         })
     }
 }

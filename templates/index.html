@@ -54,9 +54,6 @@
             <button type="button" class="edition-btn active" id="btnEditionJava" onclick="setEdition('java')">
                 <span class="edition-icon">☕</span> Java Edition
             </button>
-            <button type="button" class="edition-btn" id="btnEditionAll" onclick="setEdition('all')">
-                <span class="edition-icon">⚡</span> Dual Fleet
-            </button>
         </div>
 
         <!-- Header Actions -->
@@ -98,7 +95,7 @@
                 <div class="hud-sub" id="hudHostStatus">Active Host</div>
             </div>
 
-            <div class="hud-item hud-mode">
+            <div class="hud-item hud-mode" id="hudModeContainer" style="display:none;">
                 <div class="hud-label">REMOTE HOST MODE</div>
                 <div class="hud-value" id="hudModeName">Desktop GUI</div>
                 <div class="hud-mode-actions">
@@ -162,6 +159,15 @@
                         <div class="metric-row">
                             <span class="metric-label">Tunnel Route:</span>
                             <span class="metric-val" id="javaRoute">RCON / Nexus Mesh</span>
+                        </div>
+
+                        <!-- Notice displayed when no compatible PC is online in Nexus Fleet -->
+                        <div id="javaNoNodeNotice" class="node-offline-notice" style="display:none;">
+                            <span class="notice-icon">⚠️</span>
+                            <div class="notice-text">
+                                <strong>No Remote PC Online in Nexus Network</strong>
+                                <p>Java server controls require an active workstation running the Nexus agent. Launch the Nexus agent on your PC to enable Java controls.</p>
+                            </div>
                         </div>
 
                         <!-- Chunky Pre-generation Section (appears when active) -->
